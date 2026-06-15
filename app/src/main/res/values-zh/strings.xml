@@ -1,0 +1,97 @@
+<resources>
+    <string name="app_name">干净恢复</string>
+    <string name="app_subtitle">恢复本机仍可访问的图片、视频、音频和文档。</string>
+    <string name="storage_access_required">扫描前需要先授予存储访问权限。</string>
+    <string name="storage_access_granted">已获得存储访问权限。</string>
+    <string name="storage_access_missing">尚未获得存储访问权限。</string>
+    <string name="ready_status">准备就绪。请先授权存储访问，再选择文件类型扫描。</string>
+    <string name="junk_ready_status">准备就绪。请先授权存储访问，再扫描垃圾文件。</string>
+    <string name="scan_status">正在扫描%1$s&#8230;</string>
+    <string name="progress_status">已扫描 %1$d 个，找到 %2$d 个\n%3$s</string>
+    <string name="done_status">扫描完成。已扫描 %1$d 个，找到 %2$d 个。</string>
+    <string name="junk_scan_status">正在扫描垃圾文件&#8230;</string>
+    <string name="junk_progress_status">已扫描：%1$d | 垃圾项：%2$d\n%3$s</string>
+    <string name="junk_done_status">垃圾扫描完成。已扫描 %1$d 个，找到 %2$d 个，共 %3$s。</string>
+    <string name="junk_delete_progress_status">已删除 %1$d 个，失败 %2$d 个，释放 %3$s。</string>
+    <string name="junk_delete_done_status">清理完成。已删除 %1$d 个，失败 %2$d 个，释放 %3$s。</string>
+    <string name="recover_progress_status">已恢复 %1$d 个，失败 %2$d 个。</string>
+    <string name="recover_done_status">恢复完成。成功 %1$d 个，失败 %2$d 个。%3$s</string>
+    <string name="last_output">最后输出位置：%1$s</string>
+    <string name="stopping">正在停止&#8230;</string>
+    <string name="no_files_selected">还没有选择文件。</string>
+    <string name="button_grant_access">授权存储访问</string>
+    <string name="button_select_all">全选</string>
+    <string name="button_clear">清空</string>
+    <string name="button_stop">停止</string>
+    <string name="button_recover">恢复选中文件</string>
+    <string name="button_delete_junk">删除选中垃圾</string>
+    <string name="button_scan_junk">扫描垃圾</string>
+    <string name="results_title">扫描结果</string>
+    <string name="output_hint">文件会保存到公开目录的 DataRecovery 文件夹。</string>
+    <string name="permission_title">存储权限</string>
+    <string name="permission_detail">Android 11 及以上需要“所有文件访问权限”才能完整递归扫描。</string>
+    <string name="filter_all">全部</string>
+    <string name="filter_existing">已存在</string>
+    <string name="filter_deleted">疑似已删除</string>
+    <string name="mode_recovery">恢复</string>
+    <string name="mode_cleaner">清理</string>
+    <string name="junk_filter_safe">安全</string>
+    <string name="junk_filter_review">需确认</string>
+    <string name="status_existing">已存在</string>
+    <string name="status_deleted">疑似已删除</string>
+    <string name="preview_close">关闭</string>
+    <string name="preview_missing">文件不存在或无法读取。</string>
+    <string name="preview_playback_error">此文件无法在当前设备上播放。</string>
+    <string name="preview_loading">正在加载预览&#8230;</string>
+    <string name="preview_play">播放</string>
+    <string name="preview_pause">暂停</string>
+    <string name="preview_playing">正在播放</string>
+    <string name="preview_paused">已暂停</string>
+    <string name="preview_audio_ready">音频预览已准备好。</string>
+    <string name="preview_document_message">暂不内置文档预览。恢复前可先查看下方路径和文件信息。</string>
+    <string name="type_images">图片</string>
+    <string name="type_videos">视频</string>
+    <string name="type_audio">音频</string>
+    <string name="type_documents">文档</string>
+    <string name="junk_risk_safe">安全</string>
+    <string name="junk_risk_review">需确认</string>
+    <string name="junk_risk_high">高风险</string>
+    <string name="junk_type_logs">日志</string>
+    <string name="junk_type_temp">临时文件</string>
+    <string name="junk_type_thumbnails">缩略图</string>
+    <string name="junk_type_app_cache">APP缓存</string>
+    <string name="junk_type_ad_analytics">广告/统计</string>
+    <string name="junk_type_apk">安装包</string>
+    <string name="junk_type_empty">空项目</string>
+    <string name="junk_type_residue">卸载残留</string>
+    <string name="junk_type_recycle_bin">回收站</string>
+    <string name="junk_type_app_media">APP媒体缓存</string>
+    <string name="junk_reason_empty_file">零字节文件，通常可以安全删除。</string>
+    <string name="junk_reason_empty_folder">位于受保护媒体目录和 Android 基础目录之外的空文件夹。</string>
+    <string name="junk_reason_apk">共享存储里的安装包。删除前建议确认。</string>
+    <string name="junk_reason_logs">日志、崩溃记录、错误报告或诊断文件。</string>
+    <string name="junk_reason_temp">临时文件或临时目录内容。</string>
+    <string name="junk_reason_thumbnails">缩略图缓存，通常可由系统或 APP 重新生成。</string>
+    <string name="junk_reason_ad_analytics">广告、统计、指标或 SDK 缓存。</string>
+    <string name="junk_reason_app_cache">公开 APP 缓存、WebView 缓存、GPU 缓存或离线缓存。</string>
+    <string name="junk_reason_recycle_bin">回收站或垃圾箱内容。删除前请仔细确认。</string>
+    <string name="junk_reason_app_media">聊天或社交 APP 的媒体缓存，可能包含仍需要的文件。</string>
+    <string name="junk_reason_lost_dir">LOST.DIR 中的孤立存储内容，删除前建议确认。</string>
+    <string name="junk_reason_uninstalled_residue">目录属于当前未安装的应用包。</string>
+
+    <plurals name="recovering_status">
+        <item quantity="other">正在恢复 %1$d 个文件&#8230;</item>
+    </plurals>
+    <plurals name="deleting_junk_status">
+        <item quantity="other">正在删除 %1$d 个垃圾项&#8230;</item>
+    </plurals>
+    <plurals name="results_count">
+        <item quantity="other">%1$d 个文件</item>
+    </plurals>
+    <plurals name="selected_count">
+        <item quantity="other">已选择 %1$d 个</item>
+    </plurals>
+    <plurals name="junk_results_count">
+        <item quantity="other">%1$d 项 | %2$s</item>
+    </plurals>
+</resources>

@@ -1,0 +1,23 @@
+# Gradle
+.gradle/
+build/
+**/build/
+
+# Local SDK and machine-specific config
+local.properties
+_android_sdk/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Build outputs
+dist/
+*.apk
+*.ap_
+*.aab
+
+# OS
+.DS_Store
+Thumbs.db
