@@ -27,7 +27,7 @@ public final class RecoveryCopier {
             throw new IOException("Cannot create output directory: " + outputDirectory.getAbsolutePath());
         }
 
-        File destination = uniqueDestination(outputDirectory, item.name);
+        File destination = uniqueDestination(outputDirectory, item);
         copySource(context, item, destination);
         context.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(destination)));
         return destination;
@@ -111,8 +111,8 @@ public final class RecoveryCopier {
         }
     }
 
-    static File uniqueDestination(File directory, String originalName) {
-        String safeName = originalName == null || originalName.trim().isEmpty() ? "recovered_file" : originalName;
+    static File uniqueDestination(File directory, RecoveryItem item) {
+        String safeName = buildRecoveryName(item);
         String baseName = stripExtension(safeName);
         String extension = extensionWithDot(safeName);
         File candidate = new File(directory, "Recovered_" + safeName);
@@ -122,6 +122,28 @@ public final class RecoveryCopier {
             counter++;
         }
         return candidate;
+    }
+
+    static String buildRecoveryName(RecoveryItem item) {
+        String name = item.name;
+        if (name == null || name.trim().isEmpty()) {
+            name = "recovered_file";
+        }
+        if (name.contains(".") && name.lastIndexOf('.') < name.length() - 1) {
+            return name;
+        }
+        // Name has no extension — infer from item type
+        String ext = extensionForType(item.type);
+        if (ext.isEmpty()) return name;
+        return name + "." + ext;
+    }
+
+    static String extensionForType(RecoveryType type) {
+        if (type == RecoveryType.IMAGE) return "jpg";
+        if (type == RecoveryType.VIDEO) return "mp4";
+        if (type == RecoveryType.AUDIO) return "mp3";
+        if (type == RecoveryType.DOCUMENT) return "pdf";
+        return "";
     }
 
     private static String stripExtension(String name) {
