@@ -20,10 +20,11 @@ public final class AlgorithmRegistryTest {
         assertNotNull(AlgorithmRegistry.byId(LostDirOrphanSnifferAlgorithm.ID));
         assertNotNull(AlgorithmRegistry.byId(SystemTrashScannerAlgorithm.ID));
         assertNotNull(AlgorithmRegistry.byId(WechatDirectoryScannerAlgorithm.ID));
+        assertNotNull(AlgorithmRegistry.byId(DeepValidationAlgorithm.ID));
         assertNotNull(AlgorithmRegistry.byId(LogEvidenceImportAlgorithm.ID));
         assertNotNull(AlgorithmRegistry.byId(OfflineF2fsImageAlgorithm.ID));
         assertNotNull(AlgorithmRegistry.byId(OfflineExt4JournalAlgorithm.ID));
-        assertEquals(11, AlgorithmRegistry.catalog().size());
+        assertEquals(12, AlgorithmRegistry.catalog().size());
     }
 
     @Test

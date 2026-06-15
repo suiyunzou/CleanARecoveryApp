@@ -110,7 +110,7 @@ public final class ScanDiagnostics {
         safeLog(Log.INFO, message, null);
     }
 
-    private static void debug(String message) {
+    public static void debug(String message) {
         safeLog(Log.DEBUG, message, null);
     }
 

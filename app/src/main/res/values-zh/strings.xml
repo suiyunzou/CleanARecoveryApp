@@ -36,6 +36,8 @@
     <string name="alg_log_evidence_import">日志证据导入</string>
     <string name="alg_offline_f2fs_image">离线 F2FS 镜像</string>
     <string name="alg_offline_ext4_journal">离线 ext4 日志</string>
+    <string name="alg_ffmpeg_deep_validation">FFmpeg 深度验证</string>
+    <string name="alg_ffmpeg_libs_missing">此设备缺少 FFmpeg 原生库。</string>
     <string name="alg_reason_log_evidence_only">仅查找路径/URI 线索；不恢复字节。</string>
     <string name="alg_reason_offline_requires_image">需要导入磁盘镜像或 root/离线流程。</string>
     <string name="scan_phase_type">正在扫描%1$s（第 %2$d/%3$d 项）&#8230;</string>

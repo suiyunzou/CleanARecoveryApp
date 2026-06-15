@@ -19,6 +19,7 @@ public final class AlgorithmRegistry {
             new LostDirOrphanSnifferAlgorithm(),
             new SystemTrashScannerAlgorithm(),
             new WechatDirectoryScannerAlgorithm(),
+            new DeepValidationAlgorithm(),
             new LogEvidenceImportAlgorithm(),
             new OfflineF2fsImageAlgorithm(),
             new OfflineExt4JournalAlgorithm()
@@ -60,6 +61,10 @@ public final class AlgorithmRegistry {
                 || LogEvidenceImportAlgorithm.ID.equals(id)
                 || OfflineF2fsImageAlgorithm.ID.equals(id)
                 || OfflineExt4JournalAlgorithm.ID.equals(id)) {
+            return false;
+        }
+        // FFmpeg deep validation is expensive — experimental only
+        if (DeepValidationAlgorithm.ID.equals(id) && mode != ScanMode.EXPERIMENTAL_ALL) {
             return false;
         }
         if (mode == ScanMode.DEFAULT) {

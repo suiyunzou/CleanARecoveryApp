@@ -36,6 +36,8 @@
     <string name="alg_log_evidence_import">Log evidence import</string>
     <string name="alg_offline_f2fs_image">Offline F2FS image</string>
     <string name="alg_offline_ext4_journal">Offline ext4 journal</string>
+    <string name="alg_ffmpeg_deep_validation">FFmpeg deep validation</string>
+    <string name="alg_ffmpeg_libs_missing">FFmpeg native libraries not found on this device.</string>
     <string name="alg_reason_log_evidence_only">Finds path/URI clues only; does not recover bytes.</string>
     <string name="alg_reason_offline_requires_image">Requires imported disk image or root/offline workflow.</string>
     <string name="scan_phase_type">Scanning %1$s (%2$d of %3$d)&#8230;</string>
