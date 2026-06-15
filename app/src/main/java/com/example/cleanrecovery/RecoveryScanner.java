@@ -12,11 +12,26 @@ import java.util.Locale;
 import java.util.Set;
 
 public final class RecoveryScanner {
+    private static final int PROGRESS_INTERVAL = 25;
+    private static final int PREPARE_PROGRESS_INTERVAL = 100;
+
     public interface Callback {
         boolean isCancelled();
+
         void onProgress(int scannedCount, int foundCount, String currentPath);
+
         void onItemFound(RecoveryItem item);
+
         void onDone(int scannedCount, int foundCount);
+
+        void onError(File file, Exception exception);
+    }
+
+    public interface PrepareCallback {
+        boolean isCancelled();
+
+        void onPrepareProgress(int countedSoFar, String currentPath);
+
         void onError(File file, Exception exception);
     }
 
@@ -33,19 +48,50 @@ public final class RecoveryScanner {
     private final Set<String> visitedDirectories = new HashSet<>();
     private int scannedCount;
     private int foundCount;
+    private int preparedCount;
+
+    public int countEntries(PrepareCallback callback) {
+        preparedCount = 0;
+        visitedDirectories.clear();
+        countDirectory(Environment.getExternalStorageDirectory(), callback);
+        return preparedCount;
+    }
 
     public void scan(RecoveryType type, Callback callback) {
         scannedCount = 0;
         foundCount = 0;
         visitedDirectories.clear();
-
         scanDirectory(Environment.getExternalStorageDirectory(), type, callback);
+        callback.onDone(scannedCount, foundCount);
+    }
 
-        if (type == RecoveryType.IMAGE && !callback.isCancelled()) {
-            scanDirectory(Environment.getRootDirectory(), type, callback);
+    private void countDirectory(File directory, PrepareCallback callback) {
+        if (callback.isCancelled() || directory == null || !directory.exists() || !directory.canRead()) {
+            return;
         }
 
-        callback.onDone(scannedCount, foundCount);
+        String canonicalPath = canonicalPathOf(directory);
+        if (!visitedDirectories.add(canonicalPath)) {
+            return;
+        }
+
+        File[] children = listChildren(directory, callback);
+        if (children == null) {
+            return;
+        }
+
+        for (File child : children) {
+            if (callback.isCancelled()) {
+                return;
+            }
+            preparedCount++;
+            if (preparedCount % PREPARE_PROGRESS_INTERVAL == 0) {
+                callback.onPrepareProgress(preparedCount, child.getAbsolutePath());
+            }
+            if (child.isDirectory() && !isOutputDirectory(child)) {
+                countDirectory(child, callback);
+            }
+        }
     }
 
     private void scanDirectory(File directory, RecoveryType type, Callback callback) {
@@ -53,23 +99,12 @@ public final class RecoveryScanner {
             return;
         }
 
-        String canonicalPath;
-        try {
-            canonicalPath = directory.getCanonicalPath();
-        } catch (IOException exception) {
-            canonicalPath = directory.getAbsolutePath();
-        }
+        String canonicalPath = canonicalPathOf(directory);
         if (!visitedDirectories.add(canonicalPath)) {
             return;
         }
 
-        File[] children;
-        try {
-            children = directory.listFiles();
-        } catch (SecurityException exception) {
-            callback.onError(directory, exception);
-            return;
-        }
+        File[] children = listChildren(directory, callback);
         if (children == null) {
             return;
         }
@@ -79,7 +114,7 @@ public final class RecoveryScanner {
                 return;
             }
             scannedCount++;
-            if (scannedCount % 25 == 0) {
+            if (scannedCount % PROGRESS_INTERVAL == 0) {
                 callback.onProgress(scannedCount, foundCount, child.getAbsolutePath());
             }
 
@@ -94,6 +129,32 @@ public final class RecoveryScanner {
                     callback.onItemFound(item);
                 }
             }
+        }
+    }
+
+    private static String canonicalPathOf(File directory) {
+        try {
+            return directory.getCanonicalPath();
+        } catch (IOException exception) {
+            return directory.getAbsolutePath();
+        }
+    }
+
+    private static File[] listChildren(File directory, PrepareCallback callback) {
+        try {
+            return directory.listFiles();
+        } catch (SecurityException exception) {
+            callback.onError(directory, exception);
+            return null;
+        }
+    }
+
+    private static File[] listChildren(File directory, Callback callback) {
+        try {
+            return directory.listFiles();
+        } catch (SecurityException exception) {
+            callback.onError(directory, exception);
+            return null;
         }
     }
 
@@ -147,33 +208,42 @@ public final class RecoveryScanner {
                 file.lastModified(),
                 width,
                 height,
-                isSuspectedDeleted(file, extension)
+                isSuspectedDeleted(file, extension),
+                RecoverySourceKind.VISIBLE_SHARED_FILE
         );
     }
 
-    private static boolean isSuspectedDeleted(File file, String extension) {
-        String path = file.getAbsolutePath().replace('\\', '/').toLowerCase(Locale.US);
-        String name = file.getName().toLowerCase(Locale.US);
+    static boolean isSuspectedDeletedPath(String path, String name, String extension) {
+        String normalizedPath = path.replace('\\', '/').toLowerCase(Locale.US);
+        String normalizedName = name.toLowerCase(Locale.US);
         return "thumbnails".equals(extension)
-                || name.startsWith(".")
-                || path.contains("/.thumbnails/")
-                || path.contains("/thumbnail")
-                || path.contains("/thumbnails/")
-                || path.contains("/cache/")
-                || path.contains("/cached/")
-                || path.contains("/tmp/")
-                || path.contains("/temp/")
-                || path.contains("/trash/")
-                || path.contains("/recycle")
-                || path.contains("/recycler/")
-                || path.contains("/lost.dir/")
-                || path.contains("/lost+found/")
-                || path.contains("/android/data/")
-                || path.contains("/android/media/");
+                || normalizedName.startsWith(".")
+                || normalizedPath.contains("/.thumbnails/")
+                || normalizedPath.contains("/thumbnail")
+                || normalizedPath.contains("/thumbnails/")
+                || normalizedPath.contains("/cache/")
+                || normalizedPath.contains("/cached/")
+                || normalizedPath.contains("/tmp/")
+                || normalizedPath.contains("/temp/")
+                || normalizedPath.contains("/trash/")
+                || normalizedPath.contains("/recycle")
+                || normalizedPath.contains("/recycler/")
+                || normalizedPath.contains("/lost.dir/")
+                || normalizedPath.contains("/lost+found/")
+                || normalizedPath.contains("/android/data/")
+                || normalizedPath.contains("/android/media/");
+    }
+
+    private static boolean isSuspectedDeleted(File file, String extension) {
+        return isSuspectedDeletedPath(file.getAbsolutePath(), file.getName(), extension);
+    }
+
+    static boolean isOutputDirectoryName(String directoryName) {
+        return "DataRecovery".equalsIgnoreCase(directoryName);
     }
 
     private static boolean isOutputDirectory(File directory) {
-        return "DataRecovery".equalsIgnoreCase(directory.getName());
+        return isOutputDirectoryName(directory.getName());
     }
 
     private static String extensionOf(File file) {

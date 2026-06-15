@@ -1,0 +1,4 @@
+groundTruthId,originalPath,sha256,perceptualHash,expectsExact,allowsDerivative
+gt-photo-1,/storage/emulated/0/DCIM/deleted/photo1.jpg,abc1111111111111111111111111111111111111111111111111111111111,,true,false
+gt-photo-2,/storage/emulated/0/DCIM/deleted/photo2.jpg,abc2222222222222222222222222222222222222222222222222222222222,,true,false
+gt-thumb-1,/storage/emulated/0/DCIM/deleted/photo1_thumb.jpg,different-sha-thumb,phash-thumb-1,false,true

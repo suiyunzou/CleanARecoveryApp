@@ -1,0 +1,17 @@
+{
+  "candidateCount": 2,
+  "exactMatchCount": 1,
+  "derivativeMatchCount": 0,
+  "falsePositiveCount": 1,
+  "duplicateCount": 0,
+  "metadataOnlyCount": 0,
+  "exactRecall": 0.333333,
+  "derivativeRecall": 0.000000,
+  "precision": 0.500000,
+  "falsePositiveRate": 0.500000,
+  "duplicateRate": 0.000000,
+  "runtimeMs": 120,
+  "peakMemoryBytes": 0,
+  "bytesRead": 12,
+  "bytesWritten": 0
+}

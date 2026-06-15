@@ -1,0 +1,11 @@
+{
+  "commit": "simulated-local",
+  "device": "offline-workstation",
+  "android": "13",
+  "oem": "synthetic",
+  "filesystem": "simulated",
+  "permission_state": "granted",
+  "dataset_version": "fake-corpus-v1",
+  "algorithm_config": "008h-log-evidence",
+  "simulated": true
+}

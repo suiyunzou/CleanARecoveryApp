@@ -1,441 +1,387 @@
 package com.example.cleanrecovery;
 
-import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
-import android.content.pm.PackageManager;
-import android.graphics.Color;
-import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
-import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
-import android.provider.Settings;
-import android.view.Gravity;
+import android.text.format.DateUtils;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ListView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
 import java.io.File;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class MainActivity extends Activity {
-    private static final int REQUEST_STORAGE = 4100;
+    private static final int REQUEST_ONBOARDING = 5100;
+    private static final long PROGRESS_TICK_MS = 200L;
 
-    private enum FilterMode {
-        ALL,
-        EXISTING,
-        DELETED
-    }
+    private final RecoveryState recoveryState = new RecoveryState();
+    private final ScanProgressTracker scanProgressTracker = new ScanProgressTracker();
+    private final Handler progressHandler = new Handler(Looper.getMainLooper());
 
-    private enum AppMode {
-        RECOVERY,
-        CLEANER
-    }
+    private StorageAccessController storageAccessController;
+    private RecoveryCoordinator recoveryCoordinator;
+    private RecoveryGridAdapter gridAdapter;
+    private RecoveryType currentScanType;
+    private boolean working;
+    private boolean pathExpanded;
+    private int lastScannedCount;
+    private int lastFoundCount;
 
-    private enum JunkFilter {
-        ALL,
-        SAFE,
-        REVIEW
-    }
-
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
-    private final AtomicBoolean cancelled = new AtomicBoolean(false);
-    private final ArrayList<RecoveryItem> allItems = new ArrayList<>();
-    private final ArrayList<RecoveryItem> items = new ArrayList<>();
-    private final ArrayList<JunkItem> allJunkItems = new ArrayList<>();
-    private final ArrayList<JunkItem> junkItems = new ArrayList<>();
-
-    private RecoveryAdapter adapter;
-    private JunkAdapter junkAdapter;
-    private ListView listView;
-    private TextView statusView;
-    private TextView permissionStateView;
-    private TextView resultCountView;
-    private TextView selectedCountView;
-    private LinearLayout categoryRow;
-    private Button modeRecoveryButton;
-    private Button modeCleanerButton;
-    private Button scanCleanerButton;
+    private View homePanel;
+    private View scanPanel;
+    private View resultsPanel;
+    private LinearLayout permissionBanner;
+    private TextView permissionBannerTitle;
+    private TextView permissionBannerAction;
+    private TextView lastScanSummary;
+    private TextView scanTitle;
+    private TextView scanPhaseLabel;
+    private TextView scanPercent;
+    private TextView scanEta;
+    private TextView scanDetail;
+    private ProgressBar scanProgressBar;
+    private TextView scanStats;
+    private TextView scanPathToggle;
+    private TextView scanCurrentPath;
+    private TextView resultsCount;
+    private TextView selectedCount;
+    private View resultsEmpty;
+    private RecyclerView resultsGrid;
     private Button filterAllButton;
     private Button filterExistingButton;
     private Button filterDeletedButton;
-    private Button stopButton;
-    private Button recoverButton;
-    private AppMode appMode = AppMode.RECOVERY;
-    private FilterMode currentFilter = FilterMode.ALL;
-    private JunkFilter currentJunkFilter = JunkFilter.ALL;
-    private boolean working;
+    private View bottomNav;
+    private ImageView navHomeIcon;
+    private ImageView navResultsIcon;
+    private ImageView navFolderIcon;
+    private ImageView navAboutIcon;
+    private TextView navHomeLabel;
+    private TextView navResultsLabel;
+    private TextView navFolderLabel;
+    private TextView navAboutLabel;
+
+    private String scanCurrentPathValue = "";
+
+    private final Runnable progressTick = new Runnable() {
+        @Override
+        public void run() {
+            if (!working || scanPanel.getVisibility() != View.VISIBLE) {
+                return;
+            }
+            updateScanProgressUi();
+            progressHandler.postDelayed(this, PROGRESS_TICK_MS);
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        buildUi();
-        updateStatus(getString(R.string.ready_status));
-        updatePermissionState();
-        updateCounters();
+        SystemUiHelper.apply(this);
+        setContentView(R.layout.activity_main);
+        storageAccessController = new StorageAccessController(this);
+        recoveryCoordinator = new RecoveryCoordinator(this, createCoordinatorCallback());
+        bindViews();
+        bindCategoryCards();
+        bindActions();
+        refreshHome();
+        maybeLaunchOnboarding();
+        updateBottomNav(Panel.HOME);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (resultsPanel.getVisibility() == View.VISIBLE) {
+            showPanel(Panel.HOME);
+            return;
+        }
+        if (scanPanel.getVisibility() == View.VISIBLE) {
+            recoveryCoordinator.cancelCurrentWork();
+            showPanel(Panel.HOME);
+            return;
+        }
+        super.onBackPressed();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        if (permissionStateView != null) {
-            updatePermissionState();
-        }
+        refreshPermissionBanner();
+        refreshHome();
     }
 
     @Override
     protected void onDestroy() {
-        cancelled.set(true);
-        executor.shutdownNow();
+        progressHandler.removeCallbacks(progressTick);
+        recoveryCoordinator.shutdown();
         super.onDestroy();
     }
 
-    private void buildUi() {
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.rgb(246, 248, 250));
-        root.setPadding(dp(14), dp(14), dp(14), dp(10));
-        setContentView(root);
-
-        TextView title = new TextView(this);
-        title.setText(R.string.app_name);
-        title.setTextSize(24f);
-        title.setTextColor(Color.rgb(20, 33, 43));
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setGravity(Gravity.CENTER_VERTICAL);
-        root.addView(title, matchWrap());
-
-        TextView subtitle = new TextView(this);
-        subtitle.setText(R.string.app_subtitle);
-        subtitle.setTextSize(13f);
-        subtitle.setTextColor(Color.rgb(82, 98, 109));
-        subtitle.setPadding(0, dp(2), 0, dp(12));
-        root.addView(subtitle, matchWrap());
-
-        LinearLayout permissionPanel = panel();
-        root.addView(permissionPanel, matchWrapWithBottom(10));
-
-        TextView permissionTitle = sectionTitle(R.string.permission_title);
-        permissionPanel.addView(permissionTitle);
-
-        permissionStateView = new TextView(this);
-        permissionStateView.setTextSize(14f);
-        permissionStateView.setTypeface(Typeface.DEFAULT_BOLD);
-        permissionPanel.addView(permissionStateView);
-
-        TextView permissionDetail = new TextView(this);
-        permissionDetail.setText(R.string.permission_detail);
-        permissionDetail.setTextSize(12f);
-        permissionDetail.setTextColor(Color.rgb(91, 105, 116));
-        permissionDetail.setPadding(0, dp(4), 0, dp(8));
-        permissionPanel.addView(permissionDetail);
-
-        Button accessButton = primaryButton(R.string.button_grant_access);
-        accessButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                requestStorageAccess();
-            }
-        });
-        permissionPanel.addView(accessButton, matchWrap());
-
-        LinearLayout scanPanel = panel();
-        root.addView(scanPanel, matchWrapWithBottom(10));
-        statusView = new TextView(this);
-        statusView.setTextSize(13f);
-        statusView.setTextColor(Color.rgb(36, 50, 60));
-        statusView.setPadding(0, 0, 0, dp(10));
-        scanPanel.addView(statusView, matchWrap());
-
-        LinearLayout modeRow = new LinearLayout(this);
-        modeRow.setOrientation(LinearLayout.HORIZONTAL);
-        modeRow.setPadding(0, 0, 0, dp(8));
-        scanPanel.addView(modeRow, matchWrap());
-
-        modeRecoveryButton = secondaryButton(R.string.mode_recovery);
-        modeRecoveryButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                setMode(AppMode.RECOVERY);
-            }
-        });
-        modeRow.addView(modeRecoveryButton, weightedButtonParams());
-
-        modeCleanerButton = secondaryButton(R.string.mode_cleaner);
-        modeCleanerButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                setMode(AppMode.CLEANER);
-            }
-        });
-        modeRow.addView(modeCleanerButton, weightedButtonParams());
-
-        categoryRow = new LinearLayout(this);
-        categoryRow.setOrientation(LinearLayout.HORIZONTAL);
-        scanPanel.addView(categoryRow, matchWrap());
-        addTypeButton(categoryRow, RecoveryType.IMAGE);
-        addTypeButton(categoryRow, RecoveryType.VIDEO);
-        addTypeButton(categoryRow, RecoveryType.AUDIO);
-        addTypeButton(categoryRow, RecoveryType.DOCUMENT);
-
-        scanCleanerButton = primaryButton(R.string.button_scan_junk);
-        scanCleanerButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                startJunkScan();
-            }
-        });
-        scanPanel.addView(scanCleanerButton, matchWrapWithTop(8));
-
-        LinearLayout resultHeader = new LinearLayout(this);
-        resultHeader.setOrientation(LinearLayout.HORIZONTAL);
-        resultHeader.setGravity(Gravity.CENTER_VERTICAL);
-        resultHeader.setPadding(dp(2), 0, dp(2), dp(6));
-        root.addView(resultHeader, matchWrap());
-
-        TextView resultsTitle = sectionTitle(R.string.results_title);
-        resultHeader.addView(resultsTitle, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-
-        resultCountView = smallCounter();
-        resultHeader.addView(resultCountView);
-        selectedCountView = smallCounter();
-        selectedCountView.setPadding(dp(10), 0, 0, 0);
-        resultHeader.addView(selectedCountView);
-
-        LinearLayout filterRow = new LinearLayout(this);
-        filterRow.setOrientation(LinearLayout.HORIZONTAL);
-        filterRow.setPadding(0, 0, 0, dp(8));
-        root.addView(filterRow, matchWrap());
-
-        filterAllButton = secondaryButton(R.string.filter_all);
-        filterAllButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (appMode == AppMode.RECOVERY) {
-                    setFilter(FilterMode.ALL);
-                } else {
-                    setJunkFilter(JunkFilter.ALL);
-                }
-            }
-        });
-        filterRow.addView(filterAllButton, weightedButtonParams());
-
-        filterExistingButton = secondaryButton(R.string.filter_existing);
-        filterExistingButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (appMode == AppMode.RECOVERY) {
-                    setFilter(FilterMode.EXISTING);
-                } else {
-                    setJunkFilter(JunkFilter.SAFE);
-                }
-            }
-        });
-        filterRow.addView(filterExistingButton, weightedButtonParams());
-
-        filterDeletedButton = secondaryButton(R.string.filter_deleted);
-        filterDeletedButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (appMode == AppMode.RECOVERY) {
-                    setFilter(FilterMode.DELETED);
-                } else {
-                    setJunkFilter(JunkFilter.REVIEW);
-                }
-            }
-        });
-        filterRow.addView(filterDeletedButton, weightedButtonParams());
-
-        listView = new ListView(this);
-        listView.setDividerHeight(1);
-        listView.setBackground(panelBackground(Color.WHITE));
-        adapter = new RecoveryAdapter(this, items, new RecoveryAdapter.SelectionListener() {
-            @Override
-            public void onSelectionChanged() {
-                updateCounters();
-            }
-        }, new RecoveryAdapter.ItemClickListener() {
-            @Override
-            public void onItemClicked(RecoveryItem item) {
-                openPreview(item);
-            }
-        });
-        junkAdapter = new JunkAdapter(this, junkItems, new JunkAdapter.SelectionListener() {
-            @Override
-            public void onSelectionChanged() {
-                updateCounters();
-            }
-        }, new JunkAdapter.ItemClickListener() {
-            @Override
-            public void onItemClicked(JunkItem item) {
-                openJunkItem(item);
-            }
-        });
-        listView.setAdapter(adapter);
-        root.addView(listView, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-        ));
-
-        TextView outputHint = new TextView(this);
-        outputHint.setText(R.string.output_hint);
-        outputHint.setTextSize(12f);
-        outputHint.setTextColor(Color.rgb(91, 105, 116));
-        outputHint.setPadding(dp(2), dp(8), dp(2), dp(6));
-        root.addView(outputHint, matchWrap());
-
-        LinearLayout actionRow = new LinearLayout(this);
-        actionRow.setOrientation(LinearLayout.HORIZONTAL);
-        root.addView(actionRow, matchWrap());
-
-        Button selectButton = secondaryButton(R.string.button_select_all);
-        selectButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                setAllSelected(true);
-            }
-        });
-        actionRow.addView(selectButton, weightedButtonParams());
-
-        Button clearButton = secondaryButton(R.string.button_clear);
-        clearButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                setAllSelected(false);
-            }
-        });
-        actionRow.addView(clearButton, weightedButtonParams());
-
-        stopButton = secondaryButton(R.string.button_stop);
-        stopButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                cancelled.set(true);
-                updateStatus(getString(R.string.stopping));
-            }
-        });
-        actionRow.addView(stopButton, weightedButtonParams());
-
-        recoverButton = primaryButton(R.string.button_recover);
-        recoverButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if (appMode == AppMode.RECOVERY) {
-                    recoverSelected();
-                } else {
-                    deleteSelectedJunk();
-                }
-            }
-        });
-        root.addView(recoverButton, matchWrapWithTop(8));
-
-        setWorking(false);
-        setMode(AppMode.RECOVERY);
-        updateFilterButtons();
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_ONBOARDING) {
+            refreshPermissionBanner();
+            refreshHome();
+        }
     }
 
-    private void addTypeButton(LinearLayout row, final RecoveryType type) {
-        Button button = secondaryButton(type.labelResId);
-        button.setOnClickListener(new View.OnClickListener() {
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        refreshPermissionBanner();
+    }
+
+    private void bindViews() {
+        homePanel = findViewById(R.id.home_panel);
+        scanPanel = findViewById(R.id.scan_panel);
+        resultsPanel = findViewById(R.id.results_panel);
+        permissionBanner = findViewById(R.id.permission_banner);
+        permissionBannerTitle = findViewById(R.id.permission_banner_title);
+        permissionBannerAction = findViewById(R.id.permission_banner_action);
+        lastScanSummary = findViewById(R.id.last_scan_summary);
+        scanTitle = findViewById(R.id.scan_title);
+        scanPhaseLabel = findViewById(R.id.scan_phase_label);
+        scanPercent = findViewById(R.id.scan_percent);
+        scanEta = findViewById(R.id.scan_eta);
+        scanDetail = findViewById(R.id.scan_detail);
+        scanProgressBar = findViewById(R.id.scan_progress_bar);
+        scanStats = findViewById(R.id.scan_stats);
+        scanPathToggle = findViewById(R.id.scan_path_toggle);
+        scanCurrentPath = findViewById(R.id.scan_current_path);
+        resultsCount = findViewById(R.id.results_count);
+        selectedCount = findViewById(R.id.selected_count);
+        resultsEmpty = findViewById(R.id.results_empty);
+        resultsGrid = findViewById(R.id.results_grid);
+        filterAllButton = findViewById(R.id.filter_all_button);
+        filterExistingButton = findViewById(R.id.filter_existing_button);
+        filterDeletedButton = findViewById(R.id.filter_deleted_button);
+        bottomNav = findViewById(R.id.bottom_nav);
+        navHomeIcon = findViewById(R.id.nav_home_icon);
+        navResultsIcon = findViewById(R.id.nav_results_icon);
+        navFolderIcon = findViewById(R.id.nav_folder_icon);
+        navAboutIcon = findViewById(R.id.nav_about_icon);
+        navHomeLabel = findViewById(R.id.nav_home_label);
+        navResultsLabel = findViewById(R.id.nav_results_label);
+        navFolderLabel = findViewById(R.id.nav_folder_label);
+        navAboutLabel = findViewById(R.id.nav_about_label);
+
+        gridAdapter = new RecoveryGridAdapter(this, recoveryState.getVisibleItems(), new RecoveryGridAdapter.Listener() {
+            @Override
+            public void onSelectionChanged() {
+                updateCounters();
+            }
+
+            @Override
+            public void onItemClicked(RecoveryItem item, int position) {
+                openPreview(item, position);
+            }
+        });
+        resultsGrid.setLayoutManager(new GridLayoutManager(this, 3));
+        resultsGrid.setAdapter(gridAdapter);
+    }
+
+    private void bindCategoryCards() {
+        setupCategoryCard(findViewById(R.id.card_images), RecoveryType.IMAGE, R.drawable.ic_category_image);
+        setupCategoryCard(findViewById(R.id.card_videos), RecoveryType.VIDEO, R.drawable.ic_category_video);
+        setupCategoryCard(findViewById(R.id.card_audio), RecoveryType.AUDIO, R.drawable.ic_category_audio);
+        setupCategoryCard(findViewById(R.id.card_documents), RecoveryType.DOCUMENT, R.drawable.ic_category_document);
+    }
+
+    private void setupCategoryCard(View card, final RecoveryType type, int iconResId) {
+        ImageView icon = card.findViewById(R.id.category_icon);
+        TextView title = card.findViewById(R.id.category_title);
+        title.setText(type.labelResId);
+        icon.setImageResource(iconResId);
+        card.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 startScan(type);
             }
         });
-        row.addView(button, weightedButtonParams());
     }
 
-    private void setFilter(FilterMode filterMode) {
-        currentFilter = filterMode;
-        rebuildVisibleItems();
-        updateFilterButtons();
+    private void bindActions() {
+        findViewById(R.id.home_settings_button).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                startActivity(new Intent(MainActivity.this, AboutActivity.class));
+            }
+        });
+        findViewById(R.id.open_output_button).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                RecoveryOutputPaths.openPrimaryFolder(MainActivity.this);
+            }
+        });
+        permissionBanner.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (!storageAccessController.hasStorageAccess()) {
+                    storageAccessController.requestStorageAccess();
+                }
+            }
+        });
+        findViewById(R.id.stop_scan_button).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                recoveryCoordinator.cancelCurrentWork();
+            }
+        });
+        scanPathToggle.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                pathExpanded = !pathExpanded;
+                scanCurrentPath.setVisibility(pathExpanded ? View.VISIBLE : View.GONE);
+                scanPathToggle.setText(pathExpanded ? R.string.hide_current_path : R.string.show_current_path);
+            }
+        });
+        findViewById(R.id.results_back_button).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                showPanel(Panel.HOME);
+            }
+        });
+        findViewById(R.id.nav_home).setOnClickListener(v -> showPanel(Panel.HOME));
+        findViewById(R.id.nav_results).setOnClickListener(v -> {
+            if (hasScanResults()) {
+                showPanel(Panel.RESULTS);
+            } else {
+                Toast.makeText(this, R.string.last_scan_empty, Toast.LENGTH_SHORT).show();
+            }
+        });
+        findViewById(R.id.nav_folder).setOnClickListener(v -> RecoveryOutputPaths.openPrimaryFolder(this));
+        findViewById(R.id.nav_about).setOnClickListener(v ->
+                startActivity(new Intent(MainActivity.this, AboutActivity.class)));
+        filterAllButton.setOnClickListener(v -> setFilter(RecoveryState.FilterMode.ALL));
+        filterExistingButton.setOnClickListener(v -> setFilter(RecoveryState.FilterMode.EXISTING));
+        filterDeletedButton.setOnClickListener(v -> setFilter(RecoveryState.FilterMode.DELETED));
+        findViewById(R.id.select_all_button).setOnClickListener(v -> {
+            recoveryState.setAllSelected(true);
+            gridAdapter.notifyDataSetChanged();
+            updateCounters();
+        });
+        findViewById(R.id.clear_selection_button).setOnClickListener(v -> {
+            recoveryState.setAllSelected(false);
+            gridAdapter.notifyDataSetChanged();
+            updateCounters();
+        });
+        findViewById(R.id.recover_button).setOnClickListener(v -> recoverSelected());
+        findViewById(R.id.rescan_button).setOnClickListener(v -> {
+            if (currentScanType != null) {
+                startScan(currentScanType);
+            } else {
+                showPanel(Panel.HOME);
+            }
+        });
     }
 
-    private void setJunkFilter(JunkFilter filterMode) {
-        currentJunkFilter = filterMode;
-        rebuildVisibleJunkItems();
-        updateFilterButtons();
+    private void maybeLaunchOnboarding() {
+        if (!ScanHistoryStore.isOnboardingComplete(this)) {
+            startActivityForResult(new Intent(this, OnboardingActivity.class), REQUEST_ONBOARDING);
+        }
     }
 
-    private void setMode(AppMode mode) {
+    private void refreshHome() {
+        ScanHistoryStore.Snapshot snapshot = ScanHistoryStore.read(this);
+        if (snapshot.hasScanHistory()) {
+            CharSequence when = DateUtils.getRelativeTimeSpanString(
+                    snapshot.lastScanTimeMs,
+                    System.currentTimeMillis(),
+                    DateUtils.MINUTE_IN_MILLIS
+            );
+            lastScanSummary.setText(getString(
+                    R.string.last_scan_summary,
+                    when,
+                    snapshot.lastScannedCount,
+                    snapshot.lastFoundCount
+            ));
+        } else {
+            lastScanSummary.setText(R.string.last_scan_empty);
+        }
+        updateCategoryCounts(snapshot);
+        refreshPermissionBanner();
+    }
+
+    private void updateCategoryCounts(ScanHistoryStore.Snapshot snapshot) {
+        updateCategoryCount(findViewById(R.id.card_images), snapshot.countForType(RecoveryType.IMAGE));
+        updateCategoryCount(findViewById(R.id.card_videos), snapshot.countForType(RecoveryType.VIDEO));
+        updateCategoryCount(findViewById(R.id.card_audio), snapshot.countForType(RecoveryType.AUDIO));
+        updateCategoryCount(findViewById(R.id.card_documents), snapshot.countForType(RecoveryType.DOCUMENT));
+    }
+
+    private void updateCategoryCount(View card, int count) {
+        TextView countView = card.findViewById(R.id.category_count);
+        if (count > 0) {
+            countView.setText(getString(R.string.category_count_found, count));
+        } else {
+            countView.setText(R.string.category_count_none);
+        }
+    }
+
+    private void refreshPermissionBanner() {
+        boolean granted = storageAccessController.hasStorageAccess();
+        permissionBannerTitle.setText(granted ? R.string.storage_access_granted : R.string.storage_access_missing);
+        permissionBannerTitle.setTextColor(resolveColorRes(granted ? R.color.status_success : R.color.status_warning));
+        permissionBannerAction.setText(granted
+                ? R.string.trust_non_destructive
+                : R.string.button_grant_access);
+    }
+
+    private void startScan(RecoveryType type) {
         if (working) {
             return;
         }
-        appMode = mode;
-        if (listView != null) {
-            listView.setAdapter(appMode == AppMode.RECOVERY ? adapter : junkAdapter);
+        if (!storageAccessController.hasStorageAccess()) {
+            Toast.makeText(this, R.string.storage_access_required, Toast.LENGTH_SHORT).show();
+            storageAccessController.requestStorageAccess();
+            return;
         }
-        if (categoryRow != null) {
-            categoryRow.setVisibility(appMode == AppMode.RECOVERY ? View.VISIBLE : View.GONE);
-        }
-        if (scanCleanerButton != null) {
-            scanCleanerButton.setVisibility(appMode == AppMode.CLEANER ? View.VISIBLE : View.GONE);
-        }
-        recoverButton.setText(appMode == AppMode.RECOVERY ? R.string.button_recover : R.string.button_delete_junk);
-        updateModeButtons();
-        updateFilterButtons();
-        updateCounters();
-        updateStatus(getString(appMode == AppMode.RECOVERY ? R.string.ready_status : R.string.junk_ready_status));
+        currentScanType = type;
+        recoveryState.clear();
+        gridAdapter.notifyDataSetChanged();
+        ScanHistoryStore.Snapshot history = ScanHistoryStore.read(this);
+        int historicalEstimate = history.lastScannedCount > 0 ? history.lastScannedCount : 10_000;
+        scanProgressTracker.reset(historicalEstimate);
+        lastScannedCount = 0;
+        lastFoundCount = 0;
+        scanCurrentPathValue = "";
+        pathExpanded = false;
+        scanCurrentPath.setVisibility(View.GONE);
+        scanPathToggle.setText(R.string.show_current_path);
+        scanTitle.setText(getString(R.string.scan_status, getString(type.labelResId)));
+        scanStats.setText(getString(R.string.scan_stats_format, 0, 0));
+        updateScanProgressUi();
+        showPanel(Panel.SCAN);
+        progressHandler.removeCallbacks(progressTick);
+        progressHandler.post(progressTick);
+        recoveryCoordinator.startScan(type);
     }
 
-    private void rebuildVisibleItems() {
-        items.clear();
-        for (RecoveryItem item : allItems) {
-            if (matchesFilter(item)) {
-                items.add(item);
-            }
+    private void recoverSelected() {
+        if (working) {
+            return;
         }
-        adapter.notifyDataSetChanged();
-        updateCounters();
+        List<RecoveryItem> selected = recoveryState.getSelectedItems();
+        if (selected.isEmpty()) {
+            Toast.makeText(this, R.string.no_files_selected, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        recoveryCoordinator.recoverSelected(selected);
     }
 
-    private boolean matchesFilter(RecoveryItem item) {
-        if (currentFilter == FilterMode.EXISTING) {
-            return !item.suspectedDeleted;
-        }
-        if (currentFilter == FilterMode.DELETED) {
-            return item.suspectedDeleted;
-        }
-        return true;
-    }
-
-    private void rebuildVisibleJunkItems() {
-        junkItems.clear();
-        for (JunkItem item : allJunkItems) {
-            if (matchesJunkFilter(item)) {
-                junkItems.add(item);
-            }
-        }
-        junkAdapter.notifyDataSetChanged();
-        updateCounters();
-    }
-
-    private boolean matchesJunkFilter(JunkItem item) {
-        if (currentJunkFilter == JunkFilter.SAFE) {
-            return item.risk == JunkRisk.SAFE;
-        }
-        if (currentJunkFilter == JunkFilter.REVIEW) {
-            return item.risk != JunkRisk.SAFE;
-        }
-        return true;
-    }
-
-    private void openPreview(RecoveryItem item) {
+    private void openPreview(RecoveryItem item, int position) {
+        PreviewSession.setItems(recoveryState.getVisibleItems(), position);
         Intent intent = new Intent(this, PreviewActivity.class);
         intent.putExtra(PreviewActivity.EXTRA_PATH, item.path);
         intent.putExtra(PreviewActivity.EXTRA_NAME, item.name);
@@ -444,557 +390,271 @@ public final class MainActivity extends Activity {
         startActivity(intent);
     }
 
-    private void openJunkItem(JunkItem item) {
-        if (item.directory) {
-            Toast.makeText(this, item.reason, Toast.LENGTH_SHORT).show();
-            return;
-        }
-        RecoveryType previewType = previewTypeFor(item.name);
-        if (previewType == null) {
-            Toast.makeText(this, item.reason, Toast.LENGTH_SHORT).show();
-            return;
-        }
-        Intent intent = new Intent(this, PreviewActivity.class);
-        intent.putExtra(PreviewActivity.EXTRA_PATH, item.path);
-        intent.putExtra(PreviewActivity.EXTRA_NAME, item.name);
-        intent.putExtra(PreviewActivity.EXTRA_TYPE, previewType.name());
-        intent.putExtra(PreviewActivity.EXTRA_SUSPECTED_DELETED, true);
-        startActivity(intent);
-    }
-
-    private void startScan(final RecoveryType type) {
-        if (working) {
-            return;
-        }
-        if (!hasStorageAccess()) {
-            requestStorageAccess();
-            updateStatus(getString(R.string.storage_access_required));
-            return;
-        }
-
-        cancelled.set(false);
-        allItems.clear();
-        items.clear();
-        adapter.notifyDataSetChanged();
+    private void setFilter(RecoveryState.FilterMode mode) {
+        recoveryState.setFilter(mode);
+        gridAdapter.notifyDataSetChanged();
+        styleFilterTabs();
         updateCounters();
-        setWorking(true);
-        updateStatus(getString(R.string.scan_status, getString(type.labelResId)));
-
-        executor.execute(new Runnable() {
-            @Override
-            public void run() {
-                RecoveryScanner scanner = new RecoveryScanner();
-                scanner.scan(type, new RecoveryScanner.Callback() {
-                    @Override
-                    public boolean isCancelled() {
-                        return cancelled.get();
-                    }
-
-                    @Override
-                    public void onProgress(final int scannedCount, final int foundCount, final String currentPath) {
-                        mainHandler.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                updateStatus(getString(R.string.progress_status, scannedCount, foundCount, currentPath));
-                            }
-                        });
-                    }
-
-                    @Override
-                    public void onItemFound(final RecoveryItem item) {
-                        mainHandler.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                allItems.add(item);
-                                if (matchesFilter(item)) {
-                                    items.add(item);
-                                    adapter.notifyDataSetChanged();
-                                    updateCounters();
-                                }
-                            }
-                        });
-                    }
-
-                    @Override
-                    public void onDone(final int scannedCount, final int foundCount) {
-                        mainHandler.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                setWorking(false);
-                                updateStatus(getString(R.string.done_status, scannedCount, foundCount));
-                                updateCounters();
-                            }
-                        });
-                    }
-
-                    @Override
-                    public void onError(File file, Exception exception) {
-                        // Keep scanning other readable directories.
-                    }
-                });
-            }
-        });
+        updateEmptyState();
     }
 
-    private void startJunkScan() {
-        if (working) {
-            return;
-        }
-        if (!hasStorageAccess()) {
-            requestStorageAccess();
-            updateStatus(getString(R.string.storage_access_required));
-            return;
-        }
-
-        cancelled.set(false);
-        allJunkItems.clear();
-        junkItems.clear();
-        junkAdapter.notifyDataSetChanged();
-        updateCounters();
-        setWorking(true);
-        updateStatus(getString(R.string.junk_scan_status));
-
-        executor.execute(new Runnable() {
-            @Override
-            public void run() {
-                JunkScanner scanner = new JunkScanner(MainActivity.this);
-                scanner.scan(new JunkScanner.Callback() {
-                    @Override
-                    public boolean isCancelled() {
-                        return cancelled.get();
-                    }
-
-                    @Override
-                    public void onProgress(final int scannedCount, final int foundCount, final String currentPath) {
-                        mainHandler.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                updateStatus(getString(R.string.junk_progress_status, scannedCount, foundCount, currentPath));
-                            }
-                        });
-                    }
-
-                    @Override
-                    public void onItemFound(final JunkItem item) {
-                        mainHandler.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                allJunkItems.add(item);
-                                if (matchesJunkFilter(item)) {
-                                    junkItems.add(item);
-                                    junkAdapter.notifyDataSetChanged();
-                                    updateCounters();
-                                }
-                            }
-                        });
-                    }
-
-                    @Override
-                    public void onDone(final int scannedCount, final int foundCount, final long totalBytes) {
-                        mainHandler.post(new Runnable() {
-                            @Override
-                            public void run() {
-                                setWorking(false);
-                                updateStatus(getString(R.string.junk_done_status, scannedCount, foundCount, JunkItem.formatSize(totalBytes)));
-                                updateCounters();
-                            }
-                        });
-                    }
-
-                    @Override
-                    public void onError(File file, Exception exception) {
-                        // Keep scanning readable directories.
-                    }
-                });
-            }
-        });
-    }
-
-    private void recoverSelected() {
-        if (working) {
-            return;
-        }
-        if (!hasStorageAccess()) {
-            requestStorageAccess();
-            updateStatus(getString(R.string.storage_access_required));
-            return;
-        }
-
-        final List<RecoveryItem> selected = new ArrayList<>();
-        for (RecoveryItem item : items) {
-            if (item.selected) {
-                selected.add(item);
-            }
-        }
-        if (selected.isEmpty()) {
-            Toast.makeText(this, R.string.no_files_selected, Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        setWorking(true);
-        cancelled.set(false);
-        updateStatus(getResources().getQuantityString(R.plurals.recovering_status, selected.size(), selected.size()));
-
-        executor.execute(new Runnable() {
-            @Override
-            public void run() {
-                int success = 0;
-                int failed = 0;
-                File lastOutput = null;
-                for (RecoveryItem item : selected) {
-                    if (cancelled.get()) {
-                        break;
-                    }
-                    try {
-                        lastOutput = RecoveryCopier.copyToRecoveryDirectory(MainActivity.this, item);
-                        success++;
-                    } catch (Exception exception) {
-                        failed++;
-                    }
-                    final int progressSuccess = success;
-                    final int progressFailed = failed;
-                    mainHandler.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            updateStatus(getString(R.string.recover_progress_status, progressSuccess, progressFailed));
-                        }
-                    });
-                }
-
-                final int finalSuccess = success;
-                final int finalFailed = failed;
-                final File output = lastOutput;
-                mainHandler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        setWorking(false);
-                        String outputPath = output == null ? "" : "\n" + getString(R.string.last_output, output.getParent());
-                        updateStatus(getString(R.string.recover_done_status, finalSuccess, finalFailed, outputPath));
-                    }
-                });
-            }
-        });
-    }
-
-    private void deleteSelectedJunk() {
-        if (working) {
-            return;
-        }
-        if (!hasStorageAccess()) {
-            requestStorageAccess();
-            updateStatus(getString(R.string.storage_access_required));
-            return;
-        }
-
-        final List<JunkItem> selected = new ArrayList<>();
-        for (JunkItem item : junkItems) {
-            if (item.selected) {
-                selected.add(item);
-            }
-        }
-        if (selected.isEmpty()) {
-            Toast.makeText(this, R.string.no_files_selected, Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        setWorking(true);
-        cancelled.set(false);
-        updateStatus(getResources().getQuantityString(R.plurals.deleting_junk_status, selected.size(), selected.size()));
-
-        executor.execute(new Runnable() {
-            @Override
-            public void run() {
-                int success = 0;
-                int failed = 0;
-                long deletedBytes = 0L;
-                for (JunkItem item : selected) {
-                    if (cancelled.get()) {
-                        break;
-                    }
-                    if (JunkCleaner.delete(item)) {
-                        success++;
-                        deletedBytes += item.size;
-                    } else {
-                        failed++;
-                    }
-                    final int progressSuccess = success;
-                    final int progressFailed = failed;
-                    final long progressBytes = deletedBytes;
-                    mainHandler.post(new Runnable() {
-                        @Override
-                        public void run() {
-                            updateStatus(getString(R.string.junk_delete_progress_status, progressSuccess, progressFailed, JunkItem.formatSize(progressBytes)));
-                        }
-                    });
-                }
-
-                final int finalSuccess = success;
-                final int finalFailed = failed;
-                final long finalBytes = deletedBytes;
-                mainHandler.post(new Runnable() {
-                    @Override
-                    public void run() {
-                        setWorking(false);
-                        removeDeletedJunk();
-                        updateStatus(getString(R.string.junk_delete_done_status, finalSuccess, finalFailed, JunkItem.formatSize(finalBytes)));
-                    }
-                });
-            }
-        });
-    }
-
-    private void removeDeletedJunk() {
-        for (int index = allJunkItems.size() - 1; index >= 0; index--) {
-            if (allJunkItems.get(index).selected && !allJunkItems.get(index).asFile().exists()) {
-                allJunkItems.remove(index);
-            }
-        }
-        rebuildVisibleJunkItems();
-    }
-
-    private boolean hasStorageAccess() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
-                ? Environment.isExternalStorageManager()
-                : checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
-    }
-
-    private void requestStorageAccess() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            try {
-                Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
-                intent.setData(Uri.parse("package:" + getPackageName()));
-                startActivity(intent);
-            } catch (Exception ignored) {
-                startActivity(new Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION));
-            }
-        } else {
-            requestPermissions(new String[]{
-                    Manifest.permission.READ_EXTERNAL_STORAGE,
-                    Manifest.permission.WRITE_EXTERNAL_STORAGE
-            }, REQUEST_STORAGE);
-        }
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQUEST_STORAGE && hasStorageAccess()) {
-            updateStatus(getString(R.string.storage_access_granted));
-        }
-        updatePermissionState();
-    }
-
-    private void setAllSelected(boolean selected) {
-        if (appMode == AppMode.RECOVERY) {
-            for (RecoveryItem item : items) {
-                item.selected = selected;
-            }
-            adapter.notifyDataSetChanged();
-        } else {
-            for (JunkItem item : junkItems) {
-                item.selected = selected;
-            }
-            junkAdapter.notifyDataSetChanged();
-        }
-        updateCounters();
-    }
-
-    private void setWorking(boolean value) {
-        working = value;
-        stopButton.setEnabled(value);
-        recoverButton.setEnabled(!value);
-        if (scanCleanerButton != null) {
-            scanCleanerButton.setEnabled(!value);
-        }
-    }
-
-    private void updateFilterButtons() {
-        if (appMode == AppMode.RECOVERY) {
-            filterAllButton.setText(R.string.filter_all);
-            filterExistingButton.setText(R.string.filter_existing);
-            filterDeletedButton.setText(R.string.filter_deleted);
-            styleFilterButton(filterAllButton, currentFilter == FilterMode.ALL);
-            styleFilterButton(filterExistingButton, currentFilter == FilterMode.EXISTING);
-            styleFilterButton(filterDeletedButton, currentFilter == FilterMode.DELETED);
-        } else {
-            filterAllButton.setText(R.string.filter_all);
-            filterExistingButton.setText(R.string.junk_filter_safe);
-            filterDeletedButton.setText(R.string.junk_filter_review);
-            styleFilterButton(filterAllButton, currentJunkFilter == JunkFilter.ALL);
-            styleFilterButton(filterExistingButton, currentJunkFilter == JunkFilter.SAFE);
-            styleFilterButton(filterDeletedButton, currentJunkFilter == JunkFilter.REVIEW);
-        }
-    }
-
-    private void updateModeButtons() {
-        styleFilterButton(modeRecoveryButton, appMode == AppMode.RECOVERY);
-        styleFilterButton(modeCleanerButton, appMode == AppMode.CLEANER);
+    private void styleFilterTabs() {
+        styleFilterButton(filterAllButton, recoveryState.getFilter() == RecoveryState.FilterMode.ALL);
+        styleFilterButton(filterExistingButton, recoveryState.getFilter() == RecoveryState.FilterMode.EXISTING);
+        styleFilterButton(filterDeletedButton, recoveryState.getFilter() == RecoveryState.FilterMode.DELETED);
     }
 
     private void styleFilterButton(Button button, boolean active) {
-        if (button == null) {
-            return;
-        }
-        button.setTextColor(active ? Color.WHITE : Color.rgb(0, 105, 92));
-        button.setBackground(active
-                ? buttonBackground(Color.rgb(0, 137, 123), Color.rgb(0, 137, 123))
-                : buttonBackground(Color.WHITE, Color.rgb(192, 210, 207)));
-    }
-
-    private void updatePermissionState() {
-        boolean granted = hasStorageAccess();
-        permissionStateView.setText(granted ? R.string.storage_access_granted : R.string.storage_access_missing);
-        permissionStateView.setTextColor(granted ? Color.rgb(0, 118, 105) : Color.rgb(174, 89, 0));
+        button.setBackgroundResource(active ? R.drawable.bg_tab_selected : R.drawable.bg_tab_unselected);
+        button.setTextColor(resolveColorRes(active ? R.color.brand_primary_dark : R.color.text_secondary));
     }
 
     private void updateCounters() {
-        int selected = 0;
-        if (appMode == AppMode.RECOVERY) {
-            for (RecoveryItem item : items) {
-                if (item.selected) {
-                    selected++;
-                }
-            }
-            if (resultCountView != null) {
-                resultCountView.setText(getResources().getQuantityString(R.plurals.results_count, items.size(), items.size()));
-            }
-        } else {
-            for (JunkItem item : junkItems) {
-                if (item.selected) {
-                    selected++;
-                }
-            }
-            if (resultCountView != null) {
-                long visibleBytes = 0L;
-                for (JunkItem item : junkItems) {
-                    visibleBytes += item.size;
-                }
-                resultCountView.setText(getResources().getQuantityString(
-                        R.plurals.junk_results_count,
-                        junkItems.size(),
-                        junkItems.size(),
-                        JunkItem.formatSize(visibleBytes)
-                ));
-            }
-        }
-        if (selectedCountView != null) {
-            selectedCountView.setText(getResources().getQuantityString(R.plurals.selected_count, selected, selected));
-        }
+        int visible = recoveryState.getVisibleCount();
+        resultsCount.setText(getResources().getQuantityString(R.plurals.results_count, visible, visible));
+        int selected = recoveryState.getSelectedCount();
+        selectedCount.setText(getResources().getQuantityString(R.plurals.selected_count, selected, selected));
+        updateEmptyState();
     }
 
-    private RecoveryType previewTypeFor(String name) {
-        String lower = name.toLowerCase(Locale.US);
-        if (lower.endsWith(".jpg") || lower.endsWith(".jpeg") || lower.endsWith(".png")
-                || lower.endsWith(".webp") || lower.endsWith(".gif") || lower.endsWith(".bmp")) {
-            return RecoveryType.IMAGE;
-        }
-        if (lower.endsWith(".mp4") || lower.endsWith(".3gp") || lower.endsWith(".mkv") || lower.endsWith(".ts")) {
-            return RecoveryType.VIDEO;
-        }
-        if (lower.endsWith(".mp3") || lower.endsWith(".flac") || lower.endsWith(".wav") || lower.endsWith(".ogg")) {
-            return RecoveryType.AUDIO;
-        }
-        if (lower.endsWith(".pdf") || lower.endsWith(".txt") || lower.endsWith(".doc")
-                || lower.endsWith(".docx") || lower.endsWith(".ppt") || lower.endsWith(".pptx")
-                || lower.endsWith(".xls") || lower.endsWith(".xlsx")) {
-            return RecoveryType.DOCUMENT;
-        }
-        return null;
+    private void updateEmptyState() {
+        boolean empty = recoveryState.getVisibleCount() == 0;
+        resultsEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
+        resultsGrid.setVisibility(empty ? View.GONE : View.VISIBLE);
     }
 
-    private void updateStatus(String message) {
-        statusView.setText(message);
-    }
-
-    private LinearLayout panel() {
-        LinearLayout panel = new LinearLayout(this);
-        panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(dp(12), dp(10), dp(12), dp(10));
-        panel.setBackground(panelBackground(Color.WHITE));
-        return panel;
-    }
-
-    private TextView sectionTitle(int stringRes) {
-        TextView textView = new TextView(this);
-        textView.setText(stringRes);
-        textView.setTextSize(14f);
-        textView.setTextColor(Color.rgb(20, 33, 43));
-        textView.setTypeface(Typeface.DEFAULT_BOLD);
-        return textView;
-    }
-
-    private TextView smallCounter() {
-        TextView textView = new TextView(this);
-        textView.setTextSize(12f);
-        textView.setTextColor(Color.rgb(82, 98, 109));
-        return textView;
-    }
-
-    private Button primaryButton(int stringRes) {
-        Button button = baseButton(stringRes);
-        button.setTextColor(Color.WHITE);
-        button.setBackground(buttonBackground(Color.rgb(0, 137, 123), Color.rgb(0, 137, 123)));
-        return button;
-    }
-
-    private Button secondaryButton(int stringRes) {
-        Button button = baseButton(stringRes);
-        button.setTextColor(Color.rgb(0, 105, 92));
-        button.setBackground(buttonBackground(Color.WHITE, Color.rgb(192, 210, 207)));
-        return button;
-    }
-
-    private Button baseButton(int stringRes) {
-        Button button = new Button(this);
-        button.setText(stringRes);
-        button.setAllCaps(false);
-        button.setMinHeight(dp(42));
-        button.setTextSize(13f);
-        return button;
-    }
-
-    private GradientDrawable panelBackground(int color) {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(color);
-        drawable.setCornerRadius(dp(8));
-        drawable.setStroke(1, Color.rgb(229, 234, 238));
-        return drawable;
-    }
-
-    private GradientDrawable buttonBackground(int fill, int stroke) {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(fill);
-        drawable.setCornerRadius(dp(8));
-        drawable.setStroke(1, stroke);
-        return drawable;
-    }
-
-    private LinearLayout.LayoutParams matchWrap() {
-        return new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
+    private void persistScanHistory() {
+        ScanHistoryStore.saveScanResult(
+                this,
+                currentScanType,
+                lastScannedCount,
+                lastFoundCount,
+                recoveryState.countByType(RecoveryType.IMAGE),
+                recoveryState.countByType(RecoveryType.VIDEO),
+                recoveryState.countByType(RecoveryType.AUDIO),
+                recoveryState.countByType(RecoveryType.DOCUMENT)
         );
+        refreshHome();
     }
 
-    private LinearLayout.LayoutParams matchWrapWithBottom(int bottomDp) {
-        LinearLayout.LayoutParams params = matchWrap();
-        params.setMargins(0, 0, 0, dp(bottomDp));
-        return params;
+    private void finishScanUi(int scannedCount, int foundCount) {
+        scanProgressTracker.onScanProgress(scannedCount);
+        scanProgressTracker.complete();
+        lastScannedCount = scannedCount;
+        lastFoundCount = foundCount;
+        updateScanProgressUi();
+        scanStats.setText(getString(R.string.scan_stats_format, scannedCount, foundCount));
+        progressHandler.removeCallbacks(progressTick);
+        persistScanHistory();
+        gridAdapter.notifyDataSetChanged();
+        styleFilterTabs();
+        updateCounters();
+        showPanel(Panel.RESULTS);
     }
 
-    private LinearLayout.LayoutParams matchWrapWithTop(int topDp) {
-        LinearLayout.LayoutParams params = matchWrap();
-        params.setMargins(0, dp(topDp), 0, 0);
-        return params;
+    private void updateScanProgressUi() {
+        int percent = scanProgressTracker.getDisplayPercent();
+        scanPercent.setText(getString(R.string.scan_percent_format, percent));
+        scanProgressBar.setProgress(percent);
+        scanStats.setText(getString(R.string.scan_stats_format, lastScannedCount, lastFoundCount));
+
+        ScanProgressTracker.Phase phase = scanProgressTracker.getPhase();
+        if (phase == ScanProgressTracker.Phase.PREPARING) {
+            scanPhaseLabel.setText(R.string.scan_phase_preparing);
+            scanDetail.setText(getString(R.string.scan_prepare_detail, scanProgressTracker.getPreparedCount()));
+            scanEta.setText(R.string.scan_eta_calculating);
+            return;
+        }
+        if (phase == ScanProgressTracker.Phase.COMPLETE) {
+            scanPhaseLabel.setText(R.string.scan_phase_complete);
+            scanDetail.setText(getString(
+                    R.string.scan_progress_detail,
+                    scanProgressTracker.getScannedCount(),
+                    Math.max(scanProgressTracker.getPreparedTotal(), scanProgressTracker.getScannedCount())
+            ));
+            scanEta.setText(R.string.scan_eta_complete);
+            return;
+        }
+        if (phase == ScanProgressTracker.Phase.MEDIASTORE) {
+            scanPhaseLabel.setText(R.string.scan_phase_mediastore);
+            scanDetail.setText(getString(R.string.scan_stats_format, lastScannedCount, lastFoundCount));
+            scanEta.setText(R.string.scan_eta_calculating);
+            return;
+        }
+        if (phase == ScanProgressTracker.Phase.CACHE) {
+            scanPhaseLabel.setText(R.string.scan_phase_cache);
+            scanDetail.setText(getString(R.string.scan_stats_format, lastScannedCount, lastFoundCount));
+            scanEta.setText(R.string.scan_eta_calculating);
+            return;
+        }
+
+        scanPhaseLabel.setText(R.string.scan_phase_scanning);
+        int total = scanProgressTracker.getPreparedTotal();
+        scanDetail.setText(getString(R.string.scan_progress_detail, scanProgressTracker.getScannedCount(), total));
+        long etaMs = scanProgressTracker.getEstimatedRemainingMs();
+        if (etaMs < 0L) {
+            scanEta.setText(R.string.scan_eta_calculating);
+        } else if (etaMs < 1_000L) {
+            scanEta.setText(R.string.scan_eta_almost_done);
+        } else {
+            scanEta.setText(formatEta(etaMs));
+        }
     }
 
-    private LinearLayout.LayoutParams weightedButtonParams() {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        params.setMargins(dp(3), 0, dp(3), 0);
-        return params;
+    private String formatEta(long etaMs) {
+        long totalSeconds = Math.max(1L, (etaMs + 999L) / 1_000L);
+        if (totalSeconds < 60L) {
+            return getString(R.string.scan_eta_seconds, totalSeconds);
+        }
+        long minutes = totalSeconds / 60L;
+        long seconds = totalSeconds % 60L;
+        if (minutes < 60L) {
+            return getString(R.string.scan_eta_minutes, minutes, seconds);
+        }
+        long hours = minutes / 60L;
+        minutes = minutes % 60L;
+        return getString(R.string.scan_eta_hours, hours, minutes);
     }
 
-    private int dp(int value) {
-        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    private void showPanel(Panel panel) {
+        homePanel.setVisibility(panel == Panel.HOME ? View.VISIBLE : View.GONE);
+        scanPanel.setVisibility(panel == Panel.SCAN ? View.VISIBLE : View.GONE);
+        resultsPanel.setVisibility(panel == Panel.RESULTS ? View.VISIBLE : View.GONE);
+        updateBottomNav(panel);
+    }
+
+    private boolean hasScanResults() {
+        return recoveryState.getAllCount() > 0;
+    }
+
+    private void updateBottomNav(Panel panel) {
+        bottomNav.setVisibility(panel == Panel.SCAN ? View.GONE : View.VISIBLE);
+        if (panel == Panel.SCAN) {
+            return;
+        }
+        boolean hasResults = hasScanResults();
+        int activeColor = resolveColorRes(R.color.brand_primary);
+        int inactiveColor = resolveColorRes(R.color.text_secondary);
+        int disabledColor = resolveColorRes(R.color.text_muted);
+
+        styleNavItem(navHomeIcon, navHomeLabel, panel == Panel.HOME, activeColor, inactiveColor);
+        styleNavItem(navResultsIcon, navResultsLabel, panel == Panel.RESULTS, activeColor,
+                hasResults ? inactiveColor : disabledColor);
+        navResultsIcon.setEnabled(hasResults);
+        navResultsLabel.setEnabled(hasResults);
+        findViewById(R.id.nav_results).setEnabled(hasResults);
+        styleNavItem(navFolderIcon, navFolderLabel, false, activeColor, inactiveColor);
+        styleNavItem(navAboutIcon, navAboutLabel, false, activeColor, inactiveColor);
+    }
+
+    private void styleNavItem(ImageView icon, TextView label, boolean active, int activeColor, int inactiveColor) {
+        int color = active ? activeColor : inactiveColor;
+        icon.setColorFilter(color);
+        label.setTextColor(color);
+    }
+
+    private int resolveColorRes(int resId) {
+        return getResources().getColor(resId, getTheme());
+    }
+
+    private RecoveryCoordinator.ScanCallback createCoordinatorCallback() {
+        return new RecoveryCoordinator.ScanCallback() {
+            @Override
+            public void onWorkingChanged(boolean value) {
+                working = value;
+                findViewById(R.id.recover_button).setEnabled(!value);
+            }
+
+            @Override
+            public void onPrepareProgress(int countedSoFar, String currentPath) {
+                scanProgressTracker.onPrepareProgress(countedSoFar);
+                scanCurrentPathValue = currentPath;
+                if (pathExpanded) {
+                    scanCurrentPath.setText(currentPath);
+                }
+            }
+
+            @Override
+            public void onPrepareComplete(int totalEntries) {
+                scanProgressTracker.onPrepared(totalEntries);
+                updateScanProgressUi();
+            }
+
+            @Override
+            public void onScanPhaseChanged(ScanProgressTracker.Phase phase) {
+                if (phase == ScanProgressTracker.Phase.MEDIASTORE) {
+                    scanProgressTracker.onMediaStorePhaseStart();
+                } else if (phase == ScanProgressTracker.Phase.CACHE) {
+                    scanProgressTracker.onCachePhaseStart(0);
+                }
+                updateScanProgressUi();
+            }
+
+            @Override
+            public void onPhaseProgress(ScanProgressTracker.Phase phase, int processedCount) {
+                if (phase == ScanProgressTracker.Phase.MEDIASTORE) {
+                    scanProgressTracker.onMediaStoreProgress(processedCount);
+                } else if (phase == ScanProgressTracker.Phase.CACHE) {
+                    scanProgressTracker.onCacheProgress(processedCount);
+                }
+                updateScanProgressUi();
+            }
+
+            @Override
+            public void onProgress(int scannedCount, int foundCount, String currentPath) {
+                lastScannedCount = scannedCount;
+                lastFoundCount = foundCount;
+                scanProgressTracker.onScanProgress(scannedCount);
+                scanCurrentPathValue = currentPath;
+                if (pathExpanded) {
+                    scanCurrentPath.setText(currentPath);
+                }
+            }
+
+            @Override
+            public void onItemsBatch(List<RecoveryItem> items) {
+                recoveryState.addAll(items);
+                if (recoveryState.isResultCapReached()) {
+                    recoveryCoordinator.cancelCurrentWork();
+                    Toast.makeText(MainActivity.this, getString(R.string.result_cap_reached, ScanLimits.MAX_RESULTS), Toast.LENGTH_LONG).show();
+                }
+                gridAdapter.notifyDataSetChanged();
+                updateCounters();
+            }
+
+            @Override
+            public void onResultCapReached() {
+                Toast.makeText(MainActivity.this, getString(R.string.result_cap_reached, ScanLimits.MAX_RESULTS), Toast.LENGTH_LONG).show();
+            }
+
+            @Override
+            public void onScanComplete(int scannedCount, int foundCount) {
+                lastScannedCount = scannedCount;
+                lastFoundCount = foundCount;
+                finishScanUi(scannedCount, foundCount);
+            }
+
+            @Override
+            public void onRecoverProgress(int successCount, int failedCount) {
+                // Keep results visible during recovery.
+            }
+
+            @Override
+            public void onRecoverComplete(int successCount, int failedCount, File lastOutput) {
+                Intent intent = new Intent(MainActivity.this, RecoverCompleteActivity.class);
+                intent.putExtra(RecoverCompleteActivity.EXTRA_SUCCESS, successCount);
+                intent.putExtra(RecoverCompleteActivity.EXTRA_FAILED, failedCount);
+                intent.putExtra(RecoverCompleteActivity.EXTRA_OUTPUT_PATH, lastOutput == null
+                        ? RecoveryOutputPaths.primaryDisplayPath()
+                        : lastOutput.getParent());
+                startActivity(intent);
+            }
+        };
+    }
+
+    private enum Panel {
+        HOME,
+        SCAN,
+        RESULTS
     }
 }

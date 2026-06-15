@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_card"
+    android:foreground="?android:attr/selectableItemBackground">
+
+    <ImageView
+        android:id="@+id/grid_thumbnail"
+        android:layout_width="match_parent"
+        android:layout_height="112dp"
+        android:scaleType="centerCrop" />
+
+    <CheckBox
+        android:id="@+id/grid_checkbox"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:padding="@dimen/space_xs" />
+
+    <TextView
+        android:id="@+id/grid_badge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_margin="@dimen/space_xs"
+        android:paddingStart="6dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="6dp"
+        android:paddingBottom="2dp"
+        android:textSize="10sp" />
+
+    <TextView
+        android:id="@+id/grid_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="@color/overlay_scrim"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:padding="@dimen/space_xs"
+        android:textColor="@android:color/white"
+        android:textSize="11sp" />
+</FrameLayout>

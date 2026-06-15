@@ -16,6 +16,7 @@ public final class RecoveryItem {
     public final int width;
     public final int height;
     public final boolean suspectedDeleted;
+    public final RecoverySourceKind sourceKind;
     public boolean selected;
 
     public RecoveryItem(
@@ -28,6 +29,20 @@ public final class RecoveryItem {
             int height,
             boolean suspectedDeleted
     ) {
+        this(type, name, path, size, modifiedAt, width, height, suspectedDeleted, RecoverySourceKind.VISIBLE_SHARED_FILE);
+    }
+
+    public RecoveryItem(
+            RecoveryType type,
+            String name,
+            String path,
+            long size,
+            long modifiedAt,
+            int width,
+            int height,
+            boolean suspectedDeleted,
+            RecoverySourceKind sourceKind
+    ) {
         this.type = type;
         this.name = name;
         this.path = path;
@@ -36,6 +51,7 @@ public final class RecoveryItem {
         this.width = width;
         this.height = height;
         this.suspectedDeleted = suspectedDeleted;
+        this.sourceKind = sourceKind == null ? RecoverySourceKind.VISIBLE_SHARED_FILE : sourceKind;
     }
 
     public File asFile() {

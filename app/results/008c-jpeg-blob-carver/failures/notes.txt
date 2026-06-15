@@ -1,0 +1,3 @@
+header_footer_baseline_candidates=2
+structured_candidates=2
+baseline_false_positive_risk=higher_when_random_ffd9_inside_entropy

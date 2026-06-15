@@ -1,0 +1,4 @@
+candidateId,sourceKind,sourceUriOrPath,extractionMethod,originalContainer,byteLength,sha256,perceptualHash,mimeDetected,decodeStatus,width,height,exactGroundTruthMatch,derivativeMatch,extractionOffsetStart,extractionOffsetEnd,readBytes,elapsedMs,errorCode,label,grade
+sim-ms-trash-1,MEDIASTORE_TRASH,content://media/external/images/media/101,simulated,,204800,abc1111111111111111111111111111111111111111111111111111111111,,,,0,0,true,false,-1,-1,0,0,,TRASH_OBJECT,EXACT_BYTES
+sim-ms-pending-meta,MEDIASTORE_PENDING,content://media/external/images/media/103,simulated,,0,,,,METADATA_ONLY,0,0,false,false,-1,-1,0,0,,METADATA_ONLY,METADATA_ONLY
+sim-ms-stale,MEDIASTORE_STALE_RECORD,content://media/external/images/media/999,simulated,,0,,,,UNREADABLE,0,0,false,false,-1,-1,0,0,stale_row,METADATA_ONLY,FALSE_POSITIVE

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_app"
+    android:fitsSystemWindows="true"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:padding="@dimen/space_xl">
+
+    <ImageView
+        android:layout_width="140dp"
+        android:layout_height="140dp"
+        android:contentDescription="@string/recover_complete_title"
+        android:src="@drawable/ill_recover_success" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:paddingTop="@dimen/space_lg"
+        android:text="@string/recover_complete_title"
+        android:textColor="@color/text_primary"
+        android:textSize="@dimen/text_title"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/recover_complete_summary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:paddingTop="@dimen/space_md"
+        android:textColor="@color/text_secondary"
+        android:textSize="@dimen/text_body" />
+
+    <TextView
+        android:id="@+id/recover_complete_path"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:paddingTop="@dimen/space_sm"
+        android:textColor="@color/text_muted"
+        android:textSize="@dimen/text_caption" />
+
+    <Button
+        android:id="@+id/open_folder_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_xl"
+        android:background="@drawable/bg_button_primary"
+        android:text="@string/open_folder_button"
+        android:textAllCaps="false"
+        android:textColor="@android:color/white" />
+
+    <Button
+        android:id="@+id/back_results_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/space_sm"
+        android:background="@drawable/bg_button_secondary"
+        android:text="@string/back_to_results"
+        android:textAllCaps="false" />
+</LinearLayout>

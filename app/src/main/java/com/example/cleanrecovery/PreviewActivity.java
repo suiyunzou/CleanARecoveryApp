@@ -1,24 +1,20 @@
 package com.example.cleanrecovery;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.graphics.Bitmap;
-import android.graphics.Color;
 import android.graphics.SurfaceTexture;
-import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.Surface;
-import android.view.Gravity;
 import android.view.TextureView;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.ImageButton;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -27,6 +23,8 @@ import java.io.File;
 import java.text.DateFormat;
 import java.util.Date;
 import java.util.Locale;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public final class PreviewActivity extends Activity {
     public static final String EXTRA_PATH = "com.example.cleanrecovery.extra.PATH";
@@ -34,7 +32,16 @@ public final class PreviewActivity extends Activity {
     public static final String EXTRA_TYPE = "com.example.cleanrecovery.extra.TYPE";
     public static final String EXTRA_SUSPECTED_DELETED = "com.example.cleanrecovery.extra.SUSPECTED_DELETED";
 
-    private LinearLayout root;
+    private static final ExecutorService RECOVER_EXECUTOR = Executors.newSingleThreadExecutor();
+
+    private FrameLayout contentHost;
+    private TextView previewIndex;
+    private TextView previewFileName;
+    private TextView previewMeta;
+    private Button previewPrevButton;
+    private Button previewNextButton;
+    private Button previewRecoverButton;
+
     private MediaPlayer mediaPlayer;
     private Surface mediaSurface;
     private Button playbackButton;
@@ -44,34 +51,10 @@ public final class PreviewActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        buildBaseUi();
-
-        String path = getIntent().getStringExtra(EXTRA_PATH);
-        String name = getIntent().getStringExtra(EXTRA_NAME);
-        String typeName = getIntent().getStringExtra(EXTRA_TYPE);
-        boolean suspectedDeleted = getIntent().getBooleanExtra(EXTRA_SUSPECTED_DELETED, false);
-        File file = path == null ? null : new File(path);
-
-        if (name == null || name.length() == 0) {
-            name = file == null ? "" : file.getName();
-        }
-        RecoveryType type = parseType(typeName);
-
-        addHeader(name, file, suspectedDeleted);
-        if (file == null || !file.exists() || !file.canRead()) {
-            addMessage(getString(R.string.preview_missing));
-            return;
-        }
-
-        if (type == RecoveryType.IMAGE) {
-            addImagePreview(file);
-        } else if (type == RecoveryType.VIDEO) {
-            addVideoPreview(file);
-        } else if (type == RecoveryType.AUDIO) {
-            addAudioPreview(file);
-        } else {
-            addDocumentPreview(file);
-        }
+        SystemUiHelper.apply(this);
+        setContentView(R.layout.activity_preview);
+        bindChrome();
+        renderCurrentItem();
     }
 
     @Override
@@ -89,41 +72,128 @@ public final class PreviewActivity extends Activity {
         super.onDestroy();
     }
 
-    private void buildBaseUi() {
-        root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.rgb(246, 248, 250));
-        root.setPadding(dp(14), dp(14), dp(14), dp(14));
-        setContentView(root);
-    }
+    private void bindChrome() {
+        contentHost = findViewById(R.id.preview_content_host);
+        previewIndex = findViewById(R.id.preview_index);
+        previewFileName = findViewById(R.id.preview_file_name);
+        previewMeta = findViewById(R.id.preview_meta);
+        previewPrevButton = findViewById(R.id.preview_prev_button);
+        previewNextButton = findViewById(R.id.preview_next_button);
+        previewRecoverButton = findViewById(R.id.preview_recover_button);
+        ImageButton backButton = findViewById(R.id.preview_back_button);
 
-    private void addHeader(String name, File file, boolean suspectedDeleted) {
-        LinearLayout header = panel();
-        root.addView(header, matchWrapWithBottom(10));
-
-        TextView title = new TextView(this);
-        title.setText(name);
-        title.setTextSize(18f);
-        title.setTextColor(Color.rgb(20, 33, 43));
-        title.setTypeface(Typeface.DEFAULT_BOLD);
-        title.setSingleLine(false);
-        header.addView(title, matchWrap());
-
-        TextView meta = new TextView(this);
-        meta.setTextSize(12f);
-        meta.setTextColor(Color.rgb(82, 98, 109));
-        meta.setPadding(0, dp(6), 0, dp(8));
-        meta.setText(buildMeta(file, suspectedDeleted));
-        header.addView(meta, matchWrap());
-
-        Button closeButton = secondaryButton(R.string.preview_close);
-        closeButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                finish();
+        previewPrevButton.setOnClickListener(v -> {
+            if (PreviewSession.moveBy(-1)) {
+                renderCurrentItem();
             }
         });
-        header.addView(closeButton, matchWrap());
+        previewNextButton.setOnClickListener(v -> {
+            if (PreviewSession.moveBy(1)) {
+                renderCurrentItem();
+            }
+        });
+        backButton.setOnClickListener(v -> finish());
+        previewRecoverButton.setOnClickListener(v -> recoverCurrentItem());
+    }
+
+    private void renderCurrentItem() {
+        releasePlayer();
+        contentHost.removeAllViews();
+        playbackButton = null;
+        playbackStateView = null;
+
+        RecoveryItem item = PreviewSession.currentItem();
+        if (item == null) {
+            item = itemFromIntent();
+        }
+        if (item == null) {
+            finish();
+            return;
+        }
+
+        int total = PreviewSession.totalCount();
+        if (total > 0) {
+            previewIndex.setText(getString(R.string.preview_index_format, PreviewSession.currentIndex() + 1, total));
+            previewPrevButton.setEnabled(PreviewSession.currentIndex() > 0);
+            previewNextButton.setEnabled(PreviewSession.currentIndex() < total - 1);
+        } else {
+            previewIndex.setText("");
+            previewPrevButton.setEnabled(false);
+            previewNextButton.setEnabled(false);
+        }
+
+        File file = item.asFile();
+        previewFileName.setText(item.name);
+        previewMeta.setText(buildMeta(file, item.suspectedDeleted));
+
+        if (!file.exists() || !file.canRead()) {
+            addMessage(getString(R.string.preview_missing));
+            return;
+        }
+
+        if (item.type == RecoveryType.IMAGE) {
+            addImagePreview(file);
+        } else if (item.type == RecoveryType.VIDEO) {
+            addVideoPreview(file);
+        } else if (item.type == RecoveryType.AUDIO) {
+            addAudioPreview(file);
+        } else {
+            addDocumentPreview(file);
+        }
+    }
+
+    private RecoveryItem itemFromIntent() {
+        String path = getIntent().getStringExtra(EXTRA_PATH);
+        String name = getIntent().getStringExtra(EXTRA_NAME);
+        String typeName = getIntent().getStringExtra(EXTRA_TYPE);
+        boolean suspectedDeleted = getIntent().getBooleanExtra(EXTRA_SUSPECTED_DELETED, false);
+        if (path == null) {
+            return null;
+        }
+        if (name == null || name.isEmpty()) {
+            name = new File(path).getName();
+        }
+        RecoveryType type = parseType(typeName);
+        File file = new File(path);
+        return new RecoveryItem(type, name, path, file.length(), file.lastModified(), 0, 0, suspectedDeleted);
+    }
+
+    private void recoverCurrentItem() {
+        final RecoveryItem item = PreviewSession.currentItem() != null ? PreviewSession.currentItem() : itemFromIntent();
+        if (item == null) {
+            return;
+        }
+        previewRecoverButton.setEnabled(false);
+        RECOVER_EXECUTOR.execute(new Runnable() {
+            @Override
+            public void run() {
+                int success = 0;
+                int failed = 0;
+                File output = null;
+                try {
+                    output = RecoveryCopier.copyToRecoveryDirectory(PreviewActivity.this, item);
+                    success = 1;
+                } catch (Exception exception) {
+                    failed = 1;
+                }
+                final int finalSuccess = success;
+                final int finalFailed = failed;
+                final File finalOutput = output;
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        previewRecoverButton.setEnabled(true);
+                        Intent intent = new Intent(PreviewActivity.this, RecoverCompleteActivity.class);
+                        intent.putExtra(RecoverCompleteActivity.EXTRA_SUCCESS, finalSuccess);
+                        intent.putExtra(RecoverCompleteActivity.EXTRA_FAILED, finalFailed);
+                        intent.putExtra(RecoverCompleteActivity.EXTRA_OUTPUT_PATH, finalOutput == null
+                                ? RecoveryOutputPaths.primaryDisplayPath()
+                                : finalOutput.getParent());
+                        startActivity(intent);
+                    }
+                });
+            }
+        });
     }
 
     private String buildMeta(File file, boolean suspectedDeleted) {
@@ -141,45 +211,39 @@ public final class PreviewActivity extends Activity {
 
     private void addImagePreview(File file) {
         ImageView imageView = new ImageView(this);
-        imageView.setBackgroundColor(Color.BLACK);
         imageView.setAdjustViewBounds(true);
         imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
         imageView.setImageURI(Uri.fromFile(file));
-        root.addView(imageView, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                0,
-                1f
+        contentHost.addView(imageView, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
         ));
     }
 
     private void addVideoPreview(final File file) {
         FrameLayout previewFrame = new FrameLayout(this);
-        previewFrame.setBackgroundColor(Color.BLACK);
-
         final ImageView posterView = new ImageView(this);
-        posterView.setBackgroundColor(Color.BLACK);
         posterView.setScaleType(ImageView.ScaleType.FIT_CENTER);
         Bitmap poster = readVideoFrame(file);
         if (poster != null) {
             posterView.setImageBitmap(poster);
         }
         previewFrame.addView(posterView, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
         ));
 
         final TextureView textureView = new TextureView(this);
         textureView.setAlpha(0f);
         previewFrame.addView(textureView, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
         ));
-        root.addView(previewFrame, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                0,
-                1f
+        contentHost.addView(previewFrame, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
         ));
-        addPlaybackControls();
+        addPlaybackControlsToHost();
 
         textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
             @Override
@@ -204,17 +268,30 @@ public final class PreviewActivity extends Activity {
         });
     }
 
-    private void addAudioPreview(final File file) {
+    private void addAudioPreview(File file) {
         addMessage(getString(R.string.preview_audio_ready));
-        addPlaybackControls();
+        addPlaybackControlsToHost();
         prepareAudioPlayer(file);
+    }
+
+    private void addPlaybackControlsToHost() {
+        View controls = getLayoutInflater().inflate(R.layout.partial_preview_playback, contentHost, false);
+        playbackStateView = controls.findViewById(R.id.playback_state);
+        playbackButton = controls.findViewById(R.id.playback_button);
+        playbackButton.setEnabled(false);
+        playbackButton.setOnClickListener(v -> togglePlayback());
+        contentHost.addView(controls);
     }
 
     private void prepareVideoPlayer(File file, final TextureView textureView, final ImageView posterView) {
         releasePlayerOnly();
         mediaPrepared = false;
-        playbackButton.setEnabled(false);
-        playbackStateView.setText(R.string.preview_loading);
+        if (playbackButton != null) {
+            playbackButton.setEnabled(false);
+        }
+        if (playbackStateView != null) {
+            playbackStateView.setText(R.string.preview_loading);
+        }
 
         mediaPlayer = new MediaPlayer();
         try {
@@ -224,33 +301,13 @@ public final class PreviewActivity extends Activity {
             showPlaybackError();
             return;
         }
-
-        mediaPlayer.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+        bindPlayerCallbacks(new Runnable() {
             @Override
-            public void onPrepared(MediaPlayer mediaPlayer) {
-                mediaPrepared = true;
-                mediaPlayer.setLooping(false);
-                playbackButton.setEnabled(true);
+            public void run() {
                 textureView.setAlpha(1f);
                 posterView.setVisibility(View.GONE);
-                mediaPlayer.start();
-                updatePlaybackState(true);
             }
         });
-        mediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
-            @Override
-            public void onCompletion(MediaPlayer mediaPlayer) {
-                updatePlaybackState(false);
-            }
-        });
-        mediaPlayer.setOnErrorListener(new MediaPlayer.OnErrorListener() {
-            @Override
-            public boolean onError(MediaPlayer mediaPlayer, int what, int extra) {
-                showPlaybackError();
-                return true;
-            }
-        });
-
         try {
             mediaPlayer.prepareAsync();
         } catch (IllegalStateException exception) {
@@ -261,9 +318,12 @@ public final class PreviewActivity extends Activity {
     private void prepareAudioPlayer(File file) {
         releasePlayerOnly();
         mediaPrepared = false;
-        playbackButton.setEnabled(false);
-        playbackStateView.setText(R.string.preview_loading);
-
+        if (playbackButton != null) {
+            playbackButton.setEnabled(false);
+        }
+        if (playbackStateView != null) {
+            playbackStateView.setText(R.string.preview_loading);
+        }
         mediaPlayer = new MediaPlayer();
         try {
             mediaPlayer.setDataSource(file.getAbsolutePath());
@@ -271,14 +331,27 @@ public final class PreviewActivity extends Activity {
             showPlaybackError();
             return;
         }
+        bindPlayerCallbacks(null);
+        try {
+            mediaPlayer.prepareAsync();
+        } catch (IllegalStateException exception) {
+            showPlaybackError();
+        }
+    }
 
+    private void bindPlayerCallbacks(final Runnable onPreparedExtra) {
         mediaPlayer.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
             @Override
-            public void onPrepared(MediaPlayer mediaPlayer) {
+            public void onPrepared(MediaPlayer mp) {
                 mediaPrepared = true;
-                mediaPlayer.setLooping(false);
-                playbackButton.setEnabled(true);
-                mediaPlayer.start();
+                mp.setLooping(false);
+                if (playbackButton != null) {
+                    playbackButton.setEnabled(true);
+                }
+                if (onPreparedExtra != null) {
+                    onPreparedExtra.run();
+                }
+                mp.start();
                 updatePlaybackState(true);
             }
         });
@@ -295,35 +368,6 @@ public final class PreviewActivity extends Activity {
                 return true;
             }
         });
-
-        try {
-            mediaPlayer.prepareAsync();
-        } catch (IllegalStateException exception) {
-            showPlaybackError();
-        }
-    }
-
-    private void addPlaybackControls() {
-        LinearLayout controls = panel();
-        controls.setPadding(dp(12), dp(8), dp(12), dp(8));
-        root.addView(controls, matchWrapWithTop(10));
-
-        playbackStateView = new TextView(this);
-        playbackStateView.setText(R.string.preview_loading);
-        playbackStateView.setTextSize(12f);
-        playbackStateView.setTextColor(Color.rgb(82, 98, 109));
-        playbackStateView.setPadding(0, 0, 0, dp(6));
-        controls.addView(playbackStateView, matchWrap());
-
-        playbackButton = secondaryButton(R.string.preview_pause);
-        playbackButton.setEnabled(false);
-        playbackButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                togglePlayback();
-            }
-        });
-        controls.addView(playbackButton, matchWrap());
     }
 
     private void togglePlayback() {
@@ -370,8 +414,36 @@ public final class PreviewActivity extends Activity {
             try {
                 retriever.release();
             } catch (Exception ignored) {
-                // Ignore platform retriever cleanup failures.
             }
+        }
+    }
+
+    private void addDocumentPreview(File file) {
+        ScrollView scrollView = new ScrollView(this);
+        TextView message = new TextView(this);
+        message.setText(R.string.preview_document_message);
+        message.setTextColor(getResources().getColor(R.color.text_primary, getTheme()));
+        message.setPadding(0, 0, 0, dp(8));
+        scrollView.addView(message);
+        contentHost.addView(scrollView);
+    }
+
+    private void addMessage(String message) {
+        TextView textView = new TextView(this);
+        textView.setText(message);
+        textView.setTextColor(getResources().getColor(R.color.status_warning, getTheme()));
+        textView.setPadding(dp(16), dp(16), dp(16), dp(16));
+        contentHost.addView(textView);
+    }
+
+    private RecoveryType parseType(String typeName) {
+        if (typeName == null) {
+            return RecoveryType.DOCUMENT;
+        }
+        try {
+            return RecoveryType.valueOf(typeName);
+        } catch (IllegalArgumentException exception) {
+            return RecoveryType.DOCUMENT;
         }
     }
 
@@ -389,114 +461,10 @@ public final class PreviewActivity extends Activity {
             try {
                 mediaPlayer.stop();
             } catch (IllegalStateException ignored) {
-                // Player may not be prepared yet.
             }
             mediaPlayer.release();
             mediaPlayer = null;
         }
-    }
-
-    private void addDocumentPreview(File file) {
-        ScrollView scrollView = new ScrollView(this);
-        LinearLayout panel = panel();
-        scrollView.addView(panel, matchWrap());
-        TextView message = new TextView(this);
-        message.setText(R.string.preview_document_message);
-        message.setTextSize(14f);
-        message.setTextColor(Color.rgb(36, 50, 60));
-        message.setPadding(0, 0, 0, dp(8));
-        panel.addView(message, matchWrap());
-
-        TextView detail = new TextView(this);
-        detail.setText(file.getAbsolutePath());
-        detail.setTextSize(12f);
-        detail.setTextColor(Color.rgb(82, 98, 109));
-        detail.setSingleLine(false);
-        panel.addView(detail, matchWrap());
-
-        root.addView(scrollView, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-        ));
-    }
-
-    private void addMessage(String message) {
-        TextView textView = new TextView(this);
-        textView.setText(message);
-        textView.setTextSize(15f);
-        textView.setTextColor(Color.rgb(174, 89, 0));
-        textView.setGravity(Gravity.CENTER);
-        root.addView(textView, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-        ));
-    }
-
-    private RecoveryType parseType(String typeName) {
-        if (typeName == null) {
-            return RecoveryType.DOCUMENT;
-        }
-        try {
-            return RecoveryType.valueOf(typeName);
-        } catch (IllegalArgumentException exception) {
-            return RecoveryType.DOCUMENT;
-        }
-    }
-
-    private LinearLayout panel() {
-        LinearLayout panel = new LinearLayout(this);
-        panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(dp(12), dp(10), dp(12), dp(10));
-        panel.setBackground(panelBackground(Color.WHITE));
-        return panel;
-    }
-
-    private Button secondaryButton(int stringRes) {
-        Button button = new Button(this);
-        button.setText(stringRes);
-        button.setAllCaps(false);
-        button.setMinHeight(dp(42));
-        button.setTextSize(13f);
-        button.setTextColor(Color.rgb(0, 105, 92));
-        button.setBackground(buttonBackground(Color.WHITE, Color.rgb(192, 210, 207)));
-        return button;
-    }
-
-    private GradientDrawable panelBackground(int color) {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(color);
-        drawable.setCornerRadius(dp(8));
-        drawable.setStroke(1, Color.rgb(229, 234, 238));
-        return drawable;
-    }
-
-    private GradientDrawable buttonBackground(int fill, int stroke) {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(fill);
-        drawable.setCornerRadius(dp(8));
-        drawable.setStroke(1, stroke);
-        return drawable;
-    }
-
-    private LinearLayout.LayoutParams matchWrap() {
-        return new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-        );
-    }
-
-    private LinearLayout.LayoutParams matchWrapWithBottom(int bottomDp) {
-        LinearLayout.LayoutParams params = matchWrap();
-        params.setMargins(0, 0, 0, dp(bottomDp));
-        return params;
-    }
-
-    private LinearLayout.LayoutParams matchWrapWithTop(int topDp) {
-        LinearLayout.LayoutParams params = matchWrap();
-        params.setMargins(0, dp(topDp), 0, 0);
-        return params;
     }
 
     private int dp(int value) {

@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_app"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="@dimen/toolbar_height"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/space_sm"
+        android:paddingEnd="@dimen/space_md">
+
+        <ImageButton
+            android:id="@+id/preview_back_button"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_icon_button"
+            android:contentDescription="@string/button_back"
+            android:padding="12dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_back" />
+
+        <Button
+            android:id="@+id/preview_prev_button"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:layout_marginStart="@dimen/space_xs"
+            android:background="@drawable/bg_button_secondary"
+            android:text="@string/preview_prev"
+            android:textAllCaps="false"
+            android:textSize="@dimen/text_caption" />
+
+        <TextView
+            android:id="@+id/preview_index"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:textColor="@color/text_primary"
+            android:textSize="@dimen/text_body"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/preview_next_button"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:background="@drawable/bg_button_secondary"
+            android:text="@string/preview_next"
+            android:textAllCaps="false"
+            android:textSize="@dimen/text_caption" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/preview_content_host"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="@android:color/black" />
+
+    <LinearLayout
+        android:id="@+id/preview_meta_card"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_card"
+        android:orientation="vertical"
+        android:padding="@dimen/space_md">
+
+        <TextView
+            android:id="@+id/preview_file_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_primary"
+            android:textSize="@dimen/text_section"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/preview_meta"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="@dimen/space_sm"
+            android:textColor="@color/text_secondary"
+            android:textSize="@dimen/text_caption" />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/preview_recover_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="@dimen/space_md"
+        android:background="@drawable/bg_button_primary"
+        android:minHeight="@dimen/button_min_height"
+        android:text="@string/preview_recover_file"
+        android:textAllCaps="false"
+        android:textColor="@android:color/white" />
+</LinearLayout>
