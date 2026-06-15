@@ -20,27 +20,37 @@
         android:gravity="center"
         android:paddingTop="@dimen/space_lg"
         android:text="@string/recover_complete_title"
-        android:textColor="@color/text_primary"
+        android:textColor="@color/brand_primary"
         android:textSize="@dimen/text_title"
         android:textStyle="bold" />
 
-    <TextView
-        android:id="@+id/recover_complete_summary"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center"
-        android:paddingTop="@dimen/space_md"
-        android:textColor="@color/text_secondary"
-        android:textSize="@dimen/text_body" />
+        android:layout_marginTop="@dimen/space_md"
+        android:background="@drawable/bg_card"
+        android:elevation="@dimen/elevation_card"
+        android:orientation="vertical"
+        android:padding="@dimen/space_lg">
 
-    <TextView
-        android:id="@+id/recover_complete_path"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:paddingTop="@dimen/space_sm"
-        android:textColor="@color/text_muted"
-        android:textSize="@dimen/text_caption" />
+        <TextView
+            android:id="@+id/recover_complete_summary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:textColor="@color/text_secondary"
+            android:textSize="@dimen/text_body"
+            android:lineSpacingMultiplier="1.3" />
+
+        <TextView
+            android:id="@+id/recover_complete_path"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:paddingTop="@dimen/space_sm"
+            android:textColor="@color/text_muted"
+            android:textSize="@dimen/text_caption" />
+    </LinearLayout>
 
     <Button
         android:id="@+id/open_folder_button"
@@ -48,9 +58,10 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="@dimen/space_xl"
         android:background="@drawable/bg_button_primary"
+        android:minHeight="@dimen/button_min_height"
         android:text="@string/open_folder_button"
         android:textAllCaps="false"
-        android:textColor="@android:color/white" />
+        android:textColor="@color/text_on_primary" />
 
     <Button
         android:id="@+id/back_results_button"
@@ -58,6 +69,8 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="@dimen/space_sm"
         android:background="@drawable/bg_button_secondary"
+        android:minHeight="@dimen/button_min_height"
         android:text="@string/back_to_results"
-        android:textAllCaps="false" />
+        android:textAllCaps="false"
+        android:textColor="@color/brand_primary_dark" />
 </LinearLayout>

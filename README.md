@@ -1,6 +1,6 @@
-# Clean Recovery
+# Glimmer (微光)
 
-Non-root Android file recovery helper. The app recursively scans shared storage for still-accessible files and cache or residue artifacts left by other apps, then copies selected items into public `DataRecovery` folders.
+Non-root Android file recovery helper (**微光**). The app recursively scans shared storage for still-accessible files and cache or residue artifacts left by other apps, then gently copies selected items into public `DataRecovery` folders. Methods are transparent and user-controlled; it does not claim deleted-sector recovery.
 
 ## Non-goal
 

@@ -1,20 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="brand_primary">#00897B</color>
-    <color name="brand_primary_dark">#00695C</color>
-    <color name="brand_secondary">#26A69A</color>
-    <color name="background_app">#F6F8FA</color>
-    <color name="surface_card">#FFFFFF</color>
-    <color name="text_primary">#14212B</color>
-    <color name="text_secondary">#52626D</color>
-    <color name="text_muted">#5B6974</color>
-    <color name="border_subtle">#E5EAEE</color>
-    <color name="status_success">#007669</color>
-    <color name="status_warning">#AE5900</color>
-    <color name="badge_deleted_bg">#FFF3E0</color>
-    <color name="badge_deleted_text">#E65100</color>
-    <color name="badge_existing_bg">#ECEFF1</color>
-    <color name="badge_existing_text">#546E7A</color>
-    <color name="permission_banner_bg">#E0F2F1</color>
-    <color name="overlay_scrim">#99000000</color>
+    <!-- 拾光 · sage-teal primary with warm gold accent -->
+    <color name="brand_primary">#5A9A8F</color>
+    <color name="brand_primary_dark">#467A71</color>
+    <color name="brand_secondary">#7BB8A8</color>
+    <color name="brand_accent">#D4A853</color>
+    <color name="brand_accent_soft">#F0E4C8</color>
+    <color name="background_app">#FAF7F2</color>
+    <color name="surface_card">#FFFCF8</color>
+    <color name="text_primary">#3D3835</color>
+    <color name="text_secondary">#6B6560</color>
+    <color name="text_muted">#8A8380</color>
+    <color name="text_on_primary">#FFFFFF</color>
+    <color name="border_subtle">#E8E2D9</color>
+    <color name="status_success">#5A9A85</color>
+    <color name="status_warning">#A67C3D</color>
+    <color name="badge_deleted_bg">#F5EBD8</color>
+    <color name="badge_deleted_text">#8B6914</color>
+    <color name="badge_existing_bg">#EDEAE4</color>
+    <color name="badge_existing_text">#6B6560</color>
+    <color name="permission_banner_bg">#E8F0EC</color>
+    <color name="overlay_scrim">#803D3835</color>
+    <color name="preview_backdrop">#2C2A28</color>
 </resources>

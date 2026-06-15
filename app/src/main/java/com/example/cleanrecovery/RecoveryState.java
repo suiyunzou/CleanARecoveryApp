@@ -16,32 +16,20 @@ public final class RecoveryState {
     private final ArrayList<RecoveryItem> visibleItems = new ArrayList<>();
     private final RecoveryDeduper deduper = new RecoveryDeduper();
     private FilterMode currentFilter = FilterMode.ALL;
-    private boolean resultCapReached;
 
     public void clear() {
         allItems.clear();
         visibleItems.clear();
         deduper.clear();
-        resultCapReached = false;
     }
 
     public boolean addAll(Collection<RecoveryItem> items) {
         if (items == null || items.isEmpty()) {
             return false;
         }
-        int remaining = ScanLimits.remainingCapacity(allItems.size());
-        if (remaining <= 0) {
-            resultCapReached = true;
-            return false;
-        }
 
-        boolean truncated = items.size() > remaining;
         int added = 0;
         for (RecoveryItem item : items) {
-            if (added >= remaining) {
-                truncated = true;
-                break;
-            }
             if (deduper.isDuplicate(item)) {
                 continue;
             }
@@ -50,9 +38,6 @@ public final class RecoveryState {
                 visibleItems.add(item);
             }
             added++;
-        }
-        if (truncated) {
-            resultCapReached = true;
         }
         return added > 0;
     }
@@ -116,10 +101,6 @@ public final class RecoveryState {
         for (RecoveryItem item : visibleItems) {
             item.selected = selected;
         }
-    }
-
-    public boolean isResultCapReached() {
-        return resultCapReached;
     }
 
     public int getDuplicateSkipCount() {

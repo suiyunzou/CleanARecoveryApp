@@ -15,4 +15,12 @@ public enum RecoveryType {
         this.labelResId = labelResId;
         this.publicDirectory = publicDirectory;
     }
+
+    public static RecoveryType[] scannableValues() {
+        return values();
+    }
+
+    public static int scannableCount() {
+        return values().length;
+    }
 }

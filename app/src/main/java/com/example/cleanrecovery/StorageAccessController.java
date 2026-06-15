@@ -19,9 +19,13 @@ public final class StorageAccessController {
     }
 
     public boolean hasStorageAccess() {
+        return hasStorageAccess(activity);
+    }
+
+    public static boolean hasStorageAccess(android.content.Context context) {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
                 ? Environment.isExternalStorageManager()
-                : activity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
+                : context.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
                 == PackageManager.PERMISSION_GRANTED;
     }
 

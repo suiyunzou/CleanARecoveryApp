@@ -33,8 +33,19 @@ public final class ScanProgressTracker {
     private long startedAtMs;
     private long scanningStartedAtMs;
     private float smoothedEntriesPerMs;
+    private boolean multiTypeMode;
+    private int typeCount = 1;
+    private int currentTypeIndex;
 
     public void reset(int historicalEstimate) {
+        resetInternal(historicalEstimate, false, 1);
+    }
+
+    public void resetMultiType(int historicalEstimate, int typeCount) {
+        resetInternal(historicalEstimate, true, typeCount);
+    }
+
+    private void resetInternal(int historicalEstimate, boolean multiType, int typeCount) {
         this.historicalEstimate = Math.max(1, historicalEstimate);
         preparedTotal = 0;
         preparedCount = 0;
@@ -46,6 +57,37 @@ public final class ScanProgressTracker {
         phase = Phase.PREPARING;
         startedAtMs = System.currentTimeMillis();
         scanningStartedAtMs = 0L;
+        multiTypeMode = multiType;
+        this.typeCount = Math.max(1, typeCount);
+        currentTypeIndex = 0;
+    }
+
+    public void beginType(int typeIndex) {
+        if (!multiTypeMode) {
+            return;
+        }
+        currentTypeIndex = Math.max(0, Math.min(this.typeCount - 1, typeIndex));
+        scannedCount = 0;
+        mediastoreProcessed = 0;
+        cacheScanned = 0;
+        cacheTotal = 0;
+        smoothedEntriesPerMs = 0f;
+        if (preparedTotal > 0) {
+            phase = Phase.FILE_SCAN;
+            scanningStartedAtMs = System.currentTimeMillis();
+        }
+    }
+
+    public boolean isMultiTypeMode() {
+        return multiTypeMode;
+    }
+
+    public int getCurrentTypeIndex() {
+        return currentTypeIndex;
+    }
+
+    public int getTypeCount() {
+        return typeCount;
     }
 
     public void onPrepareProgress(int countedSoFar) {
@@ -64,6 +106,7 @@ public final class ScanProgressTracker {
         preparedCount = preparedTotal;
         phase = Phase.FILE_SCAN;
         scanningStartedAtMs = System.currentTimeMillis();
+        ScanDiagnostics.trackerEvent("onPrepared total=" + totalEntries);
     }
 
     public void onScanProgress(int scannedSoFar) {
@@ -90,6 +133,7 @@ public final class ScanProgressTracker {
         }
         phase = Phase.MEDIASTORE;
         mediastoreProcessed = 0;
+        ScanDiagnostics.trackerEvent("onMediaStorePhaseStart");
     }
 
     public void onMediaStoreProgress(int processedSoFar) {
@@ -107,6 +151,7 @@ public final class ScanProgressTracker {
         phase = Phase.CACHE;
         cacheTotal = Math.max(0, estimatedTotal);
         cacheScanned = 0;
+        ScanDiagnostics.trackerEvent("onCachePhaseStart estimatedTotal=" + estimatedTotal);
     }
 
     public void onCacheProgress(int scannedSoFar) {
@@ -125,6 +170,7 @@ public final class ScanProgressTracker {
     public void complete() {
         phase = Phase.COMPLETE;
         scannedCount = Math.max(scannedCount, preparedTotal);
+        ScanDiagnostics.trackerEvent("complete scanned=" + scannedCount);
     }
 
     public Phase getPhase() {
@@ -147,6 +193,18 @@ public final class ScanProgressTracker {
         if (phase == Phase.COMPLETE) {
             return 100;
         }
+        int singleTypePercent = getSingleTypeDisplayPercent();
+        if (!multiTypeMode || typeCount <= 1 || phase == Phase.PREPARING) {
+            return singleTypePercent;
+        }
+        int scanRange = SCANNING_CAP_PERCENT - FILE_SCAN_START_PERCENT;
+        float typeProgress = Math.max(0f, Math.min(1f,
+                (singleTypePercent - FILE_SCAN_START_PERCENT) / (float) scanRange));
+        int global = FILE_SCAN_START_PERCENT + Math.round((currentTypeIndex + typeProgress) / typeCount * scanRange);
+        return Math.max(FILE_SCAN_START_PERCENT, Math.min(SCANNING_CAP_PERCENT, global));
+    }
+
+    private int getSingleTypeDisplayPercent() {
         if (phase == Phase.PREPARING) {
             int estimate = Math.max(historicalEstimate, preparedCount + 1);
             float ratio = Math.min(1f, preparedCount / (float) estimate);
@@ -187,7 +245,9 @@ public final class ScanProgressTracker {
         if (elapsed < ETA_WARMUP_MS || scannedCount < ETA_MIN_SAMPLES || smoothedEntriesPerMs <= 0f) {
             return -1L;
         }
-        int remaining = Math.max(0, preparedTotal - scannedCount);
+        int remainingInType = Math.max(0, preparedTotal - scannedCount);
+        int remainingTypes = multiTypeMode ? Math.max(0, typeCount - currentTypeIndex - 1) : 0;
+        int remaining = remainingInType + remainingTypes * preparedTotal;
         if (remaining == 0) {
             return 0L;
         }

@@ -116,9 +116,9 @@ public final class RecoveryStateTest {
     }
 
     @Test
-    public void addAllStopsAtResultCap() {
+    public void addAllAcceptsLargeBatches() {
         RecoveryState state = new RecoveryState();
-        RecoveryItem[] items = new RecoveryItem[ScanLimits.MAX_RESULTS + 5];
+        RecoveryItem[] items = new RecoveryItem[10_005];
         for (int index = 0; index < items.length; index++) {
             items[index] = new RecoveryItem(
                     RecoveryType.IMAGE,
@@ -134,7 +134,6 @@ public final class RecoveryStateTest {
 
         state.addAll(Arrays.asList(items));
 
-        assertEquals(ScanLimits.MAX_RESULTS, state.getAllCount());
-        assertTrue(state.isResultCapReached());
+        assertEquals(items.length, state.getAllCount());
     }
 }

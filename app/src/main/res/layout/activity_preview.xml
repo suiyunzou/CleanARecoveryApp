@@ -33,6 +33,7 @@
             android:background="@drawable/bg_button_secondary"
             android:text="@string/preview_prev"
             android:textAllCaps="false"
+            android:textColor="@color/brand_primary_dark"
             android:textSize="@dimen/text_caption" />
 
         <TextView
@@ -52,6 +53,7 @@
             android:background="@drawable/bg_button_secondary"
             android:text="@string/preview_next"
             android:textAllCaps="false"
+            android:textColor="@color/brand_primary_dark"
             android:textSize="@dimen/text_caption" />
     </LinearLayout>
 
@@ -59,14 +61,19 @@
         android:id="@+id/preview_content_host"
         android:layout_width="match_parent"
         android:layout_height="0dp"
+        android:layout_marginStart="@dimen/space_md"
+        android:layout_marginEnd="@dimen/space_md"
         android:layout_weight="1"
-        android:background="@android:color/black" />
+        android:background="@color/preview_backdrop"
+        android:clipToOutline="true" />
 
     <LinearLayout
         android:id="@+id/preview_meta_card"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_margin="@dimen/space_md"
         android:background="@drawable/bg_card"
+        android:elevation="@dimen/elevation_card"
         android:orientation="vertical"
         android:padding="@dimen/space_md">
 
@@ -91,10 +98,12 @@
         android:id="@+id/preview_recover_button"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="@dimen/space_md"
+        android:layout_marginStart="@dimen/space_md"
+        android:layout_marginEnd="@dimen/space_md"
+        android:layout_marginBottom="@dimen/space_md"
         android:background="@drawable/bg_button_primary"
         android:minHeight="@dimen/button_min_height"
         android:text="@string/preview_recover_file"
         android:textAllCaps="false"
-        android:textColor="@android:color/white" />
+        android:textColor="@color/text_on_primary" />
 </LinearLayout>

@@ -58,11 +58,30 @@ public final class ScanProgressTrackerTest {
     }
 
     @Test
-    public void etaRequiresWarmupSamples() {
+    public void multiTypeProgressSpansAllTypes() {
         ScanProgressTracker tracker = new ScanProgressTracker();
-        tracker.reset(10_000);
-        tracker.onPrepared(10_000);
-        tracker.onScanProgress(10);
-        assertEquals(-1L, tracker.getEstimatedRemainingMs());
+        tracker.resetMultiType(1_000, 4);
+        tracker.onPrepared(1_000);
+        tracker.beginType(0);
+        tracker.onFileScanProgress(500);
+        int firstTypeMid = tracker.getDisplayPercent();
+        assertTrue(firstTypeMid >= 10 && firstTypeMid <= 15);
+
+        tracker.beginType(2);
+        tracker.onFileScanProgress(500);
+        int thirdTypeMid = tracker.getDisplayPercent();
+        assertTrue(thirdTypeMid >= 55 && thirdTypeMid <= 60);
+    }
+
+    @Test
+    public void multiTypeCompleteShowsOneHundred() {
+        ScanProgressTracker tracker = new ScanProgressTracker();
+        tracker.resetMultiType(1_000, 4);
+        tracker.onPrepared(1_000);
+        tracker.beginType(3);
+        tracker.onFileScanProgress(1_000);
+        assertTrue(tracker.getDisplayPercent() <= 99);
+        tracker.complete();
+        assertEquals(100, tracker.getDisplayPercent());
     }
 }
