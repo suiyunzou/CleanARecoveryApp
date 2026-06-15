@@ -121,7 +121,7 @@ public final class FileBrowserActivity extends Activity {
         listView.setAdapter(adapter);
 
         selectButton = findViewById(R.id.file_browser_select);
-        findViewById(R.id.file_browser_back).setOnClickListener(v -> onBackPressed());
+        findViewById(R.id.file_browser_back).setOnClickListener(v -> finish());
         findViewById(R.id.file_browser_up).setOnClickListener(v -> navigateUp());
         selectButton.setOnClickListener(v -> toggleMultiSelectMode());
         findViewById(R.id.file_browser_menu).setOnClickListener(this::showToolbarMenu);
