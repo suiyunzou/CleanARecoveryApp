@@ -34,6 +34,10 @@ public final class FakeCoordinatorAlgorithms {
             }
 
             @Override
+            public void onAlgorithmEvent(AlgorithmEvent event) {
+            }
+
+            @Override
             public int getDuplicateCount() {
                 return 0;
             }

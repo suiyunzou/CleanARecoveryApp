@@ -12,7 +12,7 @@
                 <corners android:radius="10dp" />
                 <gradient
                     android:angle="0"
-                    android:endColor="@color/brand_accent"
+                    android:endColor="@color/brand_secondary"
                     android:startColor="@color/brand_primary" />
             </shape>
         </clip>

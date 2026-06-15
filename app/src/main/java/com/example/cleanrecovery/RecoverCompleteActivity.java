@@ -6,7 +6,8 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
-import android.widget.Toast;
+
+import java.io.File;
 
 public final class RecoverCompleteActivity extends Activity {
     public static final String EXTRA_SUCCESS = "com.example.cleanrecovery.extra.SUCCESS";
@@ -21,10 +22,10 @@ public final class RecoverCompleteActivity extends Activity {
 
         int success = getIntent().getIntExtra(EXTRA_SUCCESS, 0);
         int failed = getIntent().getIntExtra(EXTRA_FAILED, 0);
-        String outputPath = getIntent().getStringExtra(EXTRA_OUTPUT_PATH);
-        if (outputPath == null || outputPath.isEmpty()) {
-            outputPath = RecoveryOutputPaths.primaryDisplayPath();
-        }
+        String outputPathExtra = getIntent().getStringExtra(EXTRA_OUTPUT_PATH);
+        final String outputPath = (outputPathExtra == null || outputPathExtra.isEmpty())
+                ? RecoveryOutputPaths.primaryDisplayPath()
+                : outputPathExtra;
 
         TextView summary = findViewById(R.id.recover_complete_summary);
         summary.setText(getString(R.string.recover_done_status, success, failed, ""));
@@ -36,10 +37,7 @@ public final class RecoverCompleteActivity extends Activity {
         openFolder.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                boolean opened = RecoveryOutputPaths.openPrimaryFolder(RecoverCompleteActivity.this);
-                if (!opened) {
-                    Toast.makeText(RecoverCompleteActivity.this, R.string.folder_open_failed, Toast.LENGTH_LONG).show();
-                }
+                FileBrowserActivity.open(RecoverCompleteActivity.this, new File(outputPath));
             }
         });
 

@@ -4,6 +4,8 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 
+import com.example.cleanrecovery.algorithm.AlgorithmEvent;
+
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class ScanSelfTestReceiver extends BroadcastReceiver {
@@ -64,6 +66,14 @@ public final class ScanSelfTestReceiver extends BroadcastReceiver {
 
         @Override
         public void onProgress(int scannedCount, int foundCount, String currentPath) {
+        }
+
+        @Override
+        public void onAlgorithmEvent(AlgorithmEvent event) {
+        }
+
+        @Override
+        public void onAlgorithmProgress(String algorithmId, int processed, int found) {
         }
 
         @Override

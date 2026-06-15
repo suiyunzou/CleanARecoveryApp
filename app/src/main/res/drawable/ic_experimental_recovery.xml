@@ -5,15 +5,24 @@
     android:viewportWidth="32"
     android:viewportHeight="32">
     <path
-        android:fillColor="@color/brand_accent"
-        android:pathData="M16,3 L25,7 L24,15 C23,22 20,26 16,29 C12,26 9,22 8,15 L7,7 Z" />
+        android:fillColor="#14B8A6"
+        android:pathData="M6,12 L14,8 L26,8 Q28,8 28,10 L28,22 Q28,24 26,24 L6,24 Q4,24 4,22 L4,14 Q4,12 6,12 Z" />
     <path
-        android:fillColor="@color/surface_card"
-        android:pathData="M12,11 L20,11 Q22,11 22,13 L22,20 Q22,22 20,22 L12,22 Q10,22 10,20 L10,13 Q10,11 12,11 Z" />
+        android:fillColor="#0EA5A0"
+        android:pathData="M4,14 L4,10 Q4,8 6,8 L14,8 L16,6 L26,6 Q28,6 28,8 L28,12 L4,14 Z" />
     <path
-        android:fillColor="@color/brand_primary"
-        android:pathData="M11,19 Q14,15 17,18 Q19,20 21,16 L21,21 L11,21 Z" />
+        android:fillColor="#FFFFFF"
+        android:pathData="M16,13m-5,0a5,5 0,1 1,10 0a5,5 0,1 1,-10 0" />
     <path
-        android:fillColor="@color/brand_secondary"
-        android:pathData="M15,14m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0" />
+        android:fillColor="#14B8A6"
+        android:pathData="M16,10 L18,12 L17,12 Q17,15 15,16 Q13,17 11,16 L10,17 Q12,19 15,18 Q18,17 19,15 Q20,13 19,11 L20,11 L18,9 L16,10 Z" />
+    <path
+        android:fillColor="#14B8A6"
+        android:pathData="M16,18 L14,16 L15,16 Q15,13 17,12 Q19,11 21,12 L22,11 Q20,9 17,10 Q14,11 13,13 Q12,15 13,17 L12,17 L14,19 L16,18 Z" />
+    <path
+        android:fillColor="#F97316"
+        android:pathData="M20,4 L26,4 Q27,4 27,5 L27,9 Q27,10 26,10 L20,10 Q19,10 19,9 L19,5 Q19,4 20,4 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M21,5.5 L25,7.5 L21,9.5 Z" />
 </vector>

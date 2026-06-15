@@ -5,6 +5,7 @@ import android.os.Handler;
 import android.os.Looper;
 
 import com.example.cleanrecovery.algorithm.AlgorithmContext;
+import com.example.cleanrecovery.algorithm.AlgorithmEvent;
 import com.example.cleanrecovery.algorithm.AlgorithmRunner;
 import com.example.cleanrecovery.algorithm.CacheProfileAlgorithm;
 import com.example.cleanrecovery.algorithm.MediaStoreIndexTrashAlgorithm;
@@ -28,6 +29,8 @@ public final class RecoveryCoordinator {
         void onScanPhaseChanged(ScanProgressTracker.Phase phase);
         void onPhaseProgress(ScanProgressTracker.Phase phase, int processedCount);
         void onProgress(int scannedCount, int foundCount, String currentPath);
+        void onAlgorithmEvent(AlgorithmEvent event);
+        void onAlgorithmProgress(String algorithmId, int processed, int found);
         void onItemsBatch(List<RecoveryItem> items);
         void onScanComplete(int scannedCount, int foundCount);
         void onRecoverProgress(int successCount, int failedCount);
@@ -163,6 +166,8 @@ public final class RecoveryCoordinator {
     ) {
         final AlgorithmContext algorithmContext = new AlgorithmContext(context, type);
         final PhaseTracker phaseTracker = new PhaseTracker(type);
+        final String[] currentAlgorithmId = {null};
+        final int[] foundAtAlgorithmStart = {0};
         algorithmRunner.run(scanMode, type, algorithmContext, new AlgorithmRunner.Delegate() {
             @Override
             public boolean isCancelled() {
@@ -202,6 +207,13 @@ public final class RecoveryCoordinator {
             @Override
             public void onProgress(int processed, String currentPath, ScanProgressTracker.Phase phase) {
                 phaseTracker.updateProcessed(processed);
+                if (currentAlgorithmId[0] != null && scanMode == ScanMode.EXPERIMENTAL_ALL) {
+                    postAlgorithmProgress(
+                            currentAlgorithmId[0],
+                            processed,
+                            session.foundCount - foundAtAlgorithmStart[0]
+                    );
+                }
                 if (phase == ScanProgressTracker.Phase.FILE_SCAN) {
                     session.scannedCount = processed;
                 } else if (phase == ScanProgressTracker.Phase.MEDIASTORE) {
@@ -221,6 +233,21 @@ public final class RecoveryCoordinator {
             @Override
             public int getDuplicateCount() {
                 return deduper.getDuplicateCount();
+            }
+
+            @Override
+            public void onAlgorithmEvent(AlgorithmEvent event) {
+                if (event.kind == AlgorithmEvent.Kind.ALGORITHM_START) {
+                    currentAlgorithmId[0] = event.algorithmId;
+                    foundAtAlgorithmStart[0] = session.foundCount;
+                } else if (event.kind == AlgorithmEvent.Kind.ALGORITHM_END
+                        || event.kind == AlgorithmEvent.Kind.ALGORITHM_SKIPPED
+                        || event.kind == AlgorithmEvent.Kind.ALGORITHM_ERROR) {
+                    currentAlgorithmId[0] = null;
+                }
+                if (scanMode == ScanMode.EXPERIMENTAL_ALL) {
+                    postAlgorithmEvent(event);
+                }
             }
         });
         phaseTracker.closeOpenPhase(session);
@@ -387,6 +414,24 @@ public final class RecoveryCoordinator {
             @Override
             public void run() {
                 callback.onWorkingChanged(working);
+            }
+        });
+    }
+
+    private void postAlgorithmEvent(final AlgorithmEvent event) {
+        mainHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                callback.onAlgorithmEvent(event);
+            }
+        });
+    }
+
+    private void postAlgorithmProgress(final String algorithmId, final int processed, final int found) {
+        mainHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                callback.onAlgorithmProgress(algorithmId, processed, found);
             }
         });
     }

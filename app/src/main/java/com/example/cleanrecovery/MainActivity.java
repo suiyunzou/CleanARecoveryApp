@@ -20,7 +20,13 @@ import android.widget.Toast;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.example.cleanrecovery.algorithm.AlgorithmEvent;
+import com.example.cleanrecovery.algorithm.AlgorithmRegistry;
+import com.example.cleanrecovery.algorithm.RecoveryAlgorithm;
+import com.example.cleanrecovery.algorithm.ScanMode;
+
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
 
 public final class MainActivity extends Activity {
@@ -62,6 +68,7 @@ public final class MainActivity extends Activity {
     private TextView resultsCount;
     private TextView selectedCount;
     private View resultsEmpty;
+    private TextView resultsEmptyMessage;
     private RecyclerView resultsGrid;
     private Button filterAllButton;
     private Button filterExistingButton;
@@ -75,8 +82,12 @@ public final class MainActivity extends Activity {
     private TextView navResultsLabel;
     private TextView navFolderLabel;
     private TextView navAboutLabel;
+    private View algorithmLogContainer;
+    private RecyclerView algorithmLogList;
+    private AlgorithmStepAdapter algorithmStepAdapter;
 
     private String scanCurrentPathValue = "";
+    private String runningAlgorithmId;
 
     private final Runnable progressTick = new Runnable() {
         @Override
@@ -99,6 +110,7 @@ public final class MainActivity extends Activity {
         bindViews();
         bindCategoryCards();
         bindActions();
+        restoreResultsSessionIfNeeded();
         refreshHome();
         maybeLaunchOnboarding();
         updateBottomNav(Panel.HOME);
@@ -167,6 +179,7 @@ public final class MainActivity extends Activity {
         resultsCount = findViewById(R.id.results_count);
         selectedCount = findViewById(R.id.selected_count);
         resultsEmpty = findViewById(R.id.results_empty);
+        resultsEmptyMessage = findViewById(R.id.results_empty_message);
         resultsGrid = findViewById(R.id.results_grid);
         filterAllButton = findViewById(R.id.filter_all_button);
         filterExistingButton = findViewById(R.id.filter_existing_button);
@@ -180,6 +193,11 @@ public final class MainActivity extends Activity {
         navResultsLabel = findViewById(R.id.nav_results_label);
         navFolderLabel = findViewById(R.id.nav_folder_label);
         navAboutLabel = findViewById(R.id.nav_about_label);
+        algorithmLogContainer = findViewById(R.id.algorithm_log_container);
+        algorithmLogList = findViewById(R.id.algorithm_log_list);
+        algorithmStepAdapter = new AlgorithmStepAdapter(this);
+        algorithmLogList.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this));
+        algorithmLogList.setAdapter(algorithmStepAdapter);
 
         gridAdapter = new RecoveryGridAdapter(this, recoveryState.getVisibleItems(), new RecoveryGridAdapter.Listener() {
             @Override
@@ -197,17 +215,18 @@ public final class MainActivity extends Activity {
     }
 
     private void bindCategoryCards() {
-        setupCategoryCard(findViewById(R.id.card_images), RecoveryType.IMAGE, R.drawable.ic_type_image);
-        setupCategoryCard(findViewById(R.id.card_videos), RecoveryType.VIDEO, R.drawable.ic_type_video);
-        setupCategoryCard(findViewById(R.id.card_audio), RecoveryType.AUDIO, R.drawable.ic_type_audio);
-        setupCategoryCard(findViewById(R.id.card_documents), RecoveryType.DOCUMENT, R.drawable.ic_type_document);
+        setupCategoryCard(findViewById(R.id.card_images), RecoveryType.IMAGE, R.drawable.ic_type_image, R.color.accent_image);
+        setupCategoryCard(findViewById(R.id.card_videos), RecoveryType.VIDEO, R.drawable.ic_type_video, R.color.accent_video);
+        setupCategoryCard(findViewById(R.id.card_audio), RecoveryType.AUDIO, R.drawable.ic_type_audio, R.color.accent_audio);
+        setupCategoryCard(findViewById(R.id.card_documents), RecoveryType.DOCUMENT, R.drawable.ic_type_document, R.color.accent_document);
     }
 
-    private void setupCategoryCard(View card, final RecoveryType type, int iconResId) {
+    private void setupCategoryCard(View card, final RecoveryType type, int iconResId, int accentColorRes) {
         ImageView icon = card.findViewById(R.id.category_icon);
         TextView title = card.findViewById(R.id.category_title);
         title.setText(type.labelResId);
         icon.setImageResource(iconResId);
+        icon.setBackgroundTintList(android.content.res.ColorStateList.valueOf(resolveColorRes(accentColorRes)));
         card.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -230,18 +249,6 @@ public final class MainActivity extends Activity {
             public void onClick(View view) {
                 performLightHaptic(view);
                 showExperimentalTypePicker();
-            }
-        });
-        findViewById(R.id.home_settings_button).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                startActivity(new Intent(MainActivity.this, AboutActivity.class));
-            }
-        });
-        findViewById(R.id.open_output_button).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                openRecoveryFolder();
             }
         });
         permissionBanner.setOnClickListener(new View.OnClickListener() {
@@ -273,10 +280,7 @@ public final class MainActivity extends Activity {
             }
         });
         findViewById(R.id.nav_home).setOnClickListener(v -> showPanel(Panel.HOME));
-        findViewById(R.id.nav_results).setOnClickListener(v -> {
-            showPanel(Panel.RESULTS);
-            updateCounters();
-        });
+        findViewById(R.id.nav_results).setOnClickListener(v -> openResultsTab());
         findViewById(R.id.nav_folder).setOnClickListener(v -> openRecoveryFolder());
         findViewById(R.id.nav_about).setOnClickListener(v ->
                 startActivity(new Intent(MainActivity.this, AboutActivity.class)));
@@ -322,9 +326,8 @@ public final class MainActivity extends Activity {
                     DateUtils.MINUTE_IN_MILLIS
             );
             lastScanSummary.setText(getString(
-                    R.string.last_scan_summary,
+                    R.string.last_scan_compact,
                     when,
-                    snapshot.lastScannedCount,
                     snapshot.lastFoundCount
             ));
         } else {
@@ -354,9 +357,10 @@ public final class MainActivity extends Activity {
         boolean granted = storageAccessController.hasStorageAccess();
         permissionBannerTitle.setText(granted ? R.string.storage_access_granted : R.string.storage_access_missing);
         permissionBannerTitle.setTextColor(resolveColorRes(granted ? R.color.status_success : R.color.status_warning));
-        permissionBannerAction.setText(granted
-                ? R.string.trust_non_destructive
-                : R.string.button_grant_access);
+        permissionBannerAction.setVisibility(granted ? View.GONE : View.VISIBLE);
+        if (!granted) {
+            permissionBannerAction.setText(R.string.button_grant_access);
+        }
     }
 
     private void startScan(RecoveryType type) {
@@ -379,11 +383,24 @@ public final class MainActivity extends Activity {
         }
         new AlertDialog.Builder(this)
                 .setTitle(R.string.experimental_scan_title)
-                .setMessage(R.string.experimental_scan_warning)
                 .setItems(labels, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        startExperimentalScan(types[which]);
+                        showExperimentalConfirmDialog(types[which]);
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void showExperimentalConfirmDialog(final RecoveryType type) {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.experimental_scan_title)
+                .setMessage(R.string.experimental_scan_warning)
+                .setPositiveButton(R.string.experimental_scan_confirm, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        startExperimentalScan(type);
                     }
                 })
                 .setNegativeButton(android.R.string.cancel, null)
@@ -402,6 +419,7 @@ public final class MainActivity extends Activity {
         scanAllMode = allTypes;
         experimentalMode = experimental;
         currentScanType = type;
+        RecoveryResultsSession.clear();
         recoveryState.clear();
         gridAdapter.notifyDataSetChanged();
         ScanHistoryStore.Snapshot history = ScanHistoryStore.read(this);
@@ -418,6 +436,13 @@ public final class MainActivity extends Activity {
         pathExpanded = false;
         scanCurrentPath.setVisibility(View.GONE);
         scanPathToggle.setText(R.string.show_current_path);
+        algorithmLogContainer.setVisibility(experimental ? View.VISIBLE : View.GONE);
+        if (experimental && type != null) {
+            prepareExperimentalAlgorithmLog(type);
+        } else {
+            algorithmStepAdapter.setRows(new ArrayList<AlgorithmStepAdapter.Row>());
+            runningAlgorithmId = null;
+        }
         if (allTypes) {
             scanTitle.setText(R.string.scan_status_all);
         } else if (experimental) {
@@ -462,10 +487,27 @@ public final class MainActivity extends Activity {
     }
 
     private void openRecoveryFolder() {
-        boolean opened = RecoveryOutputPaths.openPrimaryFolder(this);
-        if (!opened) {
-            Toast.makeText(this, R.string.folder_open_failed, Toast.LENGTH_LONG).show();
+        FileBrowserActivity.open(this, RecoveryOutputPaths.primaryDataRecoveryDir());
+    }
+
+    private void openResultsTab() {
+        restoreResultsSessionIfNeeded();
+        showPanel(Panel.RESULTS);
+        styleFilterTabs();
+        gridAdapter.notifyDataSetChanged();
+        updateCounters();
+    }
+
+    private void restoreResultsSessionIfNeeded() {
+        if (recoveryState.getAllCount() > 0 || !RecoveryResultsSession.hasResults()) {
+            return;
         }
+        RecoveryResultsSession.restoreTo(recoveryState);
+        scanAllMode = RecoveryResultsSession.isScanAllMode();
+        experimentalMode = RecoveryResultsSession.isExperimentalMode();
+        currentScanType = RecoveryResultsSession.getScanType();
+        lastScannedCount = RecoveryResultsSession.getScannedCount();
+        lastFoundCount = RecoveryResultsSession.getFoundCount();
     }
 
     private void setFilter(RecoveryState.FilterMode mode) {
@@ -499,6 +541,14 @@ public final class MainActivity extends Activity {
         boolean empty = recoveryState.getVisibleCount() == 0;
         resultsEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
         resultsGrid.setVisibility(empty ? View.GONE : View.VISIBLE);
+        if (empty) {
+            boolean neverScanned = !RecoveryResultsSession.hasResults()
+                    && !ScanHistoryStore.read(this).hasScanHistory();
+            resultsEmptyMessage.setText(neverScanned
+                    ? R.string.results_empty_never_scanned
+                    : R.string.empty_results_title);
+            findViewById(R.id.rescan_button).setVisibility(neverScanned ? View.GONE : View.VISIBLE);
+        }
     }
 
     private void persistScanHistory() {
@@ -526,6 +576,71 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private void prepareExperimentalAlgorithmLog(RecoveryType type) {
+        ArrayList<AlgorithmStepAdapter.Row> rows = new ArrayList<>();
+        List<RecoveryAlgorithm> algorithms = AlgorithmRegistry.runnableForMode(ScanMode.EXPERIMENTAL_ALL, type);
+        for (RecoveryAlgorithm algorithm : algorithms) {
+            rows.add(new AlgorithmStepAdapter.Row(algorithm.id()));
+        }
+        algorithmStepAdapter.setRows(rows);
+        runningAlgorithmId = null;
+    }
+
+    private void handleAlgorithmEvent(AlgorithmEvent event) {
+        if (!experimentalMode) {
+            return;
+        }
+        AlgorithmStepAdapter.Row row = algorithmStepAdapter.findRow(event.algorithmId);
+        if (row == null) {
+            row = new AlgorithmStepAdapter.Row(event.algorithmId);
+        }
+        switch (event.kind) {
+            case ALGORITHM_START:
+                row.status = AlgorithmStepAdapter.Status.RUNNING;
+                row.processed = 0;
+                row.found = 0;
+                row.durationMs = 0L;
+                runningAlgorithmId = event.algorithmId;
+                break;
+            case ALGORITHM_END:
+                row.status = AlgorithmStepAdapter.Status.COMPLETED;
+                row.processed = event.processed;
+                row.found = event.found;
+                row.durationMs = event.durationMs;
+                runningAlgorithmId = null;
+                break;
+            case ALGORITHM_SKIPPED:
+                row.status = AlgorithmStepAdapter.Status.SKIPPED;
+                row.reason = event.reason;
+                break;
+            case ALGORITHM_ERROR:
+                row.status = AlgorithmStepAdapter.Status.ERROR;
+                row.reason = event.reason;
+                runningAlgorithmId = null;
+                break;
+            default:
+                break;
+        }
+        algorithmStepAdapter.upsertRow(row);
+        if (algorithmLogList.getAdapter() != null && algorithmLogList.getAdapter().getItemCount() > 0) {
+            algorithmLogList.smoothScrollToPosition(algorithmStepAdapter.getItemCount() - 1);
+        }
+    }
+
+    private void handleAlgorithmProgress(String algorithmId, int processed, int found) {
+        if (!experimentalMode || runningAlgorithmId == null) {
+            return;
+        }
+        AlgorithmStepAdapter.Row row = algorithmStepAdapter.findRow(runningAlgorithmId);
+        if (row == null) {
+            return;
+        }
+        row.processed = processed;
+        row.found = found;
+        row.status = AlgorithmStepAdapter.Status.RUNNING;
+        algorithmStepAdapter.upsertRow(row);
+    }
+
     private void finishScanUi(int scannedCount, int foundCount) {
         if (!scanAllMode) {
             scanProgressTracker.onScanProgress(scannedCount);
@@ -533,6 +648,14 @@ public final class MainActivity extends Activity {
         scanProgressTracker.complete();
         lastScannedCount = scannedCount;
         lastFoundCount = foundCount;
+        RecoveryResultsSession.saveFrom(
+                recoveryState,
+                currentScanType,
+                scanAllMode,
+                experimentalMode,
+                scannedCount,
+                foundCount
+        );
         updateScanProgressUi();
         scanStats.setText(getString(R.string.scan_stats_format, scannedCount, foundCount));
         progressHandler.removeCallbacks(progressTick);
@@ -617,10 +740,6 @@ public final class MainActivity extends Activity {
         scanPanel.setVisibility(panel == Panel.SCAN ? View.VISIBLE : View.GONE);
         resultsPanel.setVisibility(panel == Panel.RESULTS ? View.VISIBLE : View.GONE);
         updateBottomNav(panel);
-    }
-
-    private boolean hasScanResults() {
-        return recoveryState.getAllCount() > 0;
     }
 
     private void updateBottomNav(Panel panel) {
@@ -720,6 +839,16 @@ public final class MainActivity extends Activity {
                 if (pathExpanded) {
                     scanCurrentPath.setText(currentPath);
                 }
+            }
+
+            @Override
+            public void onAlgorithmEvent(AlgorithmEvent event) {
+                handleAlgorithmEvent(event);
+            }
+
+            @Override
+            public void onAlgorithmProgress(String algorithmId, int processed, int found) {
+                handleAlgorithmProgress(algorithmId, processed, found);
             }
 
             @Override

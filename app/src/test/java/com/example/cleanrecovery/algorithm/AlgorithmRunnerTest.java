@@ -55,6 +55,10 @@ public final class AlgorithmRunnerTest {
             }
 
             @Override
+            public void onAlgorithmEvent(AlgorithmEvent event) {
+            }
+
+            @Override
             public int getDuplicateCount() {
                 return 0;
             }

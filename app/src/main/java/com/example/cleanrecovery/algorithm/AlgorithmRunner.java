@@ -18,6 +18,8 @@ public final class AlgorithmRunner {
 
         void onProgress(int processed, String currentPath, ScanProgressTracker.Phase phase);
 
+        void onAlgorithmEvent(AlgorithmEvent event);
+
         int getDuplicateCount();
     }
 
@@ -46,11 +48,13 @@ public final class AlgorithmRunner {
             if (!availability.isRunnable()) {
                 String reason = skipReason(availability);
                 ScanDiagnostics.algorithmSkipped(algorithm.id(), reason);
+                delegate.onAlgorithmEvent(AlgorithmEvent.algorithmSkipped(algorithm.id(), reason));
                 continue;
             }
             ScanProgressTracker.Phase phase = delegate.phaseForAlgorithm(algorithm.id());
             delegate.onAlgorithmPhase(phase);
             ScanDiagnostics.algorithmStart(algorithm.id(), type);
+            delegate.onAlgorithmEvent(AlgorithmEvent.algorithmStart(algorithm.id()));
             long startedAt = System.currentTimeMillis();
             final int[] processed = {0};
             final int[] found = {0};
@@ -75,23 +79,35 @@ public final class AlgorithmRunner {
 
                 @Override
                 public void onAlgorithmEvent(AlgorithmEvent event) {
-                    // Coordinator logs algorithm lifecycle directly.
+                    delegate.onAlgorithmEvent(event);
                 }
             };
             try {
                 algorithm.scan(context, callback);
                 int duplicatesSkipped = delegate.getDuplicateCount() - duplicatesAtStart;
+                long durationMs = System.currentTimeMillis() - startedAt;
                 ScanDiagnostics.algorithmEnd(
                         algorithm.id(),
                         type,
-                        System.currentTimeMillis() - startedAt,
+                        durationMs,
                         processed[0],
                         found[0],
                         duplicatesSkipped
                 );
+                delegate.onAlgorithmEvent(AlgorithmEvent.algorithmEnd(
+                        algorithm.id(),
+                        durationMs,
+                        processed[0],
+                        found[0],
+                        duplicatesSkipped
+                ));
             } catch (Exception exception) {
                 ScanDiagnostics.algorithmError(algorithm.id(), exception.getMessage());
                 ScanDiagnostics.error("algorithm", algorithm.id(), exception);
+                delegate.onAlgorithmEvent(AlgorithmEvent.algorithmError(
+                        algorithm.id(),
+                        exception.getMessage()
+                ));
             }
         }
     }

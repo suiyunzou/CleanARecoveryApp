@@ -4,14 +4,30 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Rose trust background -->
     <path
-        android:fillColor="#BE185D"
+        android:fillColor="#F8FAFC"
         android:pathData="M0,0h108v108H0z" />
     <path
-        android:fillColor="#EC4899"
-        android:pathData="M54,54m-42,0a42,42 0,1 1,84 0a42,42 0,1 1,-84 0" />
+        android:fillColor="#CCFBF1"
+        android:pathData="M0,72 Q36,56 54,80 Q72,104 108,68 L108,108 L0,108 Z" />
     <path
-        android:fillColor="#E0F2FE"
-        android:pathData="M76,24m-19,0a19,19 0,1 1,38 0a19,19 0,1 1,-38 0" />
+        android:fillColor="#99F6E4"
+        android:fillAlpha="0.45"
+        android:pathData="M18,22 C14,30 10,38 16,44 C22,50 28,42 24,34 C20,26 18,22 18,22 Z" />
+    <path
+        android:fillColor="#99F6E4"
+        android:fillAlpha="0.35"
+        android:pathData="M82,18 C78,26 74,34 80,40 C86,46 92,38 88,30 C84,22 82,18 82,18 Z" />
+    <path
+        android:fillColor="#2DD4BF"
+        android:fillAlpha="0.5"
+        android:pathData="M24,78m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0" />
+    <path
+        android:fillColor="#14B8A6"
+        android:fillAlpha="0.6"
+        android:pathData="M88,62m-2.5,0a2.5,2.5 0,1 1,5 0a2.5,2.5 0,1 1,-5 0" />
+    <path
+        android:fillColor="#2DD4BF"
+        android:fillAlpha="0.45"
+        android:pathData="M72,88m-1.5,0a1.5,1.5 0,1 1,3 0a1.5,1.5 0,1 1,-3 0" />
 </vector>
