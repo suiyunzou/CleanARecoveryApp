@@ -31,6 +31,8 @@
     <string name="alg_jpeg_known_blob_carver">JPEG blob carver</string>
     <string name="alg_accessible_signature_sniffer">File signature sniff</string>
     <string name="alg_lost_dir_orphan_sniffer">LOST.DIR residue scan</string>
+    <string name="alg_system_trash_scanner">System trash scanner</string>
+    <string name="alg_wechat_directory_scanner">WeChat media scanner</string>
     <string name="alg_log_evidence_import">Log evidence import</string>
     <string name="alg_offline_f2fs_image">Offline F2FS image</string>
     <string name="alg_offline_ext4_journal">Offline ext4 journal</string>
@@ -58,6 +60,7 @@
     <string name="filter_all">All</string>
     <string name="filter_existing">Existing</string>
     <string name="filter_deleted">Recoverable</string>
+    <string name="filter_type_title">Filter by type</string>
     <string name="status_existing">Existing</string>
     <string name="status_deleted">Suspected deleted</string>
     <string name="preview_close">Close</string>

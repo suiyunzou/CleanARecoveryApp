@@ -31,6 +31,8 @@
     <string name="alg_jpeg_known_blob_carver">JPEG 块雕刻</string>
     <string name="alg_accessible_signature_sniffer">文件签名嗅探</string>
     <string name="alg_lost_dir_orphan_sniffer">LOST.DIR 残留扫描</string>
+    <string name="alg_system_trash_scanner">系统回收站扫描</string>
+    <string name="alg_wechat_directory_scanner">微信聊天文件扫描</string>
     <string name="alg_log_evidence_import">日志证据导入</string>
     <string name="alg_offline_f2fs_image">离线 F2FS 镜像</string>
     <string name="alg_offline_ext4_journal">离线 ext4 日志</string>
@@ -58,6 +60,7 @@
     <string name="filter_all">全部</string>
     <string name="filter_existing">已存在</string>
     <string name="filter_deleted">可恢复</string>
+    <string name="filter_type_title">按类型筛选</string>
     <string name="status_existing">已存在</string>
     <string name="status_deleted">疑似已删除</string>
     <string name="preview_close">关闭</string>

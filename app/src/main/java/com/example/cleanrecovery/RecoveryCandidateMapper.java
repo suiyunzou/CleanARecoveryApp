@@ -24,7 +24,9 @@ public final class RecoveryCandidateMapper {
         String path = candidate.sourceUriOrPath == null ? "" : candidate.sourceUriOrPath;
         String name = displayNameFor(candidate, path);
         RecoverySourceKind sourceKind = mapSourceKind(candidate.sourceKind);
-        boolean suspectedDeleted = candidate.sourceKind == CandidateSourceKind.MEDIASTORE_TRASH;
+        // All non-visible sources indicate the file was found via recovery heuristics,
+        // not as a normally accessible shared-storage file.
+        boolean suspectedDeleted = candidate.sourceKind != CandidateSourceKind.VISIBLE_SHARED_FILE;
         long modifiedAt = 0L;
         return new RecoveryItem(
                 type,
@@ -100,9 +102,9 @@ public final class RecoveryCandidateMapper {
         if (path != null && path.startsWith("content://")) {
             String fromContainer = nameFromOriginalContainer(candidate.originalContainer);
             if (fromContainer != null) {
-                return fromContainer;
+                return ensureExtension(fromContainer, candidate.mimeDetected);
             }
-            return "media_item.jpg";
+            return ensureExtension("media_item", candidate.mimeDetected);
         }
         String filePath = path == null ? "" : path;
         int hashIndex = filePath.indexOf('#');
@@ -110,13 +112,47 @@ public final class RecoveryCandidateMapper {
             filePath = filePath.substring(0, hashIndex);
         }
         if (filePath.isEmpty()) {
-            return "recovered_file";
+            return ensureExtension("recovered_file", candidate.mimeDetected);
         }
         String name = new File(filePath).getName();
         if (path != null && path.contains("#") && (name.isEmpty() || !name.contains("."))) {
             return "carved_" + path.substring(path.indexOf('#') + 1) + ".jpg";
         }
-        return name.isEmpty() ? "recovered_file" : name;
+        if (name.isEmpty()) {
+            return ensureExtension("recovered_file", candidate.mimeDetected);
+        }
+        // Fix extension from magic bytes if missing or wrong
+        return ensureExtension(name, candidate.mimeDetected);
+    }
+
+    static String ensureExtension(String name, String mimeDetected) {
+        if (name == null) return "recovered_file";
+        // Already has a plausible extension — keep it
+        int dot = name.lastIndexOf('.');
+        if (dot > 0 && dot < name.length() - 1) {
+            return name;
+        }
+        String ext = extensionForMime(mimeDetected);
+        return ext.isEmpty() ? name : name + "." + ext;
+    }
+
+    static String extensionForMime(String mimeDetected) {
+        if (mimeDetected == null || mimeDetected.isEmpty()) return "";
+        String m = mimeDetected.toLowerCase(Locale.US);
+        if (m.equals("image/jpeg")) return "jpg";
+        if (m.equals("image/png")) return "png";
+        if (m.equals("image/gif")) return "gif";
+        if (m.equals("image/webp")) return "webp";
+        if (m.equals("image/bmp")) return "bmp";
+        if (m.equals("image/heif")) return "heic";
+        if (m.equals("video/mp4")) return "mp4";
+        if (m.equals("video/x-matroska")) return "mkv";
+        if (m.equals("application/pdf")) return "pdf";
+        if (m.equals("application/zip")) return "zip";
+        if (m.equals("audio/ogg")) return "ogg";
+        if (m.equals("audio/flac")) return "flac";
+        if (m.equals("audio/amr")) return "amr";
+        return "";
     }
 
     private static String nameFromOriginalContainer(String originalContainer) {

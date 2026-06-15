@@ -17,6 +17,8 @@ public final class AlgorithmRegistry {
             new JpegKnownBlobCarverAlgorithm(),
             new AccessibleSignatureSnifferAlgorithm(),
             new LostDirOrphanSnifferAlgorithm(),
+            new SystemTrashScannerAlgorithm(),
+            new WechatDirectoryScannerAlgorithm(),
             new LogEvidenceImportAlgorithm(),
             new OfflineF2fsImageAlgorithm(),
             new OfflineExt4JournalAlgorithm()

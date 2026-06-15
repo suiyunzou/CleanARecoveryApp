@@ -18,11 +18,13 @@ public final class RecoveryState {
     private final ArrayList<RecoveryItem> visibleItems = new ArrayList<>();
     private final RecoveryDeduper deduper = new RecoveryDeduper();
     private FilterMode currentFilter = FilterMode.ALL;
+    private RecoveryType typeFilter;
 
     public void clear() {
         allItems.clear();
         visibleItems.clear();
         deduper.clear();
+        typeFilter = null;
     }
 
     public boolean addAll(Collection<RecoveryItem> items) {
@@ -54,6 +56,15 @@ public final class RecoveryState {
 
     public FilterMode getFilter() {
         return currentFilter;
+    }
+
+    public void setTypeFilter(RecoveryType type) {
+        typeFilter = type;
+        rebuildVisibleItems();
+    }
+
+    public RecoveryType getTypeFilter() {
+        return typeFilter;
     }
 
     public List<RecoveryItem> getVisibleItems() {
@@ -113,6 +124,9 @@ public final class RecoveryState {
     }
 
     public boolean matchesFilter(RecoveryItem item) {
+        if (typeFilter != null && item.type != typeFilter) {
+            return false;
+        }
         if (currentFilter == FilterMode.EXISTING) {
             return !item.suspectedDeleted;
         }

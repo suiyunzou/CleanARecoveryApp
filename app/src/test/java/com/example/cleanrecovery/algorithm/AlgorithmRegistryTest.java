@@ -18,10 +18,12 @@ public final class AlgorithmRegistryTest {
         assertNotNull(AlgorithmRegistry.byId(JpegKnownBlobCarverAlgorithm.ID));
         assertNotNull(AlgorithmRegistry.byId(AccessibleSignatureSnifferAlgorithm.ID));
         assertNotNull(AlgorithmRegistry.byId(LostDirOrphanSnifferAlgorithm.ID));
+        assertNotNull(AlgorithmRegistry.byId(SystemTrashScannerAlgorithm.ID));
+        assertNotNull(AlgorithmRegistry.byId(WechatDirectoryScannerAlgorithm.ID));
         assertNotNull(AlgorithmRegistry.byId(LogEvidenceImportAlgorithm.ID));
         assertNotNull(AlgorithmRegistry.byId(OfflineF2fsImageAlgorithm.ID));
         assertNotNull(AlgorithmRegistry.byId(OfflineExt4JournalAlgorithm.ID));
-        assertEquals(9, AlgorithmRegistry.catalog().size());
+        assertEquals(11, AlgorithmRegistry.catalog().size());
     }
 
     @Test
@@ -37,8 +39,8 @@ public final class AlgorithmRegistryTest {
 
     @Test
     public void defaultModeIncludesConservativeAlgorithmsOnly() {
-        assertEquals(5, AlgorithmRegistry.runnableForMode(ScanMode.DEFAULT, RecoveryType.IMAGE).size());
-        assertEquals(4, AlgorithmRegistry.runnableForMode(ScanMode.DEFAULT, RecoveryType.VIDEO).size());
+        assertEquals(7, AlgorithmRegistry.runnableForMode(ScanMode.DEFAULT, RecoveryType.IMAGE).size());
+        assertEquals(6, AlgorithmRegistry.runnableForMode(ScanMode.DEFAULT, RecoveryType.VIDEO).size());
     }
 
     @Test

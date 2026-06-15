@@ -9,15 +9,22 @@ public final class ScanProgressTracker {
         FILE_SCAN,
         MEDIASTORE,
         CACHE,
+        TRASH_SCAN,
+        WECHAT_SCAN,
         COMPLETE
     }
 
     private static final int PREPARING_CAP_PERCENT = 5;
     private static final int FILE_SCAN_START_PERCENT = 5;
-    private static final int FILE_SCAN_END_PERCENT = 55;
-    private static final int MEDIASTORE_START_PERCENT = 55;
-    private static final int MEDIASTORE_END_PERCENT = 65;
-    private static final int CACHE_START_PERCENT = 65;
+    private static final int FILE_SCAN_END_PERCENT = 45;
+    private static final int MEDIASTORE_START_PERCENT = 45;
+    private static final int MEDIASTORE_END_PERCENT = 55;
+    private static final int CACHE_START_PERCENT = 55;
+    private static final int CACHE_END_PERCENT = 65;
+    private static final int TRASH_START_PERCENT = 65;
+    private static final int TRASH_END_PERCENT = 75;
+    private static final int WECHAT_START_PERCENT = 75;
+    private static final int WECHAT_END_PERCENT = 85;
     private static final int SCANNING_CAP_PERCENT = 99;
     private static final long ETA_WARMUP_MS = 2_000L;
     private static final int ETA_MIN_SAMPLES = 40;
@@ -226,13 +233,19 @@ public final class ScanProgressTracker {
                     MEDIASTORE_START_PERCENT + Math.round(ratio * span)));
         }
         if (phase == Phase.CACHE) {
-            int span = SCANNING_CAP_PERCENT - CACHE_START_PERCENT;
+            int span = CACHE_END_PERCENT - CACHE_START_PERCENT;
             if (cacheTotal <= 0) {
                 return CACHE_START_PERCENT;
             }
             float ratio = Math.min(1f, cacheScanned / (float) cacheTotal);
-            return Math.max(CACHE_START_PERCENT, Math.min(SCANNING_CAP_PERCENT,
+            return Math.max(CACHE_START_PERCENT, Math.min(CACHE_END_PERCENT,
                     CACHE_START_PERCENT + Math.round(ratio * span)));
+        }
+        if (phase == Phase.TRASH_SCAN) {
+            return TRASH_START_PERCENT + (TRASH_END_PERCENT - TRASH_START_PERCENT) / 2;
+        }
+        if (phase == Phase.WECHAT_SCAN) {
+            return WECHAT_START_PERCENT + (WECHAT_END_PERCENT - WECHAT_START_PERCENT) / 2;
         }
         return FILE_SCAN_START_PERCENT;
     }

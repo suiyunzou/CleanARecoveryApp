@@ -45,7 +45,7 @@ public final class RecoveryCandidateMapperTest {
 
         assertNotNull(item);
         assertEquals(RecoverySourceKind.GENERIC_THUMBNAIL, item.sourceKind);
-        assertFalse(item.suspectedDeleted);
+        assertTrue(item.suspectedDeleted);
     }
 
     @Test
@@ -74,7 +74,7 @@ public final class RecoveryCandidateMapperTest {
         assertNotNull(item);
         assertEquals(RecoverySourceKind.CARVED_FROM_KNOWN_BLOB, item.sourceKind);
         assertEquals("/storage/emulated/0/MIUI/photo_blob#4096", item.path);
-        assertFalse(item.suspectedDeleted);
+        assertTrue(item.suspectedDeleted);
     }
 
     @Test
@@ -98,6 +98,6 @@ public final class RecoveryCandidateMapperTest {
 
         assertNotNull(item);
         assertEquals(RecoverySourceKind.ACCESSIBLE_SIGNATURE_MATCH, item.sourceKind);
-        assertFalse(item.suspectedDeleted);
+        assertTrue(item.suspectedDeleted);
     }
 }

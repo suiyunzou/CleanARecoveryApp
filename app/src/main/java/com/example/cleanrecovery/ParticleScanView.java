@@ -222,24 +222,25 @@ public final class ParticleScanView extends View {
         c.drawCircle(cx, cy, curR - 4f*dp, pRing);
 
         // === Center text inside orb ===
-        float textY = cy + 4f*dp;
-        // Percentage
+        // Measure percentage text width for precise centering
+        String pctText = ((int)dP) + "%";
+        float pctWidth = pPct.measureText(pctText);
+        // Percentage — vertically centered in orb
         pPct.setColor(0xFFFFFFFF); pPct.setTextSize(50f*dp); pPct.setTextAlign(Paint.Align.CENTER);
         pPct.setFakeBoldText(true); pPct.setShadowLayer(12f*dp, 0, 2f*dp, 0x80000000);
-        c.drawText(((int)dP) + "%", cx, textY, pPct);
+        c.drawText(pctText, cx, cy - 4f*dp, pPct);
 
-        // Phase label
-        float phaseY = textY + 20f*dp;
-        pSub.setColor(0xFFE0F5F2); pSub.setTextSize(15f*dp); pSub.setTextAlign(Paint.Align.CENTER);
-        pSub.setFakeBoldText(true); pSub.setShadowLayer(5f*dp, 0, 0, 0x70000000);
-        c.drawText(phaseTxt, cx, phaseY, pSub);
+        // Phase label — below percentage inside orb
+        pSub.setColor(0xFFB0E8DF); pSub.setTextSize(13f*dp); pSub.setTextAlign(Paint.Align.CENTER);
+        pSub.setFakeBoldText(false); pSub.setShadowLayer(3f*dp, 0, 1f*dp, 0x60000000);
+        c.drawText(phaseTxt, cx, cy + 24f*dp, pSub);
 
-        // Found count
+        // Found count — below orb entirely
         if (dF > 0) {
-            float foundY = phaseY + 18f*dp;
-            pSub.setColor(0xFFFFFFFF); pSub.setTextSize(17f*dp); pSub.setTextAlign(Paint.Align.CENTER);
-            pSub.setFakeBoldText(true); pSub.setShadowLayer(6f*dp, 0, 0, 0x80000000);
-            c.drawText("已找到 " + dF + " 个文件", cx, foundY, pSub);
+            float foundY = cy + curR + 32f*dp;
+            pSub.setColor(0xFFCCE8E2); pSub.setTextSize(15f*dp); pSub.setTextAlign(Paint.Align.CENTER);
+            pSub.setFakeBoldText(false); pSub.setShadowLayer(4f*dp, 0, 1f*dp, 0x80000000);
+            c.drawText(getResources().getString(R.string.scan_stats_format, dF), cx, foundY, pSub);
         }
     }
 

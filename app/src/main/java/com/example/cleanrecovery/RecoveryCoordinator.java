@@ -10,6 +10,8 @@ import com.example.cleanrecovery.algorithm.AlgorithmRunner;
 import com.example.cleanrecovery.algorithm.CacheProfileAlgorithm;
 import com.example.cleanrecovery.algorithm.MediaStoreIndexTrashAlgorithm;
 import com.example.cleanrecovery.algorithm.ScanMode;
+import com.example.cleanrecovery.algorithm.SystemTrashScannerAlgorithm;
+import com.example.cleanrecovery.algorithm.WechatDirectoryScannerAlgorithm;
 import com.example.cleanrecovery.experiment.RecoveryCandidate;
 
 import java.io.File;
@@ -181,6 +183,12 @@ public final class RecoveryCoordinator {
                 }
                 if (CacheProfileAlgorithm.ID.equals(algorithmId)) {
                     return ScanProgressTracker.Phase.CACHE;
+                }
+                if (SystemTrashScannerAlgorithm.ID.equals(algorithmId)) {
+                    return ScanProgressTracker.Phase.TRASH_SCAN;
+                }
+                if (WechatDirectoryScannerAlgorithm.ID.equals(algorithmId)) {
+                    return ScanProgressTracker.Phase.WECHAT_SCAN;
                 }
                 return ScanProgressTracker.Phase.FILE_SCAN;
             }

@@ -52,6 +52,12 @@ public final class FileSignatureProbe {
         if (matchesWebp(prefix)) {
             return new ProbeResult(RecoveryType.IMAGE, "image/webp");
         }
+        if (matchesBmp(prefix)) {
+            return new ProbeResult(RecoveryType.IMAGE, "image/bmp");
+        }
+        if (matchesHeif(prefix)) {
+            return new ProbeResult(RecoveryType.IMAGE, "image/heif");
+        }
         if (matchesPdf(prefix)) {
             return new ProbeResult(RecoveryType.DOCUMENT, "application/pdf");
         }
@@ -60,6 +66,27 @@ public final class FileSignatureProbe {
         }
         if (matchesFtyp(prefix)) {
             return new ProbeResult(RecoveryType.VIDEO, "video/mp4");
+        }
+        if (matchesRiff(prefix)) {
+            return new ProbeResult(RecoveryType.VIDEO, "video/avi");
+        }
+        if (matchesMkv(prefix)) {
+            return new ProbeResult(RecoveryType.VIDEO, "video/x-matroska");
+        }
+        if (matchesOgg(prefix)) {
+            return new ProbeResult(RecoveryType.AUDIO, "audio/ogg");
+        }
+        if (matchesFlac(prefix)) {
+            return new ProbeResult(RecoveryType.AUDIO, "audio/flac");
+        }
+        if (matchesAmr(prefix)) {
+            return new ProbeResult(RecoveryType.AUDIO, "audio/amr");
+        }
+        if (matchesDocx(prefix)) {
+            return new ProbeResult(RecoveryType.DOCUMENT, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+        }
+        if (matchesXlsx(prefix)) {
+            return new ProbeResult(RecoveryType.DOCUMENT, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         }
         return null;
     }
@@ -126,5 +153,55 @@ public final class FileSignatureProbe {
     static boolean matchesFtyp(byte[] bytes) {
         return bytes.length >= 8
                 && bytes[4] == 'f' && bytes[5] == 't' && bytes[6] == 'y' && bytes[7] == 'p';
+    }
+
+    static boolean matchesBmp(byte[] bytes) {
+        return bytes.length >= 2
+                && bytes[0] == 'B' && bytes[1] == 'M';
+    }
+
+    static boolean matchesHeif(byte[] bytes) {
+        return bytes.length >= 12
+                && bytes[4] == 'f' && bytes[5] == 't' && bytes[6] == 'y' && bytes[7] == 'p'
+                && bytes[8] == 'h' && bytes[9] == 'e' && bytes[10] == 'i' && bytes[11] == 'c';
+    }
+
+    static boolean matchesRiff(byte[] bytes) {
+        return bytes.length >= 12
+                && bytes[0] == 'R' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == 'F'
+                && bytes[8] == 'A' && bytes[9] == 'V' && bytes[10] == 'I' && bytes[11] == ' ';
+    }
+
+    static boolean matchesMkv(byte[] bytes) {
+        return bytes.length >= 4
+                && bytes[0] == 0x1A && bytes[1] == 0x45 && bytes[2] == (byte) 0xDF && bytes[3] == (byte) 0xA3;
+    }
+
+    static boolean matchesOgg(byte[] bytes) {
+        return bytes.length >= 4
+                && bytes[0] == 'O' && bytes[1] == 'g' && bytes[2] == 'g' && bytes[3] == 'S';
+    }
+
+    static boolean matchesFlac(byte[] bytes) {
+        return bytes.length >= 4
+                && bytes[0] == 'f' && bytes[1] == 'L' && bytes[2] == 'a' && bytes[3] == 'C';
+    }
+
+    static boolean matchesAmr(byte[] bytes) {
+        return bytes.length >= 6
+                && bytes[0] == '#' && bytes[1] == '!' && bytes[2] == 'A' && bytes[3] == 'M'
+                && bytes[4] == 'R' && bytes[5] == '\n';
+    }
+
+    static boolean matchesDocx(byte[] bytes) {
+        return bytes.length >= 4
+                && bytes[0] == 'P' && bytes[1] == 'K'
+                && bytes[2] == 0x03 && bytes[3] == 0x04;
+    }
+
+    static boolean matchesXlsx(byte[] bytes) {
+        return bytes.length >= 4
+                && bytes[0] == 'P' && bytes[1] == 'K'
+                && bytes[2] == 0x03 && bytes[3] == 0x04;
     }
 }

@@ -69,6 +69,14 @@ public final class MainActivity extends Activity {
     private TextView filterAllButton;
     private TextView filterExistingButton;
     private TextView filterDeletedButton;
+    private ImageButton filterTypeButton;
+    private View filterTypeRow;
+    private TextView filterTypeAll;
+    private TextView filterTypeImages;
+    private TextView filterTypeVideos;
+    private TextView filterTypeAudio;
+    private TextView filterTypeDocuments;
+    private RecoveryType currentTypeFilter;
     private View bottomNav;
     private ImageView navHomeIcon;
     private ImageView navResultsIcon;
@@ -173,6 +181,13 @@ public final class MainActivity extends Activity {
         filterAllButton = findViewById(R.id.filter_all_button);
         filterExistingButton = findViewById(R.id.filter_existing_button);
         filterDeletedButton = findViewById(R.id.filter_deleted_button);
+        filterTypeButton = findViewById(R.id.filter_type_button);
+        filterTypeRow = findViewById(R.id.filter_type_row);
+        filterTypeAll = findViewById(R.id.filter_type_all);
+        filterTypeImages = findViewById(R.id.filter_type_images);
+        filterTypeVideos = findViewById(R.id.filter_type_videos);
+        filterTypeAudio = findViewById(R.id.filter_type_audio);
+        filterTypeDocuments = findViewById(R.id.filter_type_documents);
         bottomNav = findViewById(R.id.bottom_nav);
         navHomeIcon = findViewById(R.id.nav_home_icon);
         navResultsIcon = findViewById(R.id.nav_results_icon);
@@ -266,6 +281,12 @@ public final class MainActivity extends Activity {
         filterAllButton.setOnClickListener(v -> setFilter(RecoveryState.FilterMode.ALL));
         filterExistingButton.setOnClickListener(v -> setFilter(RecoveryState.FilterMode.EXISTING));
         filterDeletedButton.setOnClickListener(v -> setFilter(RecoveryState.FilterMode.DELETED));
+        filterTypeButton.setOnClickListener(v -> toggleFilterTypeRow());
+        filterTypeAll.setOnClickListener(v -> setTypeFilter(null));
+        filterTypeImages.setOnClickListener(v -> setTypeFilter(RecoveryType.IMAGE));
+        filterTypeVideos.setOnClickListener(v -> setTypeFilter(RecoveryType.VIDEO));
+        filterTypeAudio.setOnClickListener(v -> setTypeFilter(RecoveryType.AUDIO));
+        filterTypeDocuments.setOnClickListener(v -> setTypeFilter(RecoveryType.DOCUMENT));
         findViewById(R.id.select_all_button).setOnClickListener(v -> {
             recoveryState.setAllSelected(true);
             gridAdapter.notifyDataSetChanged();
@@ -489,6 +510,33 @@ public final class MainActivity extends Activity {
         updateEmptyState();
     }
 
+    private void toggleFilterTypeRow() {
+        boolean show = filterTypeRow.getVisibility() != View.VISIBLE;
+        filterTypeRow.setVisibility(show ? View.VISIBLE : View.GONE);
+    }
+
+    private void setTypeFilter(RecoveryType type) {
+        currentTypeFilter = type;
+        recoveryState.setTypeFilter(type);
+        gridAdapter.notifyDataSetChanged();
+        styleTypeFilterChips();
+        updateCounters();
+        updateEmptyState();
+    }
+
+    private void styleTypeFilterChips() {
+        styleTypeChip(filterTypeAll, currentTypeFilter == null);
+        styleTypeChip(filterTypeImages, currentTypeFilter == RecoveryType.IMAGE);
+        styleTypeChip(filterTypeVideos, currentTypeFilter == RecoveryType.VIDEO);
+        styleTypeChip(filterTypeAudio, currentTypeFilter == RecoveryType.AUDIO);
+        styleTypeChip(filterTypeDocuments, currentTypeFilter == RecoveryType.DOCUMENT);
+    }
+
+    private void styleTypeChip(TextView chip, boolean active) {
+        chip.setBackgroundResource(active ? R.drawable.bg_tab_selected : R.drawable.bg_tab_unselected);
+        chip.setTextColor(resolveColorRes(active ? R.color.text_on_primary : R.color.text_secondary));
+    }
+
     private void styleFilterTabs() {
         styleFilterButton(filterAllButton, recoveryState.getFilter() == RecoveryState.FilterMode.ALL);
         styleFilterButton(filterExistingButton, recoveryState.getFilter() == RecoveryState.FilterMode.EXISTING);
@@ -585,7 +633,9 @@ public final class MainActivity extends Activity {
                 break;
         }
         algorithmStepAdapter.upsertRow(row);
-        if (algorithmLogList.getAdapter() != null && algorithmLogList.getAdapter().getItemCount() > 0) {
+        if (algorithmLogList != null
+                && algorithmLogList.getAdapter() != null
+                && algorithmLogList.getAdapter().getItemCount() > 0) {
             algorithmLogList.smoothScrollToPosition(algorithmStepAdapter.getItemCount() - 1);
         }
     }
