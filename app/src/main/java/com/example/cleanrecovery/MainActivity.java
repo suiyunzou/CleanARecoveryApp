@@ -1,6 +1,8 @@
 package com.example.cleanrecovery;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
@@ -33,10 +35,13 @@ public final class MainActivity extends Activity {
     private RecoveryCoordinator recoveryCoordinator;
     private RecoveryGridAdapter gridAdapter;
     private RecoveryType currentScanType;
+    private boolean scanAllMode;
+    private boolean experimentalMode;
     private boolean working;
     private boolean pathExpanded;
     private int lastScannedCount;
     private int lastFoundCount;
+    private int multiTypeCompletedScanned;
 
     private View homePanel;
     private View scanPanel;
@@ -206,12 +211,27 @@ public final class MainActivity extends Activity {
         card.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                performLightHaptic(view);
                 startScan(type);
             }
         });
     }
 
     private void bindActions() {
+        findViewById(R.id.scan_all_button).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                performLightHaptic(view);
+                startScanAll();
+            }
+        });
+        findViewById(R.id.experimental_scan_button).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                performLightHaptic(view);
+                showExperimentalTypePicker();
+            }
+        });
         findViewById(R.id.home_settings_button).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -278,7 +298,11 @@ public final class MainActivity extends Activity {
         });
         findViewById(R.id.recover_button).setOnClickListener(v -> recoverSelected());
         findViewById(R.id.rescan_button).setOnClickListener(v -> {
-            if (currentScanType != null) {
+            if (scanAllMode) {
+                startScanAll();
+            } else if (experimentalMode && currentScanType != null) {
+                startExperimentalScan(currentScanType);
+            } else if (currentScanType != null) {
                 startScan(currentScanType);
             } else {
                 showPanel(Panel.HOME);
@@ -339,6 +363,37 @@ public final class MainActivity extends Activity {
     }
 
     private void startScan(RecoveryType type) {
+        beginScan(false, false, type);
+    }
+
+    private void startScanAll() {
+        beginScan(true, false, null);
+    }
+
+    private void startExperimentalScan(RecoveryType type) {
+        beginScan(false, true, type);
+    }
+
+    private void showExperimentalTypePicker() {
+        final RecoveryType[] types = RecoveryType.scannableValues();
+        CharSequence[] labels = new CharSequence[types.length];
+        for (int i = 0; i < types.length; i++) {
+            labels[i] = getString(types[i].labelResId);
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.experimental_scan_title)
+                .setMessage(R.string.experimental_scan_warning)
+                .setItems(labels, new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        startExperimentalScan(types[which]);
+                    }
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void beginScan(boolean allTypes, boolean experimental, RecoveryType type) {
         if (working) {
             return;
         }
@@ -347,25 +402,44 @@ public final class MainActivity extends Activity {
             storageAccessController.requestStorageAccess();
             return;
         }
+        scanAllMode = allTypes;
+        experimentalMode = experimental;
         currentScanType = type;
         recoveryState.clear();
         gridAdapter.notifyDataSetChanged();
         ScanHistoryStore.Snapshot history = ScanHistoryStore.read(this);
         int historicalEstimate = history.lastScannedCount > 0 ? history.lastScannedCount : 10_000;
-        scanProgressTracker.reset(historicalEstimate);
+        if (allTypes) {
+            scanProgressTracker.resetMultiType(historicalEstimate, RecoveryType.scannableCount());
+        } else {
+            scanProgressTracker.reset(historicalEstimate);
+        }
         lastScannedCount = 0;
         lastFoundCount = 0;
+        multiTypeCompletedScanned = 0;
         scanCurrentPathValue = "";
         pathExpanded = false;
         scanCurrentPath.setVisibility(View.GONE);
         scanPathToggle.setText(R.string.show_current_path);
-        scanTitle.setText(getString(R.string.scan_status, getString(type.labelResId)));
+        if (allTypes) {
+            scanTitle.setText(R.string.scan_status_all);
+        } else if (experimental) {
+            scanTitle.setText(getString(R.string.experimental_scan_status, getString(type.labelResId)));
+        } else {
+            scanTitle.setText(getString(R.string.scan_status, getString(type.labelResId)));
+        }
         scanStats.setText(getString(R.string.scan_stats_format, 0, 0));
         updateScanProgressUi();
         showPanel(Panel.SCAN);
         progressHandler.removeCallbacks(progressTick);
         progressHandler.post(progressTick);
-        recoveryCoordinator.startScan(type);
+        if (allTypes) {
+            recoveryCoordinator.startScanAll();
+        } else if (experimental) {
+            recoveryCoordinator.startExperimentalScan(type);
+        } else {
+            recoveryCoordinator.startScan(type);
+        }
     }
 
     private void recoverSelected() {
@@ -406,7 +480,7 @@ public final class MainActivity extends Activity {
 
     private void styleFilterButton(Button button, boolean active) {
         button.setBackgroundResource(active ? R.drawable.bg_tab_selected : R.drawable.bg_tab_unselected);
-        button.setTextColor(resolveColorRes(active ? R.color.brand_primary_dark : R.color.text_secondary));
+        button.setTextColor(resolveColorRes(active ? R.color.text_on_primary : R.color.text_secondary));
     }
 
     private void updateCounters() {
@@ -426,7 +500,7 @@ public final class MainActivity extends Activity {
     private void persistScanHistory() {
         ScanHistoryStore.saveScanResult(
                 this,
-                currentScanType,
+                scanAllMode ? null : currentScanType,
                 lastScannedCount,
                 lastFoundCount,
                 recoveryState.countByType(RecoveryType.IMAGE),
@@ -437,8 +511,21 @@ public final class MainActivity extends Activity {
         refreshHome();
     }
 
+    private void updateScanTitleForType(RecoveryType type, int typeIndex, int typeCount) {
+        if (scanAllMode) {
+            scanTitle.setText(getString(
+                    R.string.scan_phase_type,
+                    getString(type.labelResId),
+                    typeIndex + 1,
+                    typeCount
+            ));
+        }
+    }
+
     private void finishScanUi(int scannedCount, int foundCount) {
-        scanProgressTracker.onScanProgress(scannedCount);
+        if (!scanAllMode) {
+            scanProgressTracker.onScanProgress(scannedCount);
+        }
         scanProgressTracker.complete();
         lastScannedCount = scannedCount;
         lastFoundCount = foundCount;
@@ -490,7 +577,12 @@ public final class MainActivity extends Activity {
 
         scanPhaseLabel.setText(R.string.scan_phase_scanning);
         int total = scanProgressTracker.getPreparedTotal();
-        scanDetail.setText(getString(R.string.scan_progress_detail, scanProgressTracker.getScannedCount(), total));
+        int scanned = scanProgressTracker.getScannedCount();
+        if (scanAllMode && total > 0) {
+            total *= scanProgressTracker.getTypeCount();
+            scanned = multiTypeCompletedScanned + scanProgressTracker.getScannedCount();
+        }
+        scanDetail.setText(getString(R.string.scan_progress_detail, scanned, total));
         long etaMs = scanProgressTracker.getEstimatedRemainingMs();
         if (etaMs < 0L) {
             scanEta.setText(R.string.scan_eta_calculating);
@@ -537,20 +629,27 @@ public final class MainActivity extends Activity {
         int inactiveColor = resolveColorRes(R.color.text_secondary);
         int disabledColor = resolveColorRes(R.color.text_muted);
 
-        styleNavItem(navHomeIcon, navHomeLabel, panel == Panel.HOME, activeColor, inactiveColor);
-        styleNavItem(navResultsIcon, navResultsLabel, panel == Panel.RESULTS, activeColor,
+        styleNavItem(findViewById(R.id.nav_home), navHomeIcon, navHomeLabel, panel == Panel.HOME, activeColor, inactiveColor);
+        styleNavItem(findViewById(R.id.nav_results), navResultsIcon, navResultsLabel, panel == Panel.RESULTS, activeColor,
                 hasResults ? inactiveColor : disabledColor);
         navResultsIcon.setEnabled(hasResults);
         navResultsLabel.setEnabled(hasResults);
         findViewById(R.id.nav_results).setEnabled(hasResults);
-        styleNavItem(navFolderIcon, navFolderLabel, false, activeColor, inactiveColor);
-        styleNavItem(navAboutIcon, navAboutLabel, false, activeColor, inactiveColor);
+        styleNavItem(findViewById(R.id.nav_folder), navFolderIcon, navFolderLabel, false, activeColor, inactiveColor);
+        styleNavItem(findViewById(R.id.nav_about), navAboutIcon, navAboutLabel, false, activeColor, inactiveColor);
     }
 
-    private void styleNavItem(ImageView icon, TextView label, boolean active, int activeColor, int inactiveColor) {
+    private void styleNavItem(View container, ImageView icon, TextView label, boolean active, int activeColor, int inactiveColor) {
         int color = active ? activeColor : inactiveColor;
+        container.setBackgroundResource(active ? R.drawable.bg_nav_item_active : android.R.color.transparent);
         icon.setColorFilter(color);
         label.setTextColor(color);
+    }
+
+    private void performLightHaptic(View view) {
+        if (view != null) {
+            view.performHapticFeedback(android.view.HapticFeedbackConstants.KEYBOARD_TAP);
+        }
     }
 
     private int resolveColorRes(int resId) {
@@ -581,6 +680,16 @@ public final class MainActivity extends Activity {
             }
 
             @Override
+            public void onScanTypeChanged(RecoveryType type, int typeIndex, int typeCount) {
+                if (typeIndex > 0) {
+                    multiTypeCompletedScanned += scanProgressTracker.getPreparedTotal();
+                }
+                scanProgressTracker.beginType(typeIndex);
+                updateScanTitleForType(type, typeIndex, typeCount);
+                updateScanProgressUi();
+            }
+
+            @Override
             public void onScanPhaseChanged(ScanProgressTracker.Phase phase) {
                 if (phase == ScanProgressTracker.Phase.MEDIASTORE) {
                     scanProgressTracker.onMediaStorePhaseStart();
@@ -602,7 +711,7 @@ public final class MainActivity extends Activity {
 
             @Override
             public void onProgress(int scannedCount, int foundCount, String currentPath) {
-                lastScannedCount = scannedCount;
+                lastScannedCount = scanAllMode ? multiTypeCompletedScanned + scannedCount : scannedCount;
                 lastFoundCount = foundCount;
                 scanProgressTracker.onScanProgress(scannedCount);
                 scanCurrentPathValue = currentPath;
@@ -614,24 +723,15 @@ public final class MainActivity extends Activity {
             @Override
             public void onItemsBatch(List<RecoveryItem> items) {
                 recoveryState.addAll(items);
-                if (recoveryState.isResultCapReached()) {
-                    recoveryCoordinator.cancelCurrentWork();
-                    Toast.makeText(MainActivity.this, getString(R.string.result_cap_reached, ScanLimits.MAX_RESULTS), Toast.LENGTH_LONG).show();
-                }
                 gridAdapter.notifyDataSetChanged();
                 updateCounters();
-            }
-
-            @Override
-            public void onResultCapReached() {
-                Toast.makeText(MainActivity.this, getString(R.string.result_cap_reached, ScanLimits.MAX_RESULTS), Toast.LENGTH_LONG).show();
             }
 
             @Override
             public void onScanComplete(int scannedCount, int foundCount) {
                 lastScannedCount = scannedCount;
                 lastFoundCount = foundCount;
-                finishScanUi(scannedCount, foundCount);
+                finishScanUi(lastScannedCount, lastFoundCount);
             }
 
             @Override

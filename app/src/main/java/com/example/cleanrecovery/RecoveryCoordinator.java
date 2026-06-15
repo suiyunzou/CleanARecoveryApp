@@ -1,14 +1,15 @@
 package com.example.cleanrecovery;
 
 import android.content.Context;
-import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 
+import com.example.cleanrecovery.algorithm.AlgorithmContext;
+import com.example.cleanrecovery.algorithm.AlgorithmRunner;
+import com.example.cleanrecovery.algorithm.CacheProfileAlgorithm;
+import com.example.cleanrecovery.algorithm.MediaStoreIndexTrashAlgorithm;
+import com.example.cleanrecovery.algorithm.ScanMode;
 import com.example.cleanrecovery.experiment.RecoveryCandidate;
-import com.example.cleanrecovery.experiment.cache.CacheProfileScanner;
-import com.example.cleanrecovery.experiment.mediastore.MediaStoreExperimentScanner;
-import com.example.cleanrecovery.experiment.mediastore.MediaStoreExperimentScanner.Callback;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -23,11 +24,11 @@ public final class RecoveryCoordinator {
         void onWorkingChanged(boolean working);
         void onPrepareProgress(int countedSoFar, String currentPath);
         void onPrepareComplete(int totalEntries);
+        void onScanTypeChanged(RecoveryType type, int typeIndex, int typeCount);
         void onScanPhaseChanged(ScanProgressTracker.Phase phase);
         void onPhaseProgress(ScanProgressTracker.Phase phase, int processedCount);
         void onProgress(int scannedCount, int foundCount, String currentPath);
         void onItemsBatch(List<RecoveryItem> items);
-        void onResultCapReached();
         void onScanComplete(int scannedCount, int foundCount);
         void onRecoverProgress(int successCount, int failedCount);
         void onRecoverComplete(int successCount, int failedCount, File lastOutput);
@@ -39,10 +40,16 @@ public final class RecoveryCoordinator {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final AtomicBoolean cancelled = new AtomicBoolean(false);
     private final ProgressThrottler progressThrottler = new ProgressThrottler(ScanLimits.PROGRESS_MIN_INTERVAL_MS);
+    private final AlgorithmRunner algorithmRunner;
 
-    public RecoveryCoordinator(Context context, ScanCallback callback) {
+    RecoveryCoordinator(Context context, ScanCallback callback, AlgorithmRunner algorithmRunner) {
         this.context = context.getApplicationContext();
         this.callback = callback;
+        this.algorithmRunner = algorithmRunner;
+    }
+
+    public RecoveryCoordinator(Context context, ScanCallback callback) {
+        this(context, callback, new AlgorithmRunner());
     }
 
     public void shutdown() {
@@ -55,17 +62,34 @@ public final class RecoveryCoordinator {
     }
 
     public void startScan(final RecoveryType type) {
+        startScanInternal(new RecoveryType[] {type}, false, ScanMode.DEFAULT);
+    }
+
+    public void startExperimentalScan(final RecoveryType type) {
+        startScanInternal(new RecoveryType[] {type}, false, ScanMode.EXPERIMENTAL_ALL);
+    }
+
+    public void startScanAll() {
+        startScanInternal(RecoveryType.scannableValues(), true, ScanMode.DEFAULT);
+    }
+
+    private void startScanInternal(
+            final RecoveryType[] types,
+            final boolean scanAll,
+            final ScanMode scanMode
+    ) {
         cancelled.set(false);
         progressThrottler.reset();
         callback.onWorkingChanged(true);
+        ScanDiagnostics.scanStart(scanAll, types.length);
 
         executor.execute(new Runnable() {
             @Override
             public void run() {
+                final long scanStartedAt = System.currentTimeMillis();
                 final RecoveryDeduper deduper = new RecoveryDeduper();
                 final ArrayList<RecoveryItem> pendingBatch = new ArrayList<>();
                 final ScanSession session = new ScanSession();
-                ScanProgressTracker.Phase currentPhase = ScanProgressTracker.Phase.FILE_SCAN;
 
                 RecoveryScanner scanner = new RecoveryScanner();
                 final int totalEntries = scanner.countEntries(new RecoveryScanner.PrepareCallback() {
@@ -81,65 +105,44 @@ public final class RecoveryCoordinator {
 
                     @Override
                     public void onError(File file, Exception exception) {
-                        // Keep counting other readable directories.
+                        ScanDiagnostics.error("prepare", file.getAbsolutePath(), exception);
                     }
                 });
+                ScanDiagnostics.prepareComplete(totalEntries);
+                if (totalEntries <= 0 && !StorageAccessController.hasStorageAccess(context)) {
+                    ScanDiagnostics.permissionDenied("prepare totalEntries=0");
+                }
                 if (cancelled.get()) {
                     postWorkingChanged(false);
                     return;
                 }
                 awaitPrepareComplete(totalEntries);
-                currentPhase = ScanProgressTracker.Phase.FILE_SCAN;
-                postScanPhase(currentPhase);
 
-                final ScanProgressTracker.Phase fileScanPhase = currentPhase;
-                scanner.scan(type, new RecoveryScanner.Callback() {
-                    @Override
-                    public boolean isCancelled() {
-                        return cancelled.get() || session.atCap();
+                for (int typeIndex = 0; typeIndex < types.length; typeIndex++) {
+                    if (cancelled.get()) {
+                        break;
                     }
-
-                    @Override
-                    public void onProgress(int scannedCount, int foundCount, String currentPath) {
-                        session.scannedCount = scannedCount;
-                        long now = System.currentTimeMillis();
-                        if (!progressThrottler.shouldUpdate(now)) {
-                            return;
-                        }
-                        postProgress(session.scannedCount, session.foundCount, currentPath);
+                    RecoveryType type = types[typeIndex];
+                    if (scanAll) {
+                        ScanDiagnostics.typeStart(type, typeIndex, types.length);
+                        awaitScanTypeChanged(type, typeIndex, types.length);
                     }
-
-                    @Override
-                    public void onItemFound(RecoveryItem item) {
-                        acceptItem(item, deduper, pendingBatch, session, fileScanPhase);
-                    }
-
-                    @Override
-                    public void onDone(int scannedCount, int foundCount) {
-                        session.scannedCount = scannedCount;
-                    }
-
-                    @Override
-                    public void onError(File file, Exception exception) {
-                        // Keep scanning other readable directories.
-                    }
-                });
-
-                if (!cancelled.get() && !session.atCap() && type == RecoveryType.IMAGE && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    currentPhase = ScanProgressTracker.Phase.MEDIASTORE;
-                    runMediaStorePhase(type, deduper, pendingBatch, session, currentPhase);
-                }
-                if (!cancelled.get() && !session.atCap() && type == RecoveryType.IMAGE) {
-                    currentPhase = ScanProgressTracker.Phase.CACHE;
-                    runCachePhase(type, deduper, pendingBatch, session, currentPhase);
+                    runTypeScan(type, deduper, pendingBatch, session, scanMode);
                 }
 
                 flushBatch(pendingBatch);
-                if (session.atCap()) {
-                    postResultCapReached();
-                }
-                final int finalScanned = session.scannedCount;
+                final int finalScanned = session.cumulativeScannedCount();
                 final int finalFound = session.foundCount;
+                ScanDiagnostics.scanComplete(
+                        finalScanned,
+                        finalFound,
+                        deduper.getDuplicateCount(),
+                        session.sourceVisible,
+                        session.sourceMediastore,
+                        session.sourceCache,
+                        session.suspectedDeleted,
+                        System.currentTimeMillis() - scanStartedAt
+                );
                 mainHandler.post(new Runnable() {
                     @Override
                     public void run() {
@@ -149,6 +152,95 @@ public final class RecoveryCoordinator {
                 });
             }
         });
+    }
+
+    private void runTypeScan(
+            final RecoveryType type,
+            final RecoveryDeduper deduper,
+            final ArrayList<RecoveryItem> pendingBatch,
+            final ScanSession session,
+            final ScanMode scanMode
+    ) {
+        final AlgorithmContext algorithmContext = new AlgorithmContext(context, type);
+        final PhaseTracker phaseTracker = new PhaseTracker(type);
+        algorithmRunner.run(scanMode, type, algorithmContext, new AlgorithmRunner.Delegate() {
+            @Override
+            public boolean isCancelled() {
+                return cancelled.get();
+            }
+
+            @Override
+            public ScanProgressTracker.Phase phaseForAlgorithm(String algorithmId) {
+                if (MediaStoreIndexTrashAlgorithm.ID.equals(algorithmId)) {
+                    return ScanProgressTracker.Phase.MEDIASTORE;
+                }
+                if (CacheProfileAlgorithm.ID.equals(algorithmId)) {
+                    return ScanProgressTracker.Phase.CACHE;
+                }
+                return ScanProgressTracker.Phase.FILE_SCAN;
+            }
+
+            @Override
+            public void onAlgorithmPhase(ScanProgressTracker.Phase phase) {
+                phaseTracker.beginPhase(phase, session);
+                postScanPhase(phase);
+            }
+
+            @Override
+            public void onCandidate(RecoveryCandidate candidate, ScanProgressTracker.Phase phase) {
+                RecoveryItem item = RecoveryCandidateMapper.toRecoveryItem(candidate, type);
+                if (item == null) {
+                    return;
+                }
+                acceptItem(item, deduper, pendingBatch, session, phase);
+                long now = System.currentTimeMillis();
+                if (progressThrottler.shouldUpdate(now)) {
+                    postProgress(session.cumulativeScannedCount(), session.foundCount, item.path);
+                }
+            }
+
+            @Override
+            public void onProgress(int processed, String currentPath, ScanProgressTracker.Phase phase) {
+                phaseTracker.updateProcessed(processed);
+                if (phase == ScanProgressTracker.Phase.FILE_SCAN) {
+                    session.scannedCount = processed;
+                } else if (phase == ScanProgressTracker.Phase.MEDIASTORE) {
+                    session.mediastoreProcessed = processed;
+                    postPhaseProgress(phase, processed);
+                } else if (phase == ScanProgressTracker.Phase.CACHE) {
+                    session.cacheFilesScanned = processed;
+                    postPhaseProgress(phase, processed);
+                }
+                long now = System.currentTimeMillis();
+                if (progressThrottler.shouldUpdate(now)) {
+                    ScanDiagnostics.phaseProgress(phase, processed, session.foundCount);
+                    postProgress(session.cumulativeScannedCount(), session.foundCount, currentPath);
+                }
+            }
+
+            @Override
+            public int getDuplicateCount() {
+                return deduper.getDuplicateCount();
+            }
+        });
+        phaseTracker.closeOpenPhase(session);
+        session.completedTypeScannedCount += session.scannedCount;
+        session.scannedCount = 0;
+    }
+
+    private static long logPhaseStart(ScanProgressTracker.Phase phase, RecoveryType type) {
+        ScanDiagnostics.phaseStart(phase, type);
+        return System.currentTimeMillis();
+    }
+
+    private static void logPhaseEnd(
+            ScanProgressTracker.Phase phase,
+            RecoveryType type,
+            long startedAt,
+            int scanned,
+            int foundInPhase
+    ) {
+        ScanDiagnostics.phaseEnd(phase, type, System.currentTimeMillis() - startedAt, scanned, foundInPhase);
     }
 
     public void recoverSelected(final List<RecoveryItem> selected) {
@@ -195,84 +287,6 @@ public final class RecoveryCoordinator {
         });
     }
 
-    private void runMediaStorePhase(
-            RecoveryType type,
-            RecoveryDeduper deduper,
-            ArrayList<RecoveryItem> pendingBatch,
-            ScanSession session,
-            ScanProgressTracker.Phase phase
-    ) {
-        postScanPhase(phase);
-        MediaStoreExperimentScanner mediaStoreScanner = new MediaStoreExperimentScanner(context);
-        mediaStoreScanner.scan(new Callback() {
-            @Override
-            public boolean isCancelled() {
-                return cancelled.get() || session.atCap();
-            }
-
-            @Override
-            public void onCandidate(RecoveryCandidate candidate) {
-                RecoveryItem item = RecoveryCandidateMapper.toRecoveryItem(candidate, type);
-                if (item == null) {
-                    return;
-                }
-                acceptItem(item, deduper, pendingBatch, session, phase);
-                long now = System.currentTimeMillis();
-                if (progressThrottler.shouldUpdate(now)) {
-                    postProgress(session.scannedCount, session.foundCount, item.path);
-                }
-            }
-
-            @Override
-            public void onProgress(String message) {
-                // MediaStore cursor progress is surfaced via candidate count.
-            }
-        });
-    }
-
-    private void runCachePhase(
-            RecoveryType type,
-            RecoveryDeduper deduper,
-            ArrayList<RecoveryItem> pendingBatch,
-            ScanSession session,
-            ScanProgressTracker.Phase phase
-    ) {
-        postScanPhase(phase);
-        final CacheProfileScanner cacheScanner = new CacheProfileScanner();
-        final CacheProfilePathWalker walker = new CacheProfilePathWalker();
-        walker.walk(new CacheProfilePathWalker.Callback() {
-            @Override
-            public boolean isCancelled() {
-                return cancelled.get() || session.atCap();
-            }
-
-            @Override
-            public void onProfileFile(File file, int scannedSoFar) {
-                cacheScanner.scanFile(file, new CacheProfileScanner.Callback() {
-                    @Override
-                    public boolean isCancelled() {
-                        return cancelled.get() || session.atCap();
-                    }
-
-                    @Override
-                    public void onCandidate(RecoveryCandidate candidate) {
-                        RecoveryItem item = RecoveryCandidateMapper.toRecoveryItem(candidate, type);
-                        if (item == null) {
-                            return;
-                        }
-                        acceptItem(item, deduper, pendingBatch, session, phase);
-                    }
-                });
-                session.cacheFilesScanned = scannedSoFar;
-                postPhaseProgress(phase, scannedSoFar);
-                long now = System.currentTimeMillis();
-                if (progressThrottler.shouldUpdate(now)) {
-                    postProgress(session.scannedCount, session.foundCount, file.getAbsolutePath());
-                }
-            }
-        });
-    }
-
     private void acceptItem(
             RecoveryItem item,
             RecoveryDeduper deduper,
@@ -280,10 +294,11 @@ public final class RecoveryCoordinator {
             ScanSession session,
             ScanProgressTracker.Phase sourcePhase
     ) {
-        if (session.atCap() || deduper.isDuplicate(item)) {
+        if (deduper.isDuplicate(item)) {
             return;
         }
         session.foundCount++;
+        session.recordSource(item);
         if (sourcePhase == ScanProgressTracker.Phase.MEDIASTORE) {
             session.mediastoreProcessed++;
             postPhaseProgress(sourcePhase, session.mediastoreProcessed);
@@ -291,9 +306,6 @@ public final class RecoveryCoordinator {
         pendingBatch.add(item);
         if (pendingBatch.size() >= ScanLimits.ITEM_BATCH_SIZE) {
             flushBatch(pendingBatch);
-        }
-        if (session.atCap()) {
-            cancelled.set(true);
         }
     }
 
@@ -336,6 +348,22 @@ public final class RecoveryCoordinator {
         });
     }
 
+    private void awaitScanTypeChanged(final RecoveryType type, final int typeIndex, final int typeCount) {
+        final CountDownLatch latch = new CountDownLatch(1);
+        mainHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                callback.onScanTypeChanged(type, typeIndex, typeCount);
+                latch.countDown();
+            }
+        });
+        try {
+            latch.await();
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
     private void postScanPhase(final ScanProgressTracker.Phase phase) {
         mainHandler.post(new Runnable() {
             @Override
@@ -372,23 +400,68 @@ public final class RecoveryCoordinator {
         });
     }
 
-    private void postResultCapReached() {
-        mainHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                callback.onResultCapReached();
+    private final class PhaseTracker {
+        private final RecoveryType type;
+        private ScanProgressTracker.Phase openPhase;
+        private long phaseStartedAt;
+        private int foundAtPhaseStart;
+        private int processedAtPhaseEnd;
+
+        PhaseTracker(RecoveryType type) {
+            this.type = type;
+        }
+
+        void beginPhase(ScanProgressTracker.Phase phase, ScanSession session) {
+            closeOpenPhase(session);
+            openPhase = phase;
+            phaseStartedAt = logPhaseStart(phase, type);
+            foundAtPhaseStart = session.foundCount;
+            processedAtPhaseEnd = 0;
+        }
+
+        void updateProcessed(int processed) {
+            processedAtPhaseEnd = processed;
+        }
+
+        void closeOpenPhase(ScanSession session) {
+            if (openPhase == null) {
+                return;
             }
-        });
+            int foundInPhase = session == null ? 0 : session.foundCount - foundAtPhaseStart;
+            logPhaseEnd(openPhase, type, phaseStartedAt, processedAtPhaseEnd, foundInPhase);
+            openPhase = null;
+        }
     }
 
     static final class ScanSession {
         int scannedCount;
+        int completedTypeScannedCount;
         int foundCount;
         int mediastoreProcessed;
         int cacheFilesScanned;
+        int sourceVisible;
+        int sourceMediastore;
+        int sourceCache;
+        int suspectedDeleted;
 
-        boolean atCap() {
-            return ScanLimits.isAtCap(foundCount);
+        int cumulativeScannedCount() {
+            return completedTypeScannedCount + scannedCount;
+        }
+
+        void recordSource(RecoveryItem item) {
+            if (item.suspectedDeleted) {
+                suspectedDeleted++;
+            }
+            RecoverySourceKind kind = item.sourceKind;
+            if (kind == RecoverySourceKind.VISIBLE_SHARED_FILE
+                    || kind == RecoverySourceKind.ACCESSIBLE_SIGNATURE_MATCH) {
+                sourceVisible++;
+            } else if (kind == RecoverySourceKind.MEDIASTORE_TRASH
+                    || kind == RecoverySourceKind.MEDIASTORE_PENDING) {
+                sourceMediastore++;
+            } else {
+                sourceCache++;
+            }
         }
     }
 }

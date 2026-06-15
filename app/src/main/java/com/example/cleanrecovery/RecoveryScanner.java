@@ -61,7 +61,9 @@ public final class RecoveryScanner {
         scannedCount = 0;
         foundCount = 0;
         visitedDirectories.clear();
+        ScanDiagnostics.trackerEvent("fileScanStart type=" + type);
         scanDirectory(Environment.getExternalStorageDirectory(), type, callback);
+        ScanDiagnostics.trackerEvent("fileScanDone type=" + type + " scanned=" + scannedCount + " found=" + foundCount);
         callback.onDone(scannedCount, foundCount);
     }
 
@@ -145,6 +147,7 @@ public final class RecoveryScanner {
             return directory.listFiles();
         } catch (SecurityException exception) {
             callback.onError(directory, exception);
+            ScanDiagnostics.error("listFiles", directory.getAbsolutePath(), exception);
             return null;
         }
     }
@@ -154,6 +157,7 @@ public final class RecoveryScanner {
             return directory.listFiles();
         } catch (SecurityException exception) {
             callback.onError(directory, exception);
+            ScanDiagnostics.error("listFiles", directory.getAbsolutePath(), exception);
             return null;
         }
     }
@@ -188,7 +192,8 @@ public final class RecoveryScanner {
         options.inJustDecodeBounds = true;
         try (FileInputStream inputStream = new FileInputStream(file)) {
             BitmapFactory.decodeStream(inputStream, null, options);
-        } catch (IOException | RuntimeException ignored) {
+        } catch (IOException | RuntimeException exception) {
+            ScanDiagnostics.error("decodeImage", file.getAbsolutePath(), exception);
             return null;
         }
 
@@ -238,7 +243,7 @@ public final class RecoveryScanner {
         return isSuspectedDeletedPath(file.getAbsolutePath(), file.getName(), extension);
     }
 
-    static boolean isOutputDirectoryName(String directoryName) {
+    public static boolean isOutputDirectoryName(String directoryName) {
         return "DataRecovery".equalsIgnoreCase(directoryName);
     }
 

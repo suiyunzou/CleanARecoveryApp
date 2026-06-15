@@ -37,7 +37,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/app_name"
-                        android:textColor="@color/text_primary"
+                        android:textColor="@color/brand_primary"
                         android:textSize="@dimen/text_title"
                         android:textStyle="bold" />
 
@@ -128,12 +128,35 @@
                         android:layout_margin="@dimen/space_xs" />
                 </GridLayout>
 
+                <Button
+                    android:id="@+id/scan_all_button"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_md"
+                    android:background="@drawable/bg_button_primary"
+                    android:minHeight="@dimen/button_min_height"
+                    android:text="@string/scan_all_button"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text_on_primary" />
+
+                <Button
+                    android:id="@+id/experimental_scan_button"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_sm"
+                    android:background="@drawable/bg_button_experimental"
+                    android:minHeight="@dimen/button_min_height"
+                    android:text="@string/experimental_scan_button"
+                    android:textAllCaps="false"
+                    android:textColor="@color/status_warning" />
+
                 <LinearLayout
                     android:id="@+id/last_scan_card"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_lg"
                     android:background="@drawable/bg_card"
+                    android:elevation="@dimen/elevation_card"
                     android:orientation="vertical"
                     android:padding="@dimen/space_md">
 
@@ -229,7 +252,7 @@
                 android:id="@+id/scan_progress_bar"
                 style="?android:attr/progressBarStyleHorizontal"
                 android:layout_width="match_parent"
-                android:layout_height="12dp"
+                android:layout_height="14dp"
                 android:layout_marginTop="@dimen/space_md"
                 android:max="100"
                 android:progress="0"
@@ -341,7 +364,7 @@
                 <Button
                     android:id="@+id/filter_all_button"
                     android:layout_width="0dp"
-                    android:layout_height="36dp"
+                    android:layout_height="40dp"
                     android:layout_marginEnd="@dimen/space_xs"
                     android:layout_weight="1"
                     android:background="@drawable/bg_tab_selected"
@@ -352,7 +375,7 @@
                 <Button
                     android:id="@+id/filter_existing_button"
                     android:layout_width="0dp"
-                    android:layout_height="36dp"
+                    android:layout_height="40dp"
                     android:layout_marginEnd="@dimen/space_xs"
                     android:layout_weight="1"
                     android:background="@drawable/bg_tab_unselected"
@@ -363,7 +386,7 @@
                 <Button
                     android:id="@+id/filter_deleted_button"
                     android:layout_width="0dp"
-                    android:layout_height="36dp"
+                    android:layout_height="40dp"
                     android:layout_weight="1"
                     android:background="@drawable/bg_tab_unselected"
                     android:text="@string/filter_deleted"
@@ -413,9 +436,12 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/space_md"
                         android:background="@drawable/bg_button_primary"
+                        android:minHeight="@dimen/button_min_height"
+                        android:paddingStart="@dimen/space_xl"
+                        android:paddingEnd="@dimen/space_xl"
                         android:text="@string/rescan_button"
                         android:textAllCaps="false"
-                        android:textColor="@android:color/white" />
+                        android:textColor="@color/text_on_primary" />
                 </LinearLayout>
             </FrameLayout>
 
@@ -470,7 +496,7 @@
                         android:background="@drawable/bg_button_primary"
                         android:text="@string/button_recover"
                         android:textAllCaps="false"
-                        android:textColor="@android:color/white"
+                        android:textColor="@color/text_on_primary"
                         android:textSize="@dimen/text_caption" />
                 </LinearLayout>
             </LinearLayout>
@@ -493,7 +519,7 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:background="?android:attr/selectableItemBackground"
+            android:background="@drawable/bg_nav_item_active"
             android:clickable="true"
             android:focusable="true"
             android:gravity="center"
@@ -522,7 +548,6 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:background="?android:attr/selectableItemBackground"
             android:clickable="true"
             android:focusable="true"
             android:gravity="center"
@@ -551,7 +576,6 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:background="?android:attr/selectableItemBackground"
             android:clickable="true"
             android:focusable="true"
             android:gravity="center"
@@ -580,7 +604,6 @@
             android:layout_width="0dp"
             android:layout_height="match_parent"
             android:layout_weight="1"
-            android:background="?android:attr/selectableItemBackground"
             android:clickable="true"
             android:focusable="true"
             android:gravity="center"

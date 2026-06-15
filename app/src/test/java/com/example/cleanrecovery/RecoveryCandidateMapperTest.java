@@ -84,4 +84,20 @@ public final class RecoveryCandidateMapperTest {
         assertEquals(RecoverySourceKind.OEM_GALLERY_CACHE,
                 RecoveryCandidateMapper.mapSourceKind(CandidateSourceKind.OEM_GALLERY_CACHE));
     }
+
+    @Test
+    public void accessibleSignatureMatchDoesNotFakeDeletedStatus() {
+        RecoveryCandidate candidate = new RecoveryCandidate.Builder()
+                .sourceKind(CandidateSourceKind.ACCESSIBLE_SIGNATURE_MATCH)
+                .sourceUriOrPath("/storage/emulated/0/LOST.DIR/orphan")
+                .mimeDetected("image/jpeg")
+                .byteLength(256L)
+                .build();
+
+        RecoveryItem item = RecoveryCandidateMapper.toRecoveryItem(candidate, RecoveryType.IMAGE);
+
+        assertNotNull(item);
+        assertEquals(RecoverySourceKind.ACCESSIBLE_SIGNATURE_MATCH, item.sourceKind);
+        assertFalse(item.suspectedDeleted);
+    }
 }

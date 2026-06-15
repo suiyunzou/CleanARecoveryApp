@@ -67,6 +67,8 @@ public final class RecoveryCandidateMapper {
                 return RecoverySourceKind.KNOWN_CACHE_BLOB;
             case CARVED_FROM_KNOWN_BLOB:
                 return RecoverySourceKind.CARVED_FROM_KNOWN_BLOB;
+            case ACCESSIBLE_SIGNATURE_MATCH:
+                return RecoverySourceKind.ACCESSIBLE_SIGNATURE_MATCH;
             case VISIBLE_SHARED_FILE:
             case MEDIASTORE_STALE_RECORD:
             default:
@@ -87,6 +89,9 @@ public final class RecoveryCandidateMapper {
         }
         if (mime.startsWith("audio/")) {
             return RecoveryType.AUDIO;
+        }
+        if (mime.equals("application/pdf") || mime.equals("application/zip")) {
+            return RecoveryType.DOCUMENT;
         }
         return null;
     }
