@@ -22,7 +22,7 @@ public final class RecoveryOutputPaths {
         return primaryDataRecoveryDir().getAbsolutePath();
     }
 
-    public static void openPrimaryFolder(Context context) {
+    public static boolean openPrimaryFolder(Context context) {
         File directory = primaryDataRecoveryDir();
         if (!directory.exists()) {
             directory.mkdirs();
@@ -33,13 +33,15 @@ public final class RecoveryOutputPaths {
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         try {
             context.startActivity(intent);
+            return true;
         } catch (Exception first) {
             Intent fallback = new Intent(Intent.ACTION_GET_CONTENT);
             fallback.setDataAndType(uri, "*/*");
             try {
                 context.startActivity(fallback);
+                return true;
             } catch (Exception ignored) {
-                // No compatible file manager.
+                return false;
             }
         }
     }

@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 public final class RecoverCompleteActivity extends Activity {
     public static final String EXTRA_SUCCESS = "com.example.cleanrecovery.extra.SUCCESS";
@@ -35,7 +36,10 @@ public final class RecoverCompleteActivity extends Activity {
         openFolder.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                RecoveryOutputPaths.openPrimaryFolder(RecoverCompleteActivity.this);
+                boolean opened = RecoveryOutputPaths.openPrimaryFolder(RecoverCompleteActivity.this);
+                if (!opened) {
+                    Toast.makeText(RecoverCompleteActivity.this, R.string.folder_open_failed, Toast.LENGTH_LONG).show();
+                }
             }
         });
 

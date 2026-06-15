@@ -5,8 +5,8 @@
     <dimen name="space_md">12dp</dimen>
     <dimen name="space_lg">16dp</dimen>
     <dimen name="space_xl">24dp</dimen>
-    <dimen name="radius_card">18dp</dimen>
-    <dimen name="radius_card_large">20dp</dimen>
+    <dimen name="radius_card">8dp</dimen>
+    <dimen name="radius_card_large">8dp</dimen>
     <dimen name="radius_button">14dp</dimen>
     <dimen name="radius_button_pill">28dp</dimen>
     <dimen name="radius_thumbnail">12dp</dimen>

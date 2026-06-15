@@ -1,6 +1,6 @@
 <resources>
-    <string name="app_name">拾光</string>
-    <string name="app_subtitle">拾起散落的光，温柔找回仍可读取的时刻</string>
+    <string name="app_name">安心恢复</string>
+    <string name="app_subtitle">拾光 · 温柔找回仍可读取的照片、视频、音频和文档</string>
     <string name="storage_access_required">扫描前需要先授予存储访问权限。</string>
     <string name="storage_access_granted">已获得存储访问权限。</string>
     <string name="storage_access_missing">尚未获得存储访问权限。</string>
@@ -8,7 +8,8 @@
     <string name="scan_status">正在扫描%1$s&#8230;</string>
     <string name="scan_status_all">正在扫描全部类型&#8230;</string>
     <string name="scan_all_button">全部扫描</string>
-    <string name="experimental_scan_button">尝试实验恢复方法</string>
+    <string name="experimental_scan_button">尝试实验恢复</string>
+    <string name="experimental_scan_hint">运行手机允许的全部安全非 root 方法。</string>
     <string name="experimental_scan_warning">这些方法可能更慢，可能找到缓存副本、缩略图或不支持的线索。不会进行 root 或已删除扇区恢复。</string>
     <string name="experimental_scan_title">实验恢复</string>
     <string name="experimental_scan_status">实验扫描：%1$s&#8230;</string>
@@ -66,7 +67,7 @@
     <string name="onboarding_bullet_no_root">• 无需 root，无需连接电脑</string>
     <string name="trust_non_destructive">只读扫描 · 仅复制 · 非 root</string>
     <string name="last_scan_title">上次扫描</string>
-    <string name="last_scan_empty">还没有拾起任何光。选择上方分类或「全部扫描」开始。</string>
+    <string name="last_scan_empty">还没有扫描记录。选择分类、全部扫描或尝试实验恢复。</string>
     <string name="last_scan_summary">%1$s · 已扫描 %2$d · 找到 %3$d</string>
     <string name="category_count_found">上次找到 %1$d 个</string>
     <string name="category_count_none">尚未扫描</string>
@@ -92,8 +93,9 @@
     <string name="empty_results_title">这里还没有内容，试试其他筛选或重新扫描</string>
     <string name="rescan_button">重新扫描</string>
     <string name="about_title">关于</string>
-    <string name="about_tagline">拾起散落的光，留住珍贵时刻</string>
-    <string name="about_body">拾光会扫描可访问的共享存储，温柔地将选中文件复制到公开 DataRecovery 目录。方法透明、由你掌控；不会删除源文件，不宣称已删除扇区恢复，也不需要 root。</string>
+    <string name="about_tagline">拾光：拾起散落的光，留住珍贵时刻</string>
+    <string name="about_body">安心恢复会扫描可访问的共享存储，温柔地将选中文件复制到公开 DataRecovery 目录。方法透明、由你掌控；不会删除源文件，不宣称已删除扇区恢复，也不需要 root。</string>
+    <string name="folder_open_failed">没有找到可用的文件管理器。你可以在系统“文件”应用中打开 Pictures/DataRecovery。</string>
     <string name="recover_complete_title">时光已拾起</string>
     <string name="open_folder_button">打开文件夹</string>
     <string name="back_to_results">返回结果</string>

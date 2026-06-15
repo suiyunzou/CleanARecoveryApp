@@ -197,10 +197,10 @@ public final class MainActivity extends Activity {
     }
 
     private void bindCategoryCards() {
-        setupCategoryCard(findViewById(R.id.card_images), RecoveryType.IMAGE, R.drawable.ic_category_image);
-        setupCategoryCard(findViewById(R.id.card_videos), RecoveryType.VIDEO, R.drawable.ic_category_video);
-        setupCategoryCard(findViewById(R.id.card_audio), RecoveryType.AUDIO, R.drawable.ic_category_audio);
-        setupCategoryCard(findViewById(R.id.card_documents), RecoveryType.DOCUMENT, R.drawable.ic_category_document);
+        setupCategoryCard(findViewById(R.id.card_images), RecoveryType.IMAGE, R.drawable.ic_type_image);
+        setupCategoryCard(findViewById(R.id.card_videos), RecoveryType.VIDEO, R.drawable.ic_type_video);
+        setupCategoryCard(findViewById(R.id.card_audio), RecoveryType.AUDIO, R.drawable.ic_type_audio);
+        setupCategoryCard(findViewById(R.id.card_documents), RecoveryType.DOCUMENT, R.drawable.ic_type_document);
     }
 
     private void setupCategoryCard(View card, final RecoveryType type, int iconResId) {
@@ -241,7 +241,7 @@ public final class MainActivity extends Activity {
         findViewById(R.id.open_output_button).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                RecoveryOutputPaths.openPrimaryFolder(MainActivity.this);
+                openRecoveryFolder();
             }
         });
         permissionBanner.setOnClickListener(new View.OnClickListener() {
@@ -274,13 +274,10 @@ public final class MainActivity extends Activity {
         });
         findViewById(R.id.nav_home).setOnClickListener(v -> showPanel(Panel.HOME));
         findViewById(R.id.nav_results).setOnClickListener(v -> {
-            if (hasScanResults()) {
-                showPanel(Panel.RESULTS);
-            } else {
-                Toast.makeText(this, R.string.last_scan_empty, Toast.LENGTH_SHORT).show();
-            }
+            showPanel(Panel.RESULTS);
+            updateCounters();
         });
-        findViewById(R.id.nav_folder).setOnClickListener(v -> RecoveryOutputPaths.openPrimaryFolder(this));
+        findViewById(R.id.nav_folder).setOnClickListener(v -> openRecoveryFolder());
         findViewById(R.id.nav_about).setOnClickListener(v ->
                 startActivity(new Intent(MainActivity.this, AboutActivity.class)));
         filterAllButton.setOnClickListener(v -> setFilter(RecoveryState.FilterMode.ALL));
@@ -464,6 +461,13 @@ public final class MainActivity extends Activity {
         startActivity(intent);
     }
 
+    private void openRecoveryFolder() {
+        boolean opened = RecoveryOutputPaths.openPrimaryFolder(this);
+        if (!opened) {
+            Toast.makeText(this, R.string.folder_open_failed, Toast.LENGTH_LONG).show();
+        }
+    }
+
     private void setFilter(RecoveryState.FilterMode mode) {
         recoveryState.setFilter(mode);
         gridAdapter.notifyDataSetChanged();
@@ -624,17 +628,15 @@ public final class MainActivity extends Activity {
         if (panel == Panel.SCAN) {
             return;
         }
-        boolean hasResults = hasScanResults();
         int activeColor = resolveColorRes(R.color.brand_primary);
         int inactiveColor = resolveColorRes(R.color.text_secondary);
-        int disabledColor = resolveColorRes(R.color.text_muted);
 
         styleNavItem(findViewById(R.id.nav_home), navHomeIcon, navHomeLabel, panel == Panel.HOME, activeColor, inactiveColor);
-        styleNavItem(findViewById(R.id.nav_results), navResultsIcon, navResultsLabel, panel == Panel.RESULTS, activeColor,
-                hasResults ? inactiveColor : disabledColor);
-        navResultsIcon.setEnabled(hasResults);
-        navResultsLabel.setEnabled(hasResults);
-        findViewById(R.id.nav_results).setEnabled(hasResults);
+        styleNavItem(findViewById(R.id.nav_results), navResultsIcon, navResultsLabel, panel == Panel.RESULTS,
+                activeColor, inactiveColor);
+        navResultsIcon.setEnabled(true);
+        navResultsLabel.setEnabled(true);
+        findViewById(R.id.nav_results).setEnabled(true);
         styleNavItem(findViewById(R.id.nav_folder), navFolderIcon, navFolderLabel, false, activeColor, inactiveColor);
         styleNavItem(findViewById(R.id.nav_about), navAboutIcon, navAboutLabel, false, activeColor, inactiveColor);
     }

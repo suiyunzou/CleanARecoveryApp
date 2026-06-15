@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+    <path
+        android:fillColor="@color/brand_accent"
+        android:pathData="M16,3 L25,7 L24,15 C23,22 20,26 16,29 C12,26 9,22 8,15 L7,7 Z" />
+    <path
+        android:fillColor="@color/surface_card"
+        android:pathData="M12,11 L20,11 Q22,11 22,13 L22,20 Q22,22 20,22 L12,22 Q10,22 10,20 L10,13 Q10,11 12,11 Z" />
+    <path
+        android:fillColor="@color/brand_primary"
+        android:pathData="M11,19 Q14,15 17,18 Q19,20 21,16 L21,21 L11,21 Z" />
+    <path
+        android:fillColor="@color/brand_secondary"
+        android:pathData="M15,14m-2,0a2,2 0,1 1,4 0a2,2 0,1 1,-4 0" />
+</vector>

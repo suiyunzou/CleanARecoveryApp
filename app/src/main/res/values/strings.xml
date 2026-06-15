@@ -1,6 +1,6 @@
 <resources>
-    <string name="app_name">Lumina</string>
-    <string name="app_subtitle">Gather the light — gently recover your moments</string>
+    <string name="app_name">SafeRestore</string>
+    <string name="app_subtitle">拾光 · Gently recover readable photos, videos, audio, and documents</string>
     <string name="storage_access_required">Storage access is required before scanning.</string>
     <string name="storage_access_granted">Storage access granted.</string>
     <string name="storage_access_missing">Storage access not granted.</string>
@@ -8,7 +8,8 @@
     <string name="scan_status">Scanning %1$s&#8230;</string>
     <string name="scan_status_all">Scanning all file types&#8230;</string>
     <string name="scan_all_button">Scan All Types</string>
-    <string name="experimental_scan_button">Try experimental methods</string>
+    <string name="experimental_scan_button">Try experimental recovery</string>
+    <string name="experimental_scan_hint">Run every safe non-root method your phone allows.</string>
     <string name="experimental_scan_warning">These methods may be slower and may find cache copies, thumbnails, or unsupported evidence. They do not perform root or deleted-sector recovery.</string>
     <string name="experimental_scan_title">Experimental recovery</string>
     <string name="experimental_scan_status">Experimental scan: %1$s&#8230;</string>
@@ -66,7 +67,7 @@
     <string name="onboarding_bullet_no_root">• No root, no PC required</string>
     <string name="trust_non_destructive">Read-only scan · Copy only · Non-root</string>
     <string name="last_scan_title">Last scan</string>
-    <string name="last_scan_empty">No memories gathered yet. Choose a category or scan all to begin.</string>
+    <string name="last_scan_empty">No scan yet. Choose a category, scan all, or try experimental recovery.</string>
     <string name="last_scan_summary">%1$s · scanned %2$d · found %3$d</string>
     <string name="category_count_found">%1$d found last scan</string>
     <string name="category_count_none">Not scanned yet</string>
@@ -92,8 +93,9 @@
     <string name="empty_results_title">Nothing here yet — try another filter or scan again</string>
     <string name="rescan_button">Scan again</string>
     <string name="about_title">About</string>
-    <string name="about_tagline">Gather the light, keep your moments</string>
-    <string name="about_body">Lumina scans accessible shared storage and gently copies selected files to public DataRecovery folders. Methods are transparent and user-controlled. It does not delete source files, does not claim deleted-sector recovery, and does not require root.</string>
+    <string name="about_tagline">拾光：gather the light, keep your moments</string>
+    <string name="about_body">SafeRestore scans accessible shared storage and gently copies selected files to public DataRecovery folders. Methods are transparent and user-controlled. It does not delete source files, does not claim deleted-sector recovery, and does not require root.</string>
+    <string name="folder_open_failed">No compatible file manager was found. You can open Pictures/DataRecovery from your system Files app.</string>
     <string name="recover_complete_title">Moments gathered</string>
     <string name="open_folder_button">Open folder</string>
     <string name="back_to_results">Back to results</string>

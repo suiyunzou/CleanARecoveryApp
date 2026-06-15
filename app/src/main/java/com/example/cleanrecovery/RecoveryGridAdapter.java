@@ -71,15 +71,15 @@ public final class RecoveryGridAdapter extends RecyclerView.Adapter<RecoveryGrid
 
     private static int placeholderFor(RecoveryType type) {
         if (type == RecoveryType.VIDEO) {
-            return R.drawable.ic_category_video;
+            return R.drawable.ic_type_video;
         }
         if (type == RecoveryType.AUDIO) {
-            return R.drawable.ic_category_audio;
+            return R.drawable.ic_type_audio;
         }
         if (type == RecoveryType.DOCUMENT) {
-            return R.drawable.ic_category_document;
+            return R.drawable.ic_type_document;
         }
-        return R.drawable.ic_category_image;
+        return R.drawable.ic_type_image;
     }
 
     static final class Holder extends RecyclerView.ViewHolder {
