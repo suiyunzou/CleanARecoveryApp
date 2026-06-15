@@ -263,6 +263,7 @@ public final class MainActivity extends Activity {
             @Override
             public void onClick(View view) {
                 recoveryCoordinator.cancelCurrentWork();
+                showPanel(Panel.HOME);
             }
         });
         scanPathToggle.setOnClickListener(new View.OnClickListener() {

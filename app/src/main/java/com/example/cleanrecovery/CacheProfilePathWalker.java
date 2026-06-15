@@ -1,12 +1,11 @@
 package com.example.cleanrecovery;
 
-import android.os.Environment;
-
 import com.example.cleanrecovery.experiment.cache.CacheProfileRegistry;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -22,7 +21,14 @@ public final class CacheProfilePathWalker {
     private final Set<String> visitedDirectories = new HashSet<>();
 
     public int walk(Callback callback) {
-        return walk(Environment.getExternalStorageDirectory(), callback);
+        visitedDirectories.clear();
+        int total = 0;
+        List<File> roots = RecoveryScanner.readableStorageRoots();
+        for (File root : roots) {
+            if (callback.isCancelled()) break;
+            total += walkDirectory(root, callback, total);
+        }
+        return total;
     }
 
     public int walk(File root, Callback callback) {

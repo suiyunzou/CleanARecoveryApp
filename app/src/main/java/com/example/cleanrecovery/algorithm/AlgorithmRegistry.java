@@ -61,13 +61,7 @@ public final class AlgorithmRegistry {
             return false;
         }
         if (mode == ScanMode.DEFAULT) {
-            if (AccessibleSignatureSnifferAlgorithm.ID.equals(id)
-                    || LostDirOrphanSnifferAlgorithm.ID.equals(id)) {
-                return false;
-            }
-            return FileTreeVisibleAlgorithm.ID.equals(id)
-                    || MediaStoreIndexTrashAlgorithm.ID.equals(id)
-                    || CacheProfileAlgorithm.ID.equals(id);
+            return true;
         }
         return true;
     }

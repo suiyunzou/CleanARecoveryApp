@@ -52,6 +52,52 @@ public final class MediaStoreQuerySpec {
                 .build();
     }
 
+    public static MediaStoreQuerySpec visibleVideos(String volumeName) {
+        return baseBuilder(volumeName, QueryMode.VISIBLE)
+                .collectionUri(MediaStore.Video.Media.getContentUri(volumeName))
+                .selection(null)
+                .build();
+    }
+
+    public static MediaStoreQuerySpec trashedVideos(String volumeName) {
+        return baseBuilder(volumeName, QueryMode.TRASHED)
+                .collectionUri(MediaStore.Video.Media.getContentUri(volumeName))
+                .selection(MediaStore.MediaColumns.IS_TRASHED + "=?")
+                .selectionArgs(new String[]{"1"})
+                .build();
+    }
+
+    public static MediaStoreQuerySpec pendingVideos(String volumeName) {
+        return baseBuilder(volumeName, QueryMode.PENDING)
+                .collectionUri(MediaStore.Video.Media.getContentUri(volumeName))
+                .selection(MediaStore.MediaColumns.IS_PENDING + "=?")
+                .selectionArgs(new String[]{"1"})
+                .build();
+    }
+
+    public static MediaStoreQuerySpec visibleAudio(String volumeName) {
+        return baseBuilder(volumeName, QueryMode.VISIBLE)
+                .collectionUri(MediaStore.Audio.Media.getContentUri(volumeName))
+                .selection(null)
+                .build();
+    }
+
+    public static MediaStoreQuerySpec trashedAudio(String volumeName) {
+        return baseBuilder(volumeName, QueryMode.TRASHED)
+                .collectionUri(MediaStore.Audio.Media.getContentUri(volumeName))
+                .selection(MediaStore.MediaColumns.IS_TRASHED + "=?")
+                .selectionArgs(new String[]{"1"})
+                .build();
+    }
+
+    public static MediaStoreQuerySpec pendingAudio(String volumeName) {
+        return baseBuilder(volumeName, QueryMode.PENDING)
+                .collectionUri(MediaStore.Audio.Media.getContentUri(volumeName))
+                .selection(MediaStore.MediaColumns.IS_PENDING + "=?")
+                .selectionArgs(new String[]{"1"})
+                .build();
+    }
+
     private static Builder baseBuilder(String volumeName, QueryMode mode) {
         return new Builder()
                 .volumeName(volumeName)

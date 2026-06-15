@@ -117,7 +117,7 @@ public final class PreviewActivity extends Activity {
             previewPrevButton.setEnabled(PreviewSession.currentIndex() > 0);
             previewNextButton.setEnabled(PreviewSession.currentIndex() < total - 1);
         } else {
-            previewIndex.setText("");
+            previewIndex.setText("1 / 1");
             previewPrevButton.setEnabled(false);
             previewNextButton.setEnabled(false);
         }

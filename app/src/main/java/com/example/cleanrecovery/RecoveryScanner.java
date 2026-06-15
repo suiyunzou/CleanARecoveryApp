@@ -1,13 +1,18 @@
 package com.example.cleanrecovery;
 
 import android.graphics.BitmapFactory;
+import android.os.Build;
 import android.os.Environment;
+import android.os.storage.StorageManager;
+import android.os.storage.StorageVolume;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
@@ -53,7 +58,10 @@ public final class RecoveryScanner {
     public int countEntries(PrepareCallback callback) {
         preparedCount = 0;
         visitedDirectories.clear();
-        countDirectory(Environment.getExternalStorageDirectory(), callback);
+        for (File root : readableStorageRoots()) {
+            countDirectory(root, callback);
+            if (callback.isCancelled()) break;
+        }
         return preparedCount;
     }
 
@@ -62,7 +70,10 @@ public final class RecoveryScanner {
         foundCount = 0;
         visitedDirectories.clear();
         ScanDiagnostics.trackerEvent("fileScanStart type=" + type);
-        scanDirectory(Environment.getExternalStorageDirectory(), type, callback);
+        for (File root : readableStorageRoots()) {
+            scanDirectory(root, type, callback);
+            if (callback.isCancelled()) break;
+        }
         ScanDiagnostics.trackerEvent("fileScanDone type=" + type + " scanned=" + scannedCount + " found=" + foundCount);
         callback.onDone(scannedCount, foundCount);
     }
@@ -258,6 +269,33 @@ public final class RecoveryScanner {
             return "";
         }
         return name.substring(index + 1).toLowerCase(Locale.US);
+    }
+
+    static List<File> readableStorageRoots() {
+        List<File> roots = new ArrayList<>();
+        File primary = Environment.getExternalStorageDirectory();
+        if (primary != null && primary.exists() && primary.canRead()) {
+            roots.add(primary);
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                File[] dirs = primary.getParentFile() != null
+                        ? primary.getParentFile().listFiles()
+                        : null;
+                if (dirs != null) {
+                    for (File dir : dirs) {
+                        if (!dir.getAbsolutePath().equals(primary.getAbsolutePath())
+                                && dir.isDirectory()
+                                && dir.exists()
+                                && dir.canRead()) {
+                            roots.add(dir);
+                        }
+                    }
+                }
+            } catch (SecurityException ignored) {
+            }
+        }
+        return roots;
     }
 
     private static Set<String> setOf(String... values) {

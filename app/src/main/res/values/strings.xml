@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">Qingxun Recovery</string>
-    <string name="app_subtitle">Find what matters — safely, without intrusion</string>
-    <string name="app_slogan">Find what matters — safely, without intrusion</string>
+    <string name="app_subtitle">Find what you lost — no root, no damage, no data collected.</string>
+    <string name="app_slogan">Find what you lost — no root, no damage, no data collected.</string>
     <string name="storage_access_required">Storage access is required before scanning.</string>
     <string name="storage_access_granted">Storage access granted.</string>
     <string name="storage_access_missing">Storage access not granted.</string>
@@ -160,8 +160,17 @@
     <string name="empty_results_title">Nothing here yet — try another filter or scan again</string>
     <string name="rescan_button">Scan again</string>
     <string name="about_title">About</string>
-    <string name="about_tagline">Find what matters — safely, without intrusion</string>
-    <string name="about_body">Qingxun Recovery scans accessible shared storage and copies selected files to public DataRecovery folders. Methods are transparent and user-controlled. It does not delete source files, does not claim deleted-sector recovery, and does not require root.</string>
+    <string name="about_tagline">Find what you lost — no root, no damage, no data collected.</string>
+    <string name="about_version">Version %1$s</string>
+    <string name="about_body">Scans accessible shared storage and copies selected photos, videos, audio, and documents to public DataRecovery folders. Methods are transparent and user-controlled.</string>
+    <string name="about_feature_1">  •  Only scans files the system allows apps to read</string>
+    <string name="about_feature_2">  •  Copies files — never deletes or alters originals</string>
+    <string name="about_feature_3">  •  Works offline; no data is ever collected or uploaded</string>
+    <string name="about_badge_no_root">No root</string>
+    <string name="about_badge_read_only">Read-only</string>
+    <string name="about_badge_safe">Offline</string>
+    <string name="about_share">Share this app</string>
+    <string name="about_footer">Made with care · Qingxun Recovery</string>
     <string name="folder_open_failed">No compatible file manager was found. You can open Pictures/DataRecovery from your system Files app.</string>
     <string name="recover_complete_title">Recovery complete</string>
     <string name="open_folder_button">Open folder</string>

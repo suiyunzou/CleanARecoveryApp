@@ -59,6 +59,7 @@ public final class FileBrowserActivity extends Activity {
     private View emptyPanel;
     private TextView emptyLabel;
     private View newFolderButton;
+    private View sortButton;
     private View toolbar;
     private View multiSelectBar;
     private ImageButton selectButton;
@@ -121,10 +122,12 @@ public final class FileBrowserActivity extends Activity {
         listView.setAdapter(adapter);
 
         selectButton = findViewById(R.id.file_browser_select);
+        sortButton = findViewById(R.id.file_browser_sort);
         findViewById(R.id.file_browser_back).setOnClickListener(v -> finish());
         findViewById(R.id.file_browser_up).setOnClickListener(v -> navigateUp());
         selectButton.setOnClickListener(v -> toggleMultiSelectMode());
-        findViewById(R.id.file_browser_menu).setOnClickListener(this::showToolbarMenu);
+        sortButton.setOnClickListener(this::showToolbarMenu);
+        newFolderButton = findViewById(R.id.file_browser_new_folder);
         newFolderButton.setOnClickListener(v -> showCreateFolderDialog());
         findViewById(R.id.file_browser_batch_delete).setOnClickListener(v -> confirmBatchDelete());
         findViewById(R.id.file_browser_cancel_select).setOnClickListener(v -> exitMultiSelectMode());

@@ -37,8 +37,8 @@ public final class AlgorithmRegistryTest {
 
     @Test
     public void defaultModeIncludesConservativeAlgorithmsOnly() {
-        assertEquals(3, AlgorithmRegistry.runnableForMode(ScanMode.DEFAULT, RecoveryType.IMAGE).size());
-        assertEquals(1, AlgorithmRegistry.runnableForMode(ScanMode.DEFAULT, RecoveryType.VIDEO).size());
+        assertEquals(5, AlgorithmRegistry.runnableForMode(ScanMode.DEFAULT, RecoveryType.IMAGE).size());
+        assertEquals(4, AlgorithmRegistry.runnableForMode(ScanMode.DEFAULT, RecoveryType.VIDEO).size());
     }
 
     @Test

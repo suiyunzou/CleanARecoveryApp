@@ -30,14 +30,24 @@ public final class MediaStoreExperimentScanner {
             return results;
         }
         for (String volume : MediaStore.getExternalVolumeNames(context)) {
-            if (callback != null && callback.isCancelled()) {
-                break;
-            }
+            if (callback != null && callback.isCancelled()) break;
             results.addAll(scanVolume(volume, MediaStoreQuerySpec.visibleImages(volume), callback));
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 results.addAll(scanVolume(volume, MediaStoreQuerySpec.trashedImages(volume), callback));
             }
             results.addAll(scanVolume(volume, MediaStoreQuerySpec.pendingImages(volume), callback));
+
+            results.addAll(scanVolume(volume, MediaStoreQuerySpec.visibleVideos(volume), callback));
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                results.addAll(scanVolume(volume, MediaStoreQuerySpec.trashedVideos(volume), callback));
+            }
+            results.addAll(scanVolume(volume, MediaStoreQuerySpec.pendingVideos(volume), callback));
+
+            results.addAll(scanVolume(volume, MediaStoreQuerySpec.visibleAudio(volume), callback));
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                results.addAll(scanVolume(volume, MediaStoreQuerySpec.trashedAudio(volume), callback));
+            }
+            results.addAll(scanVolume(volume, MediaStoreQuerySpec.pendingAudio(volume), callback));
         }
         return results;
     }
@@ -55,28 +65,17 @@ public final class MediaStoreExperimentScanner {
                 spec.selectionArgs,
                 spec.sortOrder
         )) {
-            if (cursor == null) {
-                return results;
-            }
+            if (cursor == null) return results;
             while (cursor.moveToNext()) {
-                if (callback != null && callback.isCancelled()) {
-                    break;
-                }
+                if (callback != null && callback.isCancelled()) break;
                 long id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID));
-                String mimeType = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE));
                 android.net.Uri contentUri = android.content.ContentUris.withAppendedId(spec.collectionUri, id);
+                String mimeType = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE));
                 MediaStoreReadabilityProbe.ProbeResult probeResult = probe.probe(context, contentUri, mimeType);
                 RecoveryCandidate candidate = MediaStoreCandidateMapper.fromCursor(
-                        cursor,
-                        spec.collectionUri,
-                        spec.queryMode,
-                        volumeName,
-                        probeResult
-                );
+                        cursor, spec.collectionUri, spec.queryMode, volumeName, probeResult);
                 results.add(candidate);
-                if (callback != null) {
-                    callback.onCandidate(candidate);
-                }
+                if (callback != null) callback.onCandidate(candidate);
             }
         }
         return results;
