@@ -18,10 +18,13 @@ public final class MediaStoreExperimentScanner {
     }
 
     private final Context context;
-    private final MediaStoreReadabilityProbe probe = new MediaStoreReadabilityProbe();
+    private final MediaStoreReadabilityProbe probe;
+    private final boolean skipProbe;
 
     public MediaStoreExperimentScanner(Context context) {
         this.context = context.getApplicationContext();
+        this.skipProbe = true;
+        this.probe = null;
     }
 
     public List<RecoveryCandidate> scan(Callback callback) {
@@ -52,6 +55,8 @@ public final class MediaStoreExperimentScanner {
         return results;
     }
 
+    private static final int PROGRESS_INTERVAL = 25;
+
     private List<RecoveryCandidate> scanVolume(
             String volumeName,
             MediaStoreQuerySpec spec,
@@ -66,16 +71,31 @@ public final class MediaStoreExperimentScanner {
                 spec.sortOrder
         )) {
             if (cursor == null) return results;
+            int row = 0;
             while (cursor.moveToNext()) {
                 if (callback != null && callback.isCancelled()) break;
                 long id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID));
                 android.net.Uri contentUri = android.content.ContentUris.withAppendedId(spec.collectionUri, id);
                 String mimeType = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE));
-                MediaStoreReadabilityProbe.ProbeResult probeResult = probe.probe(context, contentUri, mimeType);
+                MediaStoreReadabilityProbe.ProbeResult probeResult;
+                if (skipProbe) {
+                    probeResult = new MediaStoreReadabilityProbe.ProbeResult(
+                            true, "SKIPPED", 0, 0, "",
+                            cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)),
+                            0L, "");
+                } else {
+                    probeResult = probe.probe(context, contentUri, mimeType);
+                }
                 RecoveryCandidate candidate = MediaStoreCandidateMapper.fromCursor(
                         cursor, spec.collectionUri, spec.queryMode, volumeName, probeResult);
                 results.add(candidate);
-                if (callback != null) callback.onCandidate(candidate);
+                if (callback != null) {
+                    callback.onCandidate(candidate);
+                    row++;
+                    if (row % PROGRESS_INTERVAL == 0) {
+                        callback.onProgress(spec.queryMode + " " + row);
+                    }
+                }
             }
         }
         return results;

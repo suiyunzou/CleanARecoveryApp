@@ -1,5 +1,7 @@
 package com.example.cleanrecovery;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -7,6 +9,7 @@ import android.view.ViewGroup;
 import android.widget.CheckBox;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -55,11 +58,13 @@ public final class RecoveryGridAdapter extends RecyclerView.Adapter<RecoveryGrid
             item.selected = isChecked;
             listener.onSelectionChanged();
         });
+        holder.itemView.setClickable(true);
         holder.itemView.setOnClickListener(v -> listener.onItemClicked(item, holder.getBindingAdapterPosition()));
         holder.itemView.setOnLongClickListener(v -> {
-            item.selected = !item.selected;
-            notifyItemChanged(holder.getBindingAdapterPosition());
-            listener.onSelectionChanged();
+            ClipboardManager clipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+            ClipData clip = ClipData.newPlainText("file path", item.path);
+            clipboard.setPrimaryClip(clip);
+            Toast.makeText(context, context.getString(R.string.path_copied, item.path), Toast.LENGTH_SHORT).show();
             return true;
         });
     }

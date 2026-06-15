@@ -42,6 +42,8 @@ public final class MediaStoreReadabilityProbe {
         }
     }
 
+    private static final long MAX_HASH_BYTES = 4L * 1024L * 1024L;
+
     public ProbeResult probe(Context context, Uri uri, String mimeType) {
         long started = System.currentTimeMillis();
         try (InputStream inputStream = context.getContentResolver().openInputStream(uri)) {
@@ -55,26 +57,28 @@ public final class MediaStoreReadabilityProbe {
             if (!mimeLooksValid(signature, mimeType)) {
                 return unreadable("mime_mismatch", started);
             }
-            try (InputStream boundsStream = context.getContentResolver().openInputStream(uri);
-                 InputStream hashStream = context.getContentResolver().openInputStream(uri)) {
-                if (boundsStream == null || hashStream == null) {
-                    return unreadable("reopen_failed", started);
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inJustDecodeBounds = true;
+            try (InputStream boundsStream = context.getContentResolver().openInputStream(uri)) {
+                if (boundsStream != null) {
+                    BitmapFactory.decodeStream(boundsStream, null, options);
                 }
-                BitmapFactory.Options options = new BitmapFactory.Options();
-                options.inJustDecodeBounds = true;
-                BitmapFactory.decodeStream(boundsStream, null, options);
-                byte[] allBytes = readAllBytes(hashStream);
-                return new ProbeResult(
-                        options.outWidth > 0 && options.outHeight > 0,
-                        options.outWidth > 0 ? "BOUNDS_OK" : "BOUNDS_FAILED",
-                        options.outWidth,
-                        options.outHeight,
-                        sha256(allBytes),
-                        allBytes.length,
-                        System.currentTimeMillis() - started,
-                        ""
-                );
+            } catch (IOException ignored) {
             }
+            String imageDigest = "";
+            if (mimeType != null && mimeType.startsWith("image/")) {
+                imageDigest = hashFirstBytes(context, uri, MAX_HASH_BYTES);
+            }
+            return new ProbeResult(
+                    options.outWidth > 0 && options.outHeight > 0,
+                    options.outWidth > 0 ? "BOUNDS_OK" : "BOUNDS_FAILED",
+                    options.outWidth,
+                    options.outHeight,
+                    imageDigest,
+                    imageDigest.length(),
+                    System.currentTimeMillis() - started,
+                    ""
+            );
         } catch (IOException exception) {
             return unreadable("io_error", started);
         }
@@ -114,27 +118,35 @@ public final class MediaStoreReadabilityProbe {
         return true;
     }
 
-    private static byte[] readAllBytes(InputStream inputStream) throws IOException {
-        byte[] buffer = new byte[8192];
-        int read;
-        java.io.ByteArrayOutputStream output = new java.io.ByteArrayOutputStream();
-        while ((read = inputStream.read(buffer)) >= 0) {
-            output.write(buffer, 0, read);
+    private static String hashFirstBytes(Context context, Uri uri, long maxBytes) throws IOException {
+        try (InputStream inputStream = context.getContentResolver().openInputStream(uri)) {
+            if (inputStream == null) {
+                return "";
+            }
+            MessageDigest digest;
+            try {
+                digest = MessageDigest.getInstance("SHA-256");
+            } catch (NoSuchAlgorithmException e) {
+                return "";
+            }
+            byte[] buffer = new byte[8192];
+            long totalRead = 0;
+            while (totalRead < maxBytes) {
+                int toRead = (int) Math.min(buffer.length, maxBytes - totalRead);
+                int read = inputStream.read(buffer, 0, toRead);
+                if (read < 0) break;
+                digest.update(buffer, 0, read);
+                totalRead += read;
+            }
+            return toHex(digest.digest());
         }
-        return output.toByteArray();
     }
 
-    private static String sha256(byte[] data) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(data);
-            StringBuilder builder = new StringBuilder(hash.length * 2);
-            for (byte value : hash) {
-                builder.append(String.format(Locale.US, "%02x", value));
-            }
-            return builder.toString();
-        } catch (NoSuchAlgorithmException exception) {
-            return "";
+    private static String toHex(byte[] hash) {
+        StringBuilder builder = new StringBuilder(hash.length * 2);
+        for (byte value : hash) {
+            builder.append(String.format(Locale.US, "%02x", value));
         }
+        return builder.toString();
     }
 }

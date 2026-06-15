@@ -45,6 +45,7 @@
     <string name="last_output">Last output: %1$s</string>
     <string name="stopping">Stopping&#8230;</string>
     <string name="no_files_selected">No files selected.</string>
+    <string name="path_copied">Path copied: %1$s</string>
     <string name="button_grant_access">Grant Storage Access</string>
     <string name="button_select_all">Select All</string>
     <string name="button_clear">Clear</string>
@@ -56,7 +57,7 @@
     <string name="permission_detail">Android 11+ requires All files access for a full recursive scan.</string>
     <string name="filter_all">All</string>
     <string name="filter_existing">Existing</string>
-    <string name="filter_deleted">Deleted</string>
+    <string name="filter_deleted">Recoverable</string>
     <string name="status_existing">Existing</string>
     <string name="status_deleted">Suspected deleted</string>
     <string name="preview_close">Close</string>
@@ -148,14 +149,8 @@
     <string name="scan_phase_cache">Scanning gallery caches…</string>
     <string name="scan_phase_complete">Scan complete</string>
     <string name="scan_prepare_detail">Counted %1$,d entries</string>
-    <string name="scan_progress_detail">Checked %1$,d / %2$,d entries</string>
-    <string name="scan_eta_calculating">Estimating time…</string>
-    <string name="scan_eta_almost_done">Almost done</string>
-    <string name="scan_eta_complete">Done</string>
-    <string name="scan_eta_seconds">About %1$d sec left</string>
-    <string name="scan_eta_minutes">About %1$d min %2$d sec left</string>
-    <string name="scan_eta_hours">About %1$d hr %2$d min left</string>
-    <string name="scan_stats_format">Scanned %1$d · Found %2$d</string>
+    <string name="scan_progress_detail">Checked %1$,d / %2$,d</string>
+    <string name="scan_stats_format">Found %1$d items</string>
     <string name="scan_percent_format">%1$d%%</string>
     <string name="empty_results_title">Nothing here yet — try another filter or scan again</string>
     <string name="rescan_button">Scan again</string>

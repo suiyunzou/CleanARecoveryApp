@@ -6,6 +6,8 @@ import java.util.Collections;
 import java.util.List;
 
 public final class RecoveryState {
+    private static final int MAX_ITEMS = 50_000;
+
     public enum FilterMode {
         ALL,
         EXISTING,
@@ -30,6 +32,9 @@ public final class RecoveryState {
 
         int added = 0;
         for (RecoveryItem item : items) {
+            if (allItems.size() >= MAX_ITEMS) {
+                break;
+            }
             if (deduper.isDuplicate(item)) {
                 continue;
             }

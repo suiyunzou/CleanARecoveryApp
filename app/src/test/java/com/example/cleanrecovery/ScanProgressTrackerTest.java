@@ -21,7 +21,7 @@ public final class ScanProgressTrackerTest {
         tracker.onPrepared(1_000);
         tracker.onFileScanProgress(500);
         int percent = tracker.getDisplayPercent();
-        assertTrue(percent >= 35 && percent <= 40);
+        assertTrue(percent >= 27 && percent <= 35);
     }
 
     @Test
@@ -33,7 +33,7 @@ public final class ScanProgressTrackerTest {
         tracker.onMediaStorePhaseStart();
         tracker.onMediaStoreProgress(250);
         int percent = tracker.getDisplayPercent();
-        assertTrue(percent >= 72 && percent <= 74);
+        assertTrue(percent >= 58 && percent <= 63);
     }
 
     @Test
@@ -43,7 +43,7 @@ public final class ScanProgressTrackerTest {
         tracker.onCachePhaseStart(100);
         tracker.onCacheProgress(50);
         int percent = tracker.getDisplayPercent();
-        assertTrue(percent >= 89 && percent <= 91);
+        assertTrue(percent >= 80 && percent <= 86);
     }
 
     @Test

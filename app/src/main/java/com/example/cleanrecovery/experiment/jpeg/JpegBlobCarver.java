@@ -26,21 +26,23 @@ public final class JpegBlobCarver {
     private final JpegStructureParser parser = new JpegStructureParser();
     private final JpegFragmentationValidator validator = new JpegFragmentationValidator();
 
+    private static final long MAX_STREAM_CANDIDATE_SLICE = 1_024L * 1_024L;
+
     public List<RecoveryCandidate> carve(File containerFile, Progress progress) throws IOException {
         long size = containerFile.length();
         if (size > JpegCarveLimits.MAX_CONTAINER_BYTES) {
             throw new IOException("container_exceeds_limit");
         }
-        byte[] data = readAllBytes(containerFile);
+        byte[] data = readAllBytes(containerFile, (int) size);
         return carveBytes(containerFile.getAbsolutePath(), data, progress);
     }
 
-    private static byte[] readAllBytes(File file) throws IOException {
-        byte[] buffer = new byte[(int) file.length()];
+    private static byte[] readAllBytes(File file, int byteCount) throws IOException {
+        byte[] buffer = new byte[byteCount];
         try (FileInputStream inputStream = new FileInputStream(file)) {
             int offset = 0;
-            while (offset < buffer.length) {
-                int read = inputStream.read(buffer, offset, buffer.length - offset);
+            while (offset < byteCount) {
+                int read = inputStream.read(buffer, offset, byteCount - offset);
                 if (read < 0) {
                     break;
                 }
@@ -75,6 +77,8 @@ public final class JpegBlobCarver {
             }
             byte[] slice = new byte[(int) length];
             System.arraycopy(data, startOffset, slice, 0, (int) length);
+            // Hash only this slice — not the entire container.
+            String sha256 = sha256(slice);
             RecoveryCandidate candidate = new RecoveryCandidate.Builder()
                     .candidateId(UUID.randomUUID().toString())
                     .sourceKind(CandidateSourceKind.CARVED_FROM_KNOWN_BLOB)
@@ -82,12 +86,12 @@ public final class JpegBlobCarver {
                     .extractionMethod(parseResult.valid ? "structured_jpeg_parser" : "structured_jpeg_parser_partial")
                     .originalContainer(containerLabel)
                     .byteLength(length)
-                    .sha256(sha256(slice))
+                    .sha256(sha256)
                     .mimeDetected("image/jpeg")
                     .decodeStatus(parseResult.valid ? "COMPLETE" : validation.reason)
                     .extractionOffsetStart(startOffset)
                     .extractionOffsetEnd(endOffset)
-                    .readBytes(data.length)
+                    .readBytes(length)
                     .elapsedMs(System.currentTimeMillis() - started)
                     .label(parseResult.valid ? CandidateLabel.BLOB_EXTRACTED : CandidateLabel.UNVERIFIED)
                     .build();

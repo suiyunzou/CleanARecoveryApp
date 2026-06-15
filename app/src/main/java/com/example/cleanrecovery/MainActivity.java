@@ -2,6 +2,8 @@ package com.example.cleanrecovery;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
@@ -56,13 +58,7 @@ public final class MainActivity extends Activity {
     private TextView permissionBannerTitle;
     private TextView permissionBannerAction;
     private TextView lastScanSummary;
-    private TextView scanTitle;
-    private TextView scanPhaseLabel;
-    private TextView scanPercent;
-    private TextView scanEta;
-    private TextView scanDetail;
-    private ProgressBar scanProgressBar;
-    private TextView scanStats;
+    private ParticleScanView scanParticleView;
     private TextView scanPathToggle;
     private TextView scanCurrentPath;
     private TextView resultsCount;
@@ -70,9 +66,9 @@ public final class MainActivity extends Activity {
     private View resultsEmpty;
     private TextView resultsEmptyMessage;
     private RecyclerView resultsGrid;
-    private Button filterAllButton;
-    private Button filterExistingButton;
-    private Button filterDeletedButton;
+    private TextView filterAllButton;
+    private TextView filterExistingButton;
+    private TextView filterDeletedButton;
     private View bottomNav;
     private ImageView navHomeIcon;
     private ImageView navResultsIcon;
@@ -124,7 +120,8 @@ public final class MainActivity extends Activity {
         }
         if (scanPanel.getVisibility() == View.VISIBLE) {
             recoveryCoordinator.cancelCurrentWork();
-            showPanel(Panel.HOME);
+            scanProgressTracker.complete();
+            finishScanUi(lastScannedCount, lastFoundCount);
             return;
         }
         super.onBackPressed();
@@ -167,15 +164,7 @@ public final class MainActivity extends Activity {
         permissionBannerTitle = findViewById(R.id.permission_banner_title);
         permissionBannerAction = findViewById(R.id.permission_banner_action);
         lastScanSummary = findViewById(R.id.last_scan_summary);
-        scanTitle = findViewById(R.id.scan_title);
-        scanPhaseLabel = findViewById(R.id.scan_phase_label);
-        scanPercent = findViewById(R.id.scan_percent);
-        scanEta = findViewById(R.id.scan_eta);
-        scanDetail = findViewById(R.id.scan_detail);
-        scanProgressBar = findViewById(R.id.scan_progress_bar);
-        scanStats = findViewById(R.id.scan_stats);
-        scanPathToggle = findViewById(R.id.scan_path_toggle);
-        scanCurrentPath = findViewById(R.id.scan_current_path);
+        scanParticleView = findViewById(R.id.scan_particle_view);
         resultsCount = findViewById(R.id.results_count);
         selectedCount = findViewById(R.id.selected_count);
         resultsEmpty = findViewById(R.id.results_empty);
@@ -193,11 +182,7 @@ public final class MainActivity extends Activity {
         navResultsLabel = findViewById(R.id.nav_results_label);
         navFolderLabel = findViewById(R.id.nav_folder_label);
         navAboutLabel = findViewById(R.id.nav_about_label);
-        algorithmLogContainer = findViewById(R.id.algorithm_log_container);
-        algorithmLogList = findViewById(R.id.algorithm_log_list);
         algorithmStepAdapter = new AlgorithmStepAdapter(this);
-        algorithmLogList.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this));
-        algorithmLogList.setAdapter(algorithmStepAdapter);
 
         gridAdapter = new RecoveryGridAdapter(this, recoveryState.getVisibleItems(), new RecoveryGridAdapter.Listener() {
             @Override
@@ -263,15 +248,8 @@ public final class MainActivity extends Activity {
             @Override
             public void onClick(View view) {
                 recoveryCoordinator.cancelCurrentWork();
-                showPanel(Panel.HOME);
-            }
-        });
-        scanPathToggle.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                pathExpanded = !pathExpanded;
-                scanCurrentPath.setVisibility(pathExpanded ? View.VISIBLE : View.GONE);
-                scanPathToggle.setText(pathExpanded ? R.string.hide_current_path : R.string.show_current_path);
+                scanProgressTracker.complete();
+                finishScanUi(lastScannedCount, lastFoundCount);
             }
         });
         findViewById(R.id.results_back_button).setOnClickListener(new View.OnClickListener() {
@@ -435,9 +413,6 @@ public final class MainActivity extends Activity {
         multiTypeCompletedScanned = 0;
         scanCurrentPathValue = "";
         pathExpanded = false;
-        scanCurrentPath.setVisibility(View.GONE);
-        scanPathToggle.setText(R.string.show_current_path);
-        algorithmLogContainer.setVisibility(experimental ? View.VISIBLE : View.GONE);
         if (experimental && type != null) {
             prepareExperimentalAlgorithmLog(type);
         } else {
@@ -445,14 +420,9 @@ public final class MainActivity extends Activity {
             runningAlgorithmId = null;
         }
         if (allTypes) {
-            scanTitle.setText(R.string.scan_status_all);
         } else if (experimental) {
-            scanTitle.setText(getString(R.string.experimental_scan_status, getString(type.labelResId)));
         } else {
-            scanTitle.setText(getString(R.string.scan_status, getString(type.labelResId)));
         }
-        scanStats.setText(getString(R.string.scan_stats_format, 0, 0));
-        updateScanProgressUi();
         showPanel(Panel.SCAN);
         progressHandler.removeCallbacks(progressTick);
         progressHandler.post(progressTick);
@@ -525,7 +495,7 @@ public final class MainActivity extends Activity {
         styleFilterButton(filterDeletedButton, recoveryState.getFilter() == RecoveryState.FilterMode.DELETED);
     }
 
-    private void styleFilterButton(Button button, boolean active) {
+    private void styleFilterButton(TextView button, boolean active) {
         button.setBackgroundResource(active ? R.drawable.bg_tab_selected : R.drawable.bg_tab_unselected);
         button.setTextColor(resolveColorRes(active ? R.color.text_on_primary : R.color.text_secondary));
     }
@@ -567,14 +537,6 @@ public final class MainActivity extends Activity {
     }
 
     private void updateScanTitleForType(RecoveryType type, int typeIndex, int typeCount) {
-        if (scanAllMode) {
-            scanTitle.setText(getString(
-                    R.string.scan_phase_type,
-                    getString(type.labelResId),
-                    typeIndex + 1,
-                    typeCount
-            ));
-        }
     }
 
     private void prepareExperimentalAlgorithmLog(RecoveryType type) {
@@ -658,7 +620,6 @@ public final class MainActivity extends Activity {
                 foundCount
         );
         updateScanProgressUi();
-        scanStats.setText(getString(R.string.scan_stats_format, scannedCount, foundCount));
         progressHandler.removeCallbacks(progressTick);
         persistScanHistory();
         gridAdapter.notifyDataSetChanged();
@@ -669,77 +630,41 @@ public final class MainActivity extends Activity {
 
     private void updateScanProgressUi() {
         int percent = scanProgressTracker.getDisplayPercent();
-        scanPercent.setText(getString(R.string.scan_percent_format, percent));
-        scanProgressBar.setProgress(percent);
-        scanStats.setText(getString(R.string.scan_stats_format, lastScannedCount, lastFoundCount));
+        scanParticleView.setPercent(percent);
+        scanParticleView.setFoundCount(lastFoundCount);
 
         ScanProgressTracker.Phase phase = scanProgressTracker.getPhase();
         if (phase == ScanProgressTracker.Phase.PREPARING) {
-            scanPhaseLabel.setText(R.string.scan_phase_preparing);
-            scanDetail.setText(getString(R.string.scan_prepare_detail, scanProgressTracker.getPreparedCount()));
-            scanEta.setText(R.string.scan_eta_calculating);
+            scanParticleView.setPhaseText(getString(R.string.scan_phase_preparing));
             return;
         }
         if (phase == ScanProgressTracker.Phase.COMPLETE) {
-            scanPhaseLabel.setText(R.string.scan_phase_complete);
-            scanDetail.setText(getString(
-                    R.string.scan_progress_detail,
-                    scanProgressTracker.getScannedCount(),
-                    Math.max(scanProgressTracker.getPreparedTotal(), scanProgressTracker.getScannedCount())
-            ));
-            scanEta.setText(R.string.scan_eta_complete);
+            scanParticleView.setPhaseText(getString(R.string.scan_phase_complete));
             return;
         }
         if (phase == ScanProgressTracker.Phase.MEDIASTORE) {
-            scanPhaseLabel.setText(R.string.scan_phase_mediastore);
-            scanDetail.setText(getString(R.string.scan_stats_format, lastScannedCount, lastFoundCount));
-            scanEta.setText(R.string.scan_eta_calculating);
+            scanParticleView.setPhaseText(getString(R.string.scan_phase_mediastore));
             return;
         }
         if (phase == ScanProgressTracker.Phase.CACHE) {
-            scanPhaseLabel.setText(R.string.scan_phase_cache);
-            scanDetail.setText(getString(R.string.scan_stats_format, lastScannedCount, lastFoundCount));
-            scanEta.setText(R.string.scan_eta_calculating);
+            scanParticleView.setPhaseText(getString(R.string.scan_phase_cache));
             return;
         }
 
-        scanPhaseLabel.setText(R.string.scan_phase_scanning);
-        int total = scanProgressTracker.getPreparedTotal();
-        int scanned = scanProgressTracker.getScannedCount();
-        if (scanAllMode && total > 0) {
-            total *= scanProgressTracker.getTypeCount();
-            scanned = multiTypeCompletedScanned + scanProgressTracker.getScannedCount();
-        }
-        scanDetail.setText(getString(R.string.scan_progress_detail, scanned, total));
-        long etaMs = scanProgressTracker.getEstimatedRemainingMs();
-        if (etaMs < 0L) {
-            scanEta.setText(R.string.scan_eta_calculating);
-        } else if (etaMs < 1_000L) {
-            scanEta.setText(R.string.scan_eta_almost_done);
-        } else {
-            scanEta.setText(formatEta(etaMs));
-        }
-    }
-
-    private String formatEta(long etaMs) {
-        long totalSeconds = Math.max(1L, (etaMs + 999L) / 1_000L);
-        if (totalSeconds < 60L) {
-            return getString(R.string.scan_eta_seconds, totalSeconds);
-        }
-        long minutes = totalSeconds / 60L;
-        long seconds = totalSeconds % 60L;
-        if (minutes < 60L) {
-            return getString(R.string.scan_eta_minutes, minutes, seconds);
-        }
-        long hours = minutes / 60L;
-        minutes = minutes % 60L;
-        return getString(R.string.scan_eta_hours, hours, minutes);
+        scanParticleView.setPhaseText(getString(R.string.scan_phase_scanning));
     }
 
     private void showPanel(Panel panel) {
         homePanel.setVisibility(panel == Panel.HOME ? View.VISIBLE : View.GONE);
         scanPanel.setVisibility(panel == Panel.SCAN ? View.VISIBLE : View.GONE);
         resultsPanel.setVisibility(panel == Panel.RESULTS ? View.VISIBLE : View.GONE);
+        if (scanParticleView != null) {
+            if (panel == Panel.SCAN) {
+                scanParticleView.start();
+            } else {
+                scanParticleView.stop();
+            }
+        }
         updateBottomNav(panel);
     }
 
@@ -789,10 +714,6 @@ public final class MainActivity extends Activity {
             @Override
             public void onPrepareProgress(int countedSoFar, String currentPath) {
                 scanProgressTracker.onPrepareProgress(countedSoFar);
-                scanCurrentPathValue = currentPath;
-                if (pathExpanded) {
-                    scanCurrentPath.setText(currentPath);
-                }
             }
 
             @Override
@@ -834,12 +755,9 @@ public final class MainActivity extends Activity {
             @Override
             public void onProgress(int scannedCount, int foundCount, String currentPath) {
                 lastScannedCount = scanAllMode ? multiTypeCompletedScanned + scannedCount : scannedCount;
-                lastFoundCount = foundCount;
+                lastFoundCount = Math.max(lastFoundCount, foundCount);
                 scanProgressTracker.onScanProgress(scannedCount);
-                scanCurrentPathValue = currentPath;
-                if (pathExpanded) {
-                    scanCurrentPath.setText(currentPath);
-                }
+                updateScanProgressUi();
             }
 
             @Override
@@ -855,6 +773,7 @@ public final class MainActivity extends Activity {
             @Override
             public void onItemsBatch(List<RecoveryItem> items) {
                 recoveryState.addAll(items);
+                lastFoundCount = recoveryState.getAllCount();
                 gridAdapter.notifyDataSetChanged();
                 updateCounters();
             }

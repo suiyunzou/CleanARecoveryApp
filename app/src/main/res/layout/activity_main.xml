@@ -168,141 +168,28 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:orientation="vertical"
-            android:padding="@dimen/space_lg"
+            android:background="#FF111827"
             android:visibility="gone">
 
-            <TextView
-                android:id="@+id/scan_title"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:text="@string/scan_status"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/text_section"
-                android:textStyle="bold" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_sm"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:id="@+id/scan_percent"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="0%"
-                    android:textColor="@color/brand_primary"
-                    android:textSize="32sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/scan_eta"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:gravity="end"
-                    android:text="@string/scan_eta_calculating"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="@dimen/text_caption" />
-            </LinearLayout>
-
-            <ProgressBar
-                android:id="@+id/scan_progress_bar"
-                style="?android:attr/progressBarStyleHorizontal"
-                android:layout_width="match_parent"
-                android:layout_height="12dp"
-                android:layout_marginTop="@dimen/space_sm"
-                android:max="100"
-                android:progress="0"
-                android:progressDrawable="@drawable/progress_scan" />
-
-            <TextView
-                android:id="@+id/scan_phase_label"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_sm"
-                android:gravity="center"
-                android:text="@string/scan_phase_preparing"
-                android:textColor="@color/brand_primary_dark"
-                android:textSize="@dimen/text_caption"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/scan_detail"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:textColor="@color/text_muted"
-                android:textSize="@dimen/text_caption" />
-
-            <TextView
-                android:id="@+id/scan_stats"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_xs"
-                android:gravity="center"
-                android:textColor="@color/text_secondary"
-                android:textSize="@dimen/text_caption" />
-
-            <LinearLayout
-                android:id="@+id/algorithm_log_container"
+            <com.example.cleanrecovery.ParticleScanView
+                android:id="@+id/scan_particle_view"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
-                android:layout_marginTop="@dimen/space_md"
-                android:layout_weight="1"
-                android:background="@drawable/bg_algorithm_log"
-                android:orientation="vertical"
-                android:padding="@dimen/space_sm"
-                android:visibility="gone">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingBottom="@dimen/space_xs"
-                    android:text="@string/experimental_scan_log_title"
-                    android:textColor="@color/text_primary"
-                    android:textSize="@dimen/text_body"
-                    android:textStyle="bold" />
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/algorithm_log_list"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:clipToPadding="false"
-                    android:scrollbars="vertical" />
-            </LinearLayout>
-
-            <TextView
-                android:id="@+id/scan_path_toggle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_sm"
-                android:gravity="center"
-                android:text="@string/show_current_path"
-                android:textColor="@color/brand_primary_dark"
-                android:textSize="@dimen/text_caption" />
-
-            <TextView
-                android:id="@+id/scan_current_path"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:fontFamily="monospace"
-                android:textColor="@color/text_muted"
-                android:textSize="11sp"
-                android:visibility="gone" />
+                android:layout_weight="1" />
 
             <Button
                 android:id="@+id/stop_scan_button"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_md"
+                android:layout_width="240dp"
+                android:layout_height="44dp"
+                android:layout_gravity="center"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="24dp"
                 android:background="@drawable/bg_button_secondary"
-                android:minHeight="@dimen/button_min_height"
                 android:text="@string/button_stop"
                 android:textAllCaps="false"
-                android:textColor="@color/brand_primary_dark" />
+                android:textColor="@color/text_primary"
+                android:textSize="14sp" />
+
         </LinearLayout>
 
         <LinearLayout
@@ -358,37 +245,40 @@
                 android:paddingEnd="@dimen/space_md"
                 android:paddingBottom="@dimen/space_sm">
 
-                <Button
+                <TextView
                     android:id="@+id/filter_all_button"
                     android:layout_width="0dp"
-                    android:layout_height="40dp"
-                    android:layout_marginEnd="@dimen/space_xs"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="4dp"
                     android:layout_weight="1"
                     android:background="@drawable/bg_tab_selected"
+                    android:gravity="center"
                     android:text="@string/filter_all"
-                    android:textAllCaps="false"
-                    android:textSize="@dimen/text_caption" />
+                    android:textColor="@color/text_on_primary"
+                    android:textSize="13sp" />
 
-                <Button
+                <TextView
                     android:id="@+id/filter_existing_button"
                     android:layout_width="0dp"
-                    android:layout_height="40dp"
-                    android:layout_marginEnd="@dimen/space_xs"
+                    android:layout_height="36dp"
+                    android:layout_marginEnd="4dp"
                     android:layout_weight="1"
                     android:background="@drawable/bg_tab_unselected"
+                    android:gravity="center"
                     android:text="@string/filter_existing"
-                    android:textAllCaps="false"
-                    android:textSize="@dimen/text_caption" />
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
 
-                <Button
+                <TextView
                     android:id="@+id/filter_deleted_button"
                     android:layout_width="0dp"
-                    android:layout_height="40dp"
+                    android:layout_height="36dp"
                     android:layout_weight="1"
                     android:background="@drawable/bg_tab_unselected"
+                    android:gravity="center"
                     android:text="@string/filter_deleted"
-                    android:textAllCaps="false"
-                    android:textSize="@dimen/text_caption" />
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
             </LinearLayout>
 
             <FrameLayout
@@ -451,51 +341,58 @@
                 android:orientation="vertical"
                 android:padding="@dimen/space_md">
 
-                <TextView
-                    android:id="@+id/selected_count"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="@dimen/text_caption" />
-
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
                     android:orientation="horizontal"
                     android:paddingTop="@dimen/space_sm">
 
-                    <Button
+                    <TextView
+                        android:id="@+id/selected_count"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
+
+                    <TextView
                         android:id="@+id/select_all_button"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="@dimen/space_xs"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_button_secondary"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/bg_tab_unselected"
+                        android:gravity="center"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp"
                         android:text="@string/button_select_all"
-                        android:textAllCaps="false"
-                        android:textSize="@dimen/text_caption" />
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
 
-                    <Button
+                    <TextView
                         android:id="@+id/clear_selection_button"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="@dimen/space_xs"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_button_secondary"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
+                        android:layout_marginEnd="6dp"
+                        android:background="@drawable/bg_tab_unselected"
+                        android:gravity="center"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="12dp"
                         android:text="@string/button_clear"
-                        android:textAllCaps="false"
-                        android:textSize="@dimen/text_caption" />
+                        android:textColor="@color/text_secondary"
+                        android:textSize="13sp" />
 
-                    <Button
+                    <TextView
                         android:id="@+id/recover_button"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1.4"
+                        android:layout_width="wrap_content"
+                        android:layout_height="36dp"
                         android:background="@drawable/bg_button_primary"
+                        android:gravity="center"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="14dp"
                         android:text="@string/button_recover"
-                        android:textAllCaps="false"
                         android:textColor="@color/text_on_primary"
-                        android:textSize="@dimen/text_caption" />
+                        android:textSize="13sp" />
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>

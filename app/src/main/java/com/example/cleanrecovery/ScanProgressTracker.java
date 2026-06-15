@@ -14,10 +14,10 @@ public final class ScanProgressTracker {
 
     private static final int PREPARING_CAP_PERCENT = 5;
     private static final int FILE_SCAN_START_PERCENT = 5;
-    private static final int FILE_SCAN_END_PERCENT = 65;
-    private static final int MEDIASTORE_START_PERCENT = 65;
-    private static final int MEDIASTORE_END_PERCENT = 80;
-    private static final int CACHE_START_PERCENT = 80;
+    private static final int FILE_SCAN_END_PERCENT = 55;
+    private static final int MEDIASTORE_START_PERCENT = 55;
+    private static final int MEDIASTORE_END_PERCENT = 65;
+    private static final int CACHE_START_PERCENT = 65;
     private static final int SCANNING_CAP_PERCENT = 99;
     private static final long ETA_WARMUP_MS = 2_000L;
     private static final int ETA_MIN_SAMPLES = 40;
