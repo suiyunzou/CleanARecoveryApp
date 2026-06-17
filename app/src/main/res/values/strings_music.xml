@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="music_home_title">Music</string>
+    <string name="music_now_playing">Now Playing</string>
+    <string name="music_search_hint">Search songs or artists…</string>
+    <string name="music_search_empty">No results found</string>
+    <string name="music_recommend">Recommended</string>
+    <string name="music_recent">Recently Played</string>
+    <string name="music_playlists">My Playlists</string>
+    <string name="music_playlist_empty">This playlist is empty</string>
+    <string name="music_new_playlist">+ New playlist</string>
+    <string name="music_create_playlist_title">New Playlist</string>
+    <string name="music_create_playlist_hint">Playlist name</string>
+    <string name="music_add_to_playlist">Add to playlist</string>
+    <string name="music_save_to_playlist">Save to playlist</string>
+    <string name="music_remove_from_playlist">Remove from playlist</string>
+    <string name="music_play">Play</string>
+    <string name="music_pause">Pause</string>
+    <string name="music_mode">Play mode</string>
+    <string name="music_mode_sequential">Sequential</string>
+    <string name="music_mode_repeat_all">Repeat All</string>
+    <string name="music_mode_repeat_one">Repeat One</string>
+    <string name="music_mode_shuffle">Shuffle</string>
+    <string name="music_login">Login</string>
+    <string name="music_login_account_hint">Email or username</string>
+    <string name="music_login_password_hint">Password</string>
+    <string name="music_login_submit">Sign in</string>
+    <string name="music_logout">Log out</string>
+    <string name="music_login_first">Sign in to unlock VIP songs</string>
+    <string name="music_vip_required">VIP</string>
+    <string name="music_vip_prompt">This song requires a VIP account. Sign in and subscribe to listen.</string>
+    <string name="music_vip_prompt_title">VIP Required</string>
+    <string name="music_vip_login_or_skip">Login / View</string>
+</resources>

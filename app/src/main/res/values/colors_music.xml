@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- color additions for music module — appended to existing colors.xml palette -->
+<!-- keep after </resources> tag in colors.xml: merge into project file -->
+<resources>
+    <color name="music_surface">#FFFFFF</color>
+    <color name="music_vip_badge_bg">#FEF3C7</color>
+    <color name="music_vip_badge_text">#92400E</color>
+    <color name="music_mini_player_bg">#FFFFFF</color>
+    <color name="music_progress_bg">#E5E7EB</color>
+    <color name="music_progress_fill">#14B8A6</color>
+    <color name="music_text_empty">#9CA3AF</color>
+</resources>

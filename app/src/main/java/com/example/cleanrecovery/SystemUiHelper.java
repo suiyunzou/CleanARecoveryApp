@@ -5,11 +5,11 @@ import android.os.Build;
 import android.view.View;
 import android.view.Window;
 
-final class SystemUiHelper {
+public final class SystemUiHelper {
     private SystemUiHelper() {
     }
 
-    static void apply(Activity activity) {
+    public static void apply(Activity activity) {
         Window window = activity.getWindow();
         int background = activity.getResources().getColor(R.color.background_app, activity.getTheme());
         int surface = activity.getResources().getColor(R.color.surface_card, activity.getTheme());

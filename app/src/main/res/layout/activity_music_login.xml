@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_app"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/toolbar_height"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="@dimen/space_md">
+
+        <ImageButton
+            android:id="@+id/login_back_button"
+            android:layout_width="40dp" android:layout_height="40dp"
+            android:background="@drawable/bg_icon_button"
+            android:src="@drawable/ic_back" />
+
+        <TextView
+            android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/space_md"
+            android:layout_weight="1"
+            android:text="@string/music_login"
+            android:textColor="@color/text_primary"
+            android:textSize="@dimen/text_title" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/login_form"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="@dimen/space_xl"
+        android:orientation="vertical">
+
+        <EditText
+            android:id="@+id/login_account"
+            android:layout_width="match_parent" android:layout_height="52dp"
+            android:background="@drawable/bg_card"
+            android:hint="@string/music_login_account_hint"
+            android:inputType="textEmailAddress"
+            android:paddingHorizontal="@dimen/space_md"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_muted"
+            android:textSize="@dimen/text_body" />
+
+        <EditText
+            android:id="@+id/login_password"
+            android:layout_width="match_parent" android:layout_height="52dp"
+            android:layout_marginTop="@dimen/space_md"
+            android:background="@drawable/bg_card"
+            android:hint="@string/music_login_password_hint"
+            android:inputType="textPassword"
+            android:paddingHorizontal="@dimen/space_md"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_muted"
+            android:textSize="@dimen/text_body" />
+
+        <Button
+            android:id="@+id/login_submit_button"
+            android:layout_width="match_parent" android:layout_height="@dimen/button_min_height"
+            android:layout_marginTop="@dimen/space_lg"
+            android:background="@drawable/bg_button_primary"
+            android:backgroundTint="@color/brand_primary"
+            android:text="@string/music_login_submit"
+            android:textAllCaps="false"
+            android:textColor="@color/surface_card"
+            android:textSize="@dimen/text_body" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/login_info"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="@dimen/space_xl"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/login_user_name"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="@color/text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/login_logout_button"
+            android:layout_width="wrap_content" android:layout_height="@dimen/button_min_height"
+            android:layout_marginTop="@dimen/space_lg"
+            android:background="@drawable/bg_tab_unselected"
+            android:text="@string/music_logout"
+            android:textAllCaps="false"
+            android:textColor="@color/accent_orange"
+            android:textSize="@dimen/text_body" />
+    </LinearLayout>
+</LinearLayout>

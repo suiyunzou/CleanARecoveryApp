@@ -6,10 +6,14 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.View;
+import android.widget.Button;
 import android.widget.ImageButton;
 import android.widget.TextView;
 
 import androidx.core.content.FileProvider;
+
+import com.example.cleanrecovery.music.ui.MusicHomeActivity;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -38,6 +42,11 @@ public final class AboutActivity extends Activity {
 
         ImageButton shareButton = findViewById(R.id.about_share_button);
         shareButton.setOnClickListener(view -> shareApk());
+
+        Button musicEntry = findViewById(R.id.about_music_entry);
+        musicEntry.setVisibility(View.VISIBLE);
+        musicEntry.setOnClickListener(view ->
+                startActivity(new Intent(AboutActivity.this, MusicHomeActivity.class)));
     }
 
     private void shareApk() {

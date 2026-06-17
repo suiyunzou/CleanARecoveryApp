@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_app"
+    android:orientation="vertical">
+
+    <!-- Toolbar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/toolbar_height"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="@dimen/space_md">
+
+        <ImageButton
+            android:id="@+id/music_back_button"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_icon_button"
+            android:contentDescription="@string/button_back"
+            android:src="@drawable/ic_back" />
+
+        <TextView
+            android:id="@+id/music_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/space_md"
+            android:layout_weight="1"
+            android:text="@string/music_home_title"
+            android:textColor="@color/text_primary"
+            android:textSize="@dimen/text_title" />
+
+        <ImageButton
+            android:id="@+id/music_home_login_button"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_icon_button"
+            android:contentDescription="@string/music_login"
+            android:src="@drawable/ic_nav_about"
+            android:tint="@color/brand_accent" />
+    </LinearLayout>
+
+    <!-- Search bar -->
+    <LinearLayout
+        android:id="@+id/music_search_bar"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginHorizontal="@dimen/space_lg"
+        android:layout_marginBottom="@dimen/space_sm"
+        android:background="@drawable/bg_card"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="@dimen/space_md">
+
+        <View
+            android:layout_width="24dp" android:layout_height="24dp"
+            android:background="@drawable/ic_nav_home"
+            android:backgroundTint="@color/text_muted" />
+
+        <TextView
+            android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/space_sm"
+            android:layout_weight="1"
+            android:text="@string/music_search_hint"
+            android:textColor="@color/text_muted"
+            android:textSize="@dimen/text_body" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="@dimen/music_mini_player_height">
+
+            <!-- Recommendations -->
+            <TextView
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_lg" android:layout_marginTop="@dimen/space_lg"
+                android:text="@string/music_recommend"
+                android:textColor="@color/text_primary"
+                android:textSize="@dimen/text_section" android:textStyle="bold" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/music_home_rec_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_sm"
+                android:nestedScrollingEnabled="false" />
+
+            <!-- Recent plays -->
+            <TextView
+                android:id="@+id/music_recent_label"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_lg" android:layout_marginTop="@dimen/space_lg"
+                android:text="@string/music_recent"
+                android:textColor="@color/text_primary"
+                android:textSize="@dimen/text_section" android:textStyle="bold" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/music_home_recent_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_sm"
+                android:nestedScrollingEnabled="false" />
+
+            <!-- Playlists -->
+            <TextView
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_lg" android:layout_marginTop="@dimen/space_lg"
+                android:text="@string/music_playlists"
+                android:textColor="@color/text_primary"
+                android:textSize="@dimen/text_section" android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/music_playlist_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_sm"
+                android:orientation="vertical"
+                android:paddingHorizontal="@dimen/space_lg" />
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Mini player stub (replaced by include at runtime) -->
+    <FrameLayout
+        android:id="@+id/mini_player_stub"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/music_mini_player_height"
+        android:visibility="gone" />
+
+</LinearLayout>
