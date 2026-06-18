@@ -102,6 +102,17 @@
     <string name="file_browser_delete_confirm">删除「%1$s」？</string>
     <string name="file_browser_delete_not_empty">文件夹不为空</string>
     <string name="file_browser_delete_failed">删除失败</string>
+    <string name="file_browser_recycle_bin">回收站</string>
+    <string name="file_browser_recycle_bin_move_failed">移入回收站失败</string>
+    <string name="file_browser_recycle_bin_moved">已移入回收站</string>
+    <string name="file_browser_recycle_bin_empty">回收站为空</string>
+    <string name="file_browser_recycle_bin_count">回收站中有 %1$d 项</string>
+    <string name="file_browser_recycle_bin_clear">清空回收站</string>
+    <string name="file_browser_recycle_bin_clear_confirm">永久删除回收站中的所有项目？</string>
+    <string name="file_browser_recycle_bin_restore">恢复</string>
+    <string name="file_browser_recycle_bin_delete_permanent">彻底删除</string>
+    <string name="file_browser_recycle_bin_restore_failed">恢复失败</string>
+    <string name="file_browser_recycle_bin_restore_ok">已恢复到 %1$s</string>
     <string name="file_browser_rename_failed">重命名失败</string>
     <string name="file_browser_create_failed">无法创建文件夹</string>
     <string name="file_browser_invalid_name">名称无效</string>

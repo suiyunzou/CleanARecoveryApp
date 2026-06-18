@@ -18,13 +18,42 @@ public final class ThumbnailLoader {
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final int TARGET_PX = 256;
 
+    /** 进程级单例缓存，避免每次 Activity 重建都重建缓存。 */
+    private static volatile RecoveryCache sharedCache;
+
     private ThumbnailLoader() {
+    }
+
+    private static RecoveryCache cache() {
+        RecoveryCache local = sharedCache;
+        if (local == null) {
+            synchronized (ThumbnailLoader.class) {
+                local = sharedCache;
+                if (local == null) {
+                    local = new RecoveryCache(PathManager.thumbnailCacheDir());
+                    local.trim();
+                    sharedCache = local;
+                }
+            }
+        }
+        return local;
     }
 
     public static void loadInto(ImageView target, RecoveryItem item, int placeholderResId) {
         target.setTag(item.path);
         target.setImageResource(placeholderResId);
         target.setScaleType(ImageView.ScaleType.CENTER_CROP);
+
+        // 1. 先尝试同步命中缓存，避免线程切换开销
+        String cacheKey = RecoveryCache.buildKey(item.path, item.size, item.modifiedAt);
+        Bitmap cached = cache().get(cacheKey);
+        if (cached != null && !cached.isRecycled()) {
+            Object tag = target.getTag();
+            if (tag != null && item.path.equals(tag)) {
+                target.setImageBitmap(cached);
+            }
+            return;
+        }
 
         EXECUTOR.execute(new Runnable() {
             @Override
@@ -39,6 +68,8 @@ public final class ThumbnailLoader {
                         }
                         if (bitmap != null) {
                             target.setImageBitmap(bitmap);
+                            // 写入缓存供下次命中
+                            cache().put(cacheKey, bitmap);
                         } else {
                             target.setImageResource(placeholderResId);
                         }
@@ -46,6 +77,17 @@ public final class ThumbnailLoader {
                 });
             }
         });
+    }
+
+    /** 主动清除指定项的缩略图缓存。 */
+    public static void invalidate(String path, long size, long modifiedAt) {
+        String key = RecoveryCache.buildKey(path, size, modifiedAt);
+        cache().remove(key);
+    }
+
+    /** 清空全部缩略图缓存。 */
+    public static void clearCache() {
+        cache().clear();
     }
 
     private static Bitmap decodeThumbnail(RecoveryItem item) {

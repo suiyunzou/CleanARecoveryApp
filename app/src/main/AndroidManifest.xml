@@ -54,6 +54,9 @@
             android:name=".FileBrowserActivity"
             android:exported="false" />
         <activity
+            android:name=".RecycleBinActivity"
+            android:exported="false" />
+        <activity
             android:name=".MainActivity"
             android:exported="true"
             android:icon="@mipmap/ic_launcher">

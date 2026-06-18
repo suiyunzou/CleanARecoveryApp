@@ -3,7 +3,6 @@ package com.example.cleanrecovery;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
-import android.os.Environment;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -19,10 +18,7 @@ public final class RecoveryCopier {
     }
 
     public static File copyToRecoveryDirectory(Context context, RecoveryItem item) throws IOException {
-        File outputDirectory = new File(
-                Environment.getExternalStoragePublicDirectory(item.type.publicDirectory),
-                "DataRecovery"
-        );
+        File outputDirectory = PathManager.recoveredDirFor(item.type);
         if (!outputDirectory.exists() && !outputDirectory.mkdirs()) {
             throw new IOException("Cannot create output directory: " + outputDirectory.getAbsolutePath());
         }

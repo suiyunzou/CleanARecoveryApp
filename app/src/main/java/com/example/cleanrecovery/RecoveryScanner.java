@@ -255,11 +255,19 @@ public final class RecoveryScanner {
     }
 
     public static boolean isOutputDirectoryName(String directoryName) {
-        return "DataRecovery".equalsIgnoreCase(directoryName);
+        // 跳过应用自身工作目录及其子目录，避免把恢复产物/回收站/缓存/日志当作扫描源
+        return PathManager.APP_ROOT_DIR_NAME.equalsIgnoreCase(directoryName);
     }
 
     private static boolean isOutputDirectory(File directory) {
-        return isOutputDirectoryName(directory.getName());
+        if (directory == null) return false;
+        if (isOutputDirectoryName(directory.getName())) {
+            return true;
+        }
+        // 同时跳过应用工作目录下的所有子目录（.trash/.cache/.logs/Recovered）
+        String path = directory.getAbsolutePath();
+        String appRoot = PathManager.appRoot().getAbsolutePath();
+        return path.startsWith(appRoot + File.separator) || path.equals(appRoot);
     }
 
     private static String extensionOf(File file) {

@@ -102,6 +102,17 @@
     <string name="file_browser_delete_confirm">Delete \"%1$s\"?</string>
     <string name="file_browser_delete_not_empty">Folder is not empty</string>
     <string name="file_browser_delete_failed">Could not delete</string>
+    <string name="file_browser_recycle_bin">Recycle bin</string>
+    <string name="file_browser_recycle_bin_move_failed">Could not move to recycle bin</string>
+    <string name="file_browser_recycle_bin_moved">Moved to recycle bin</string>
+    <string name="file_browser_recycle_bin_empty">Recycle bin is empty</string>
+    <string name="file_browser_recycle_bin_count">%1$d item(s) in recycle bin</string>
+    <string name="file_browser_recycle_bin_clear">Empty recycle bin</string>
+    <string name="file_browser_recycle_bin_clear_confirm">Permanently delete all items in recycle bin?</string>
+    <string name="file_browser_recycle_bin_restore">Restore</string>
+    <string name="file_browser_recycle_bin_delete_permanent">Delete permanently</string>
+    <string name="file_browser_recycle_bin_restore_failed">Could not restore</string>
+    <string name="file_browser_recycle_bin_restore_ok">Restored to %1$s</string>
     <string name="file_browser_rename_failed">Could not rename</string>
     <string name="file_browser_create_failed">Could not create folder</string>
     <string name="file_browser_invalid_name">Invalid name</string>

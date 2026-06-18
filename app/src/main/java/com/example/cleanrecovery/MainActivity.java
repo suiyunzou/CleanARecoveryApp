@@ -118,6 +118,40 @@ public final class MainActivity extends Activity {
         refreshHome();
         maybeLaunchOnboarding();
         updateBottomNav(Panel.HOME);
+        // 初始化应用工作目录并异步清理过期回收站条目（>30 天）
+        initializeAppPaths();
+    }
+
+    /**
+     * 确保应用工作目录就绪，并在后台线程清理过期回收站条目与缓存。
+     * 不阻塞 UI 线程；失败仅记录日志，不影响主流程。
+     */
+    private void initializeAppPaths() {
+        // 触发 PathManager 创建根目录（lazy mkdirs）
+        PathManager.appRoot();
+        PathManager.recoveredRoot();
+        PathManager.trashRoot();
+        PathManager.cacheRoot();
+        PathManager.logsDir();
+
+        // 后台异步清理
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    RecycleBin bin = new RecycleBin();
+                    int cleaned = bin.cleanupExpiredSync();
+                    bin.shutdown();
+                    if (cleaned > 0) {
+                        android.util.Log.i("MainActivity",
+                                "RecycleBin: cleaned " + cleaned + " expired entries on startup");
+                    }
+                } catch (Exception e) {
+                    android.util.Log.w("MainActivity",
+                            "RecycleBin cleanup failed: " + e.getMessage());
+                }
+            }
+        }, "recyclebin-init").start();
     }
 
     @Override

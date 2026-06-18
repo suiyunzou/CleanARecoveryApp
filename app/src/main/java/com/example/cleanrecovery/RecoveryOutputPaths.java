@@ -3,19 +3,20 @@ package com.example.cleanrecovery;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
-import android.os.Environment;
 
 import java.io.File;
 
+/**
+ * @deprecated 改用 {@link PathManager} 统一管理路径。本类保留作为兼容入口，
+ *             内部委托给 PathManager，避免破坏既有调用方。
+ */
+@Deprecated
 public final class RecoveryOutputPaths {
     private RecoveryOutputPaths() {
     }
 
     public static File primaryDataRecoveryDir() {
-        return new File(
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
-                "DataRecovery"
-        );
+        return PathManager.recoveredRoot();
     }
 
     public static String primaryDisplayPath() {
@@ -25,6 +26,7 @@ public final class RecoveryOutputPaths {
     public static boolean openPrimaryFolder(Context context) {
         File directory = primaryDataRecoveryDir();
         if (!directory.exists()) {
+            //noinspection ResultOfMethodCallIgnored
             directory.mkdirs();
         }
         Uri uri = Uri.parse("file://" + directory.getAbsolutePath());

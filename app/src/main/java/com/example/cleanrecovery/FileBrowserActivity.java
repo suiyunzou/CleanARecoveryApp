@@ -30,6 +30,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
@@ -129,6 +130,7 @@ public final class FileBrowserActivity extends Activity {
         sortButton.setOnClickListener(this::showToolbarMenu);
         newFolderButton = findViewById(R.id.file_browser_new_folder);
         newFolderButton.setOnClickListener(v -> showCreateFolderDialog());
+        findViewById(R.id.file_browser_recycle_bin).setOnClickListener(v -> openRecycleBin());
         findViewById(R.id.file_browser_batch_delete).setOnClickListener(v -> confirmBatchDelete());
         findViewById(R.id.file_browser_cancel_select).setOnClickListener(v -> exitMultiSelectMode());
 
@@ -454,25 +456,41 @@ public final class FileBrowserActivity extends Activity {
     }
 
     private void batchDelete(Set<String> selectedPaths) {
-        int deleted = 0;
+        final RecycleBin bin = new RecycleBin();
+        final int[] moved = {0};
+        final int[] total = {0};
         for (String path : selectedPaths) {
             File file = new File(path);
             if (!canModify(file)) {
                 continue;
             }
             if (file.isDirectory()) {
+                // 空目录直接删除，无需进回收站
                 if (isDirectoryEmpty(file) && deleteEmptyDirectory(file)) {
-                    deleted++;
+                    moved[0]++;
                 }
-            } else if (file.delete()) {
-                deleted++;
+                continue;
+            }
+            total[0]++;
+            try {
+                if (bin.moveToTrashSync(file)) {
+                    moved[0]++;
+                }
+            } catch (IOException ignored) {
             }
         }
         exitMultiSelectMode();
         reloadEntries();
-        if (deleted == 0) {
-            Toast.makeText(this, R.string.file_browser_delete_failed, Toast.LENGTH_SHORT).show();
+        if (moved[0] == 0) {
+            Toast.makeText(this, R.string.file_browser_recycle_bin_move_failed, Toast.LENGTH_SHORT).show();
+        } else if (total[0] > 0) {
+            Toast.makeText(this, R.string.file_browser_recycle_bin_moved, Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void openRecycleBin() {
+        Intent intent = new Intent(this, RecycleBinActivity.class);
+        startActivity(intent);
     }
 
     private void handleEntryClick(FileEntry entry) {
@@ -758,11 +776,26 @@ public final class FileBrowserActivity extends Activity {
             Toast.makeText(this, R.string.file_browser_not_writable, Toast.LENGTH_SHORT).show();
             return;
         }
-        boolean deleted = entry.directory ? deleteEmptyDirectory(entry.file) : entry.file.delete();
-        if (deleted) {
-            reloadEntries();
-        } else {
-            Toast.makeText(this, R.string.file_browser_delete_failed, Toast.LENGTH_SHORT).show();
+        // 空目录直接删除；非空目录不允许删除；文件进回收站
+        if (entry.directory) {
+            boolean deleted = deleteEmptyDirectory(entry.file);
+            if (deleted) {
+                reloadEntries();
+            } else {
+                Toast.makeText(this, R.string.file_browser_delete_failed, Toast.LENGTH_SHORT).show();
+            }
+            return;
+        }
+        RecycleBin bin = new RecycleBin();
+        try {
+            if (bin.moveToTrashSync(entry.file)) {
+                reloadEntries();
+                Toast.makeText(this, R.string.file_browser_recycle_bin_moved, Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, R.string.file_browser_recycle_bin_move_failed, Toast.LENGTH_SHORT).show();
+            }
+        } catch (IOException e) {
+            Toast.makeText(this, R.string.file_browser_recycle_bin_move_failed, Toast.LENGTH_SHORT).show();
         }
     }
 
