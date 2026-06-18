@@ -3,6 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background_app"
+    android:fitsSystemWindows="true"
     android:orientation="vertical">
 
     <LinearLayout
@@ -39,23 +40,43 @@
             android:layout_width="match_parent" android:layout_height="52dp"
             android:background="@drawable/bg_card"
             android:hint="@string/music_login_account_hint"
-            android:inputType="textEmailAddress"
+            android:inputType="phone"
             android:paddingHorizontal="@dimen/space_md"
             android:textColor="@color/text_primary"
             android:textColorHint="@color/text_muted"
             android:textSize="@dimen/text_body" />
 
-        <EditText
-            android:id="@+id/login_password"
-            android:layout_width="match_parent" android:layout_height="52dp"
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
             android:layout_marginTop="@dimen/space_md"
-            android:background="@drawable/bg_card"
-            android:hint="@string/music_login_password_hint"
-            android:inputType="textPassword"
-            android:paddingHorizontal="@dimen/space_md"
-            android:textColor="@color/text_primary"
-            android:textColorHint="@color/text_muted"
-            android:textSize="@dimen/text_body" />
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/login_password"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@drawable/bg_card"
+                android:hint="@string/music_login_password_hint"
+                android:inputType="number"
+                android:maxLength="6"
+                android:paddingHorizontal="@dimen/space_md"
+                android:textColor="@color/text_primary"
+                android:textColorHint="@color/text_muted"
+                android:textSize="@dimen/text_body" />
+
+            <Button
+                android:id="@+id/login_code_button"
+                android:layout_width="112dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="@dimen/space_sm"
+                android:background="@drawable/bg_button_secondary"
+                android:text="@string/music_login_code"
+                android:textAllCaps="false"
+                android:textColor="@color/brand_primary"
+                android:textSize="@dimen/text_caption" />
+        </LinearLayout>
 
         <Button
             android:id="@+id/login_submit_button"

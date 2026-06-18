@@ -33,57 +33,108 @@ public final class MusicSearchActivity extends Activity {
     private final List<SongInfo> items = new ArrayList<>();
     private final Handler handler = new Handler(Looper.getMainLooper());
 
+    private int currentPage = 1;
+    private boolean isLoading = false;
+    private boolean hasMore = true;
+    private String currentKeyword = "";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         SystemUiHelper.apply(this);
         setContentView(R.layout.activity_music_search);
-        app = MusicApp.get();
+        app = MusicApp.init(this);
 
         input = findViewById(R.id.search_input);
         results = findViewById(R.id.search_results);
         empty = findViewById(R.id.search_empty);
-        results.setLayoutManager(new LinearLayoutManager(this));
+        
+        LinearLayoutManager layoutManager = new LinearLayoutManager(this);
+        results.setLayoutManager(layoutManager);
         adapter = new MusicHomeActivity.SongListAdapter(items, this::onSongClicked);
         results.setAdapter(adapter);
+
+        results.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
+                if (dy > 0 && !isLoading && hasMore) {
+                    int visibleItemCount = layoutManager.getChildCount();
+                    int totalItemCount = layoutManager.getItemCount();
+                    int pastVisibleItems = layoutManager.findFirstVisibleItemPosition();
+
+                    if ((visibleItemCount + pastVisibleItems) >= totalItemCount - 5) {
+                        performSearch(currentKeyword, currentPage + 1);
+                    }
+                }
+            }
+        });
 
         findViewById(R.id.search_back_button).setOnClickListener(v -> finish());
 
         input.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                if (s.length() >= 2) performSearch(s.toString());
+                if (s.length() >= 2) {
+                    currentKeyword = s.toString();
+                    performSearch(currentKeyword, 1);
+                }
             }
             @Override public void afterTextChanged(Editable s) {}
         });
     }
 
-    private void performSearch(String keyword) {
+    private void performSearch(String keyword, int page) {
+        if (isLoading) return;
+        isLoading = true;
+        
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
-                List<SongInfo> found = app.dataSource.search(keyword, 1);
+                List<SongInfo> found = app.dataSource.search(keyword, page);
                 handler.post(() -> {
-                    items.clear();
-                    items.addAll(found);
+                    isLoading = false;
+                    if (page == 1) {
+                        items.clear();
+                    }
+                    if (found.isEmpty()) {
+                        hasMore = false;
+                    } else {
+                        items.addAll(found);
+                        currentPage = page;
+                        hasMore = true;
+                    }
                     adapter.notifyDataSetChanged();
                     boolean none = items.isEmpty();
                     empty.setVisibility(none ? View.VISIBLE : View.GONE);
                     results.setVisibility(none ? View.GONE : View.VISIBLE);
                 });
             } catch (Exception e) {
-                handler.post(() ->
-                        Toast.makeText(this, "Search failed: " + e.getMessage(), Toast.LENGTH_SHORT).show());
+                handler.post(() -> {
+                    isLoading = false;
+                    Toast.makeText(this, getString(R.string.music_search_failed, e.getMessage()), Toast.LENGTH_SHORT).show();
+                });
             }
         });
     }
 
     private void onSongClicked(SongInfo song) {
-        if (song.vipRequired && !app.auth.isLoggedIn()) {
+        if (song.vipRequired && !app.auth.hasVip()) {
             new android.app.AlertDialog.Builder(this)
-                    .setTitle(R.string.music_vip_prompt_title)
-                    .setMessage(R.string.music_vip_prompt)
-                    .setPositiveButton(R.string.music_login, (d, w) ->
-                            startActivity(new android.content.Intent(this, MusicLoginActivity.class)))
+                    .setTitle(app.auth.isLoggedIn()
+                            ? R.string.music_vip_prompt_title
+                            : R.string.music_login_required_title)
+                    .setMessage(app.auth.isLoggedIn()
+                            ? R.string.music_vip_prompt
+                            : R.string.music_vip_login_prompt)
+                    .setPositiveButton(app.auth.isLoggedIn()
+                            ? R.string.music_vip_login_or_skip
+                            : R.string.music_login,
+                            (d, w) -> {
+                                if (app.auth.isLoggedIn()) {
+                                    app.refreshEntitlementAsync();
+                                } else {
+                                    startActivity(new android.content.Intent(this, MusicLoginActivity.class));
+                                }
+                            })
                     .setNegativeButton(android.R.string.cancel, null)
                     .show();
             return;

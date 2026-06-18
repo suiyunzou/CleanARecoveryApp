@@ -85,7 +85,7 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
     }
 
     private void refreshLoginState() {
-        loginButton.setColorFilter(app.auth.isLoggedIn()
+        loginButton.setColorFilter(app.auth.hasVip()
                 ? getResources().getColor(R.color.status_success, getTheme())
                 : getResources().getColor(R.color.text_secondary, getTheme()));
     }
@@ -117,13 +117,13 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
         List<String> names = app.playlists.listPlaylists();
         for (String name : names) {
             int count = app.playlists.songCount(name);
-            addPlaylistRow(name, count + " songs");
+            addPlaylistRow(name, displayPlaylistName(name), getString(R.string.music_playlist_song_count, count));
         }
         // "New playlist" row
-        addPlaylistRow(getString(R.string.music_new_playlist), null);
+        addPlaylistRow(null, getString(R.string.music_new_playlist), null);
     }
 
-    private void addPlaylistRow(String title, String subtitle) {
+    private void addPlaylistRow(String playlistName, String title, String subtitle) {
         View row = LayoutInflater.from(this).inflate(R.layout.item_music_song, playlistContainer, false);
         TextView titleView = row.findViewById(R.id.song_row_title);
         TextView artistView = row.findViewById(R.id.song_row_artist);
@@ -145,13 +145,20 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
         row.setOnClickListener(v -> {
             if (subtitle != null) {
                 Intent intent = new Intent(this, PlaylistDetailActivity.class);
-                intent.putExtra("playlist_name", title);
+                intent.putExtra("playlist_name", playlistName);
                 startActivity(intent);
             } else {
                 promptCreatePlaylist();
             }
         });
         playlistContainer.addView(row);
+    }
+
+    public String displayPlaylistName(String name) {
+        if ("Favorites".equals(name)) return getString(R.string.music_playlist_favorites);
+        if ("Listen Later".equals(name)) return getString(R.string.music_playlist_listen_later);
+        if ("Recently Played".equals(name)) return getString(R.string.music_recent);
+        return name;
     }
 
     private void promptCreatePlaylist() {
@@ -172,9 +179,35 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
     }
 
     private void onSongClicked(SongInfo song) {
+        if (song.vipRequired && !app.auth.hasVip()) {
+            promptVipSync();
+            return;
+        }
         app.playlists.addRecentPlay(song);
         app.player.playSingle(song);
         startActivity(new Intent(this, MusicPlayerActivity.class));
+    }
+
+    private void promptVipSync() {
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(app.auth.isLoggedIn()
+                        ? R.string.music_vip_prompt_title
+                        : R.string.music_login_required_title)
+                .setMessage(app.auth.isLoggedIn()
+                        ? R.string.music_vip_prompt
+                        : R.string.music_vip_login_prompt)
+                .setPositiveButton(app.auth.isLoggedIn()
+                        ? R.string.music_vip_login_or_skip
+                        : R.string.music_login,
+                        (d, w) -> {
+                            if (app.auth.isLoggedIn()) {
+                                app.refreshEntitlementAsync();
+                            } else {
+                                startActivity(new Intent(this, MusicLoginActivity.class));
+                            }
+                        })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     private void updateMiniPlayer() {
@@ -209,7 +242,7 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
     @Override public void onProgressChanged(int c, int t) {}
     @Override public void onSongChanged(SongInfo song) { updateMiniPlayer(); }
     @Override public void onError(String msg) {
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, getString(R.string.music_playback_failed), Toast.LENGTH_SHORT).show();
     }
 
     // ---- Adapter ----

@@ -11,12 +11,15 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /** Singleton music player — manages playback across the app. */
 public class MusicPlayer {
 
     public enum Mode { SEQUENTIAL, REPEAT_ALL, REPEAT_ONE, SHUFFLE }
-    public enum State { IDLE, PLAYING, PAUSED, STOPPED }
+    public enum State { IDLE, LOADING, PLAYING, PAUSED, STOPPED, ERROR }
 
     public interface Callback {
         void onStateChanged(State state);
@@ -42,6 +45,8 @@ public class MusicPlayer {
     private State state = State.IDLE;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final List<Callback> callbacks = new ArrayList<>();
+    private final ExecutorService resolverExecutor = Executors.newSingleThreadExecutor();
+    private final AtomicInteger playRequestId = new AtomicInteger();
 
     private MusicPlayer() {}
 
@@ -131,6 +136,7 @@ public class MusicPlayer {
     public int getQueueIndex() { return queueIndex; }
 
     public void release() {
+        playRequestId.incrementAndGet();
         handler.removeCallbacks(progressRunnable);
         if (player != null) {
             player.release();
@@ -146,13 +152,46 @@ public class MusicPlayer {
         SongInfo song = currentSong();
         if (song == null) return;
 
-        // Defer URL resolution to data source callback; use prepared URLs
-        String url = urlResolver.resolve(song);
-        if (url == null) {
-            for (Callback cb : callbacks) cb.onError("No playable URL for: " + song.title);
-            return;
-        }
+        int requestId = playRequestId.incrementAndGet();
+        setState(State.LOADING);
+        for (Callback cb : callbacks) cb.onSongChanged(song);
+
+        resolverExecutor.execute(() -> {
+            String url = null;
+            String error = null;
+            try {
+                url = urlResolver != null ? urlResolver.resolve(song) : null;
+            } catch (Exception e) {
+                error = e.getMessage();
+            }
+            String resolvedUrl = url;
+            String resolvedError = error;
+            handler.post(() -> {
+                if (playRequestId.get() != requestId) return;
+                if (resolvedUrl == null || resolvedUrl.isEmpty()) {
+                    setState(State.ERROR);
+                    String message = resolvedError != null && !resolvedError.isEmpty()
+                            ? resolvedError
+                            : "No playable URL for: " + song.title;
+                    for (Callback cb : callbacks) cb.onError(message);
+                    return;
+                }
+                prepareResolvedUrl(song, resolvedUrl);
+            });
+        });
+    }
+
+    private void prepareResolvedUrl(SongInfo song, String url) {
         try {
+            // Start Foreground Service
+            android.content.Context ctx = com.example.cleanrecovery.music.MusicApp.get().context;
+            android.content.Intent serviceIntent = new android.content.Intent(ctx, MusicService.class);
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                ctx.startForegroundService(serviceIntent);
+            } else {
+                ctx.startService(serviceIntent);
+            }
+
             player = new MediaPlayer();
             player.setAudioAttributes(new AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -176,12 +215,13 @@ public class MusicPlayer {
                 }
             });
             player.setOnErrorListener((mp, what, extra) -> {
+                setState(State.ERROR);
                 for (Callback cb : callbacks) cb.onError("Playback error: " + what);
                 return true;
             });
             player.prepareAsync();
-            setState(State.IDLE);
         } catch (IOException e) {
+            setState(State.ERROR);
             for (Callback cb : callbacks) cb.onError(e.getMessage());
         }
     }
@@ -233,6 +273,6 @@ public class MusicPlayer {
     public static void setPlayUrlResolver(PlayUrlResolver r) { urlResolver = r; }
 
     static {
-        urlResolver = song -> "http://fs.open.kugou.com/" + (song.hash != null ? song.hash : "") + ".mp3";
+        urlResolver = song -> null;
     }
 }

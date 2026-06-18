@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Qingxun Recovery</string>
+    <string name="app_name">酷狗概念恢复</string>
     <string name="app_subtitle">Find what you lost — no root, no damage, no data collected.</string>
     <string name="app_slogan">Find what you lost — no root, no damage, no data collected.</string>
     <string name="storage_access_required">Storage access is required before scanning.</string>

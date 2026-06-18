@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">mobilecdn.kugou.com</domain>
+        <domain includeSubdomains="true">m.kugou.com</domain>
+        <domain includeSubdomains="true">trackercdn.kugou.com</domain>
+        <domain includeSubdomains="true">login.user.kugou.com</domain>
+    </domain-config>
+    <!-- Auth and entitlement APIs use HTTPS; pinning-friendly config goes here. -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">gateway.kugou.com</domain>
+        <domain includeSubdomains="true">wwwapi.kugou.com</domain>
+    </domain-config>
+</network-security-config>

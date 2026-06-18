@@ -1,4 +1,4 @@
-﻿# Gradle
+# Gradle
 .gradle/
 build/
 **/build/
@@ -24,3 +24,11 @@ Thumbs.db
 
 # Local planning docs (do not publish)
 plans/
+
+# Test scratch files and reference materials (not part of the project)
+build_log.txt
+ui.xml
+kugou_extracted/
+kugou_lite_base.zip
+数据恢复大师/
+酷狗概念版/

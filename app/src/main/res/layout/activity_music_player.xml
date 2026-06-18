@@ -3,6 +3,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/surface_card"
+    android:fitsSystemWindows="true"
     android:orientation="vertical">
 
     <LinearLayout
@@ -59,6 +60,16 @@
         android:textColor="@color/text_secondary"
         android:textSize="@dimen/text_body" />
 
+    <TextView
+        android:id="@+id/player_status_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginTop="@dimen/space_sm"
+        android:textColor="@color/text_muted"
+        android:textSize="@dimen/text_caption"
+        android:visibility="gone" />
+
     <SeekBar
         android:id="@+id/player_seekbar"
         android:layout_width="match_parent"
@@ -112,14 +123,15 @@
             android:background="@android:color/transparent"
             android:src="@drawable/ic_back" />
 
-        <ImageButton
+        <Button
             android:id="@+id/player_play_button"
             android:layout_width="64dp" android:layout_height="64dp"
             android:layout_marginStart="@dimen/space_lg"
             android:background="@drawable/bg_button_primary"
             android:backgroundTint="@color/brand_primary"
-            android:src="@drawable/ic_type_audio"
-            android:tint="@color/surface_card" />
+            android:textColor="@color/surface_card"
+            android:textSize="24sp"
+            android:text="▶" />
 
         <ImageButton
             android:id="@+id/player_next_button"

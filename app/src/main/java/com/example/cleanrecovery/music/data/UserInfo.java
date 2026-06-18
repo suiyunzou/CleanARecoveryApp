@@ -16,6 +16,6 @@ public class UserInfo {
     }
 
     public String displayName() {
-        return nickname != null && !nickname.isEmpty() ? nickname : "Guest";
+        return nickname != null && !nickname.isEmpty() ? nickname : "Phone user";
     }
 }

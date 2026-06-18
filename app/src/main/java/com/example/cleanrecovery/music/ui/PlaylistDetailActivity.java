@@ -32,11 +32,11 @@ public final class PlaylistDetailActivity extends Activity {
         super.onCreate(savedInstanceState);
         SystemUiHelper.apply(this);
         setContentView(R.layout.activity_playlist_detail);
-        app = MusicApp.get();
+        app = MusicApp.init(this);
         playlistName = getIntent().getStringExtra("playlist_name");
         if (playlistName == null) { finish(); return; }
 
-        ((TextView) findViewById(R.id.playlist_detail_title)).setText(playlistName);
+        ((TextView) findViewById(R.id.playlist_detail_title)).setText(displayPlaylistName(playlistName));
         list = findViewById(R.id.playlist_detail_list);
         emptyView = findViewById(R.id.playlist_detail_empty);
         list.setLayoutManager(new LinearLayoutManager(this));
@@ -62,8 +62,37 @@ public final class PlaylistDetailActivity extends Activity {
     }
 
     private void onSongClicked(SongInfo song) {
+        if (song.vipRequired && !app.auth.hasVip()) {
+            new android.app.AlertDialog.Builder(this)
+                    .setTitle(app.auth.isLoggedIn()
+                            ? R.string.music_vip_prompt_title
+                            : R.string.music_login_required_title)
+                    .setMessage(app.auth.isLoggedIn()
+                            ? R.string.music_vip_prompt
+                            : R.string.music_vip_login_prompt)
+                    .setPositiveButton(app.auth.isLoggedIn()
+                            ? R.string.music_vip_login_or_skip
+                            : R.string.music_login,
+                            (d, w) -> {
+                                if (app.auth.isLoggedIn()) {
+                                    app.refreshEntitlementAsync();
+                                } else {
+                                    startActivity(new Intent(this, MusicLoginActivity.class));
+                                }
+                            })
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show();
+            return;
+        }
         app.playlists.addRecentPlay(song);
         app.player.play(items, items.indexOf(song));
         startActivity(new Intent(this, MusicPlayerActivity.class));
+    }
+
+    private String displayPlaylistName(String name) {
+        if ("Favorites".equals(name)) return getString(R.string.music_playlist_favorites);
+        if ("Listen Later".equals(name)) return getString(R.string.music_playlist_listen_later);
+        if ("Recently Played".equals(name)) return getString(R.string.music_recent);
+        return name;
     }
 }

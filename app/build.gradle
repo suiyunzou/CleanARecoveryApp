@@ -7,7 +7,7 @@ android {
     compileSdk 35
 
     defaultConfig {
-        applicationId "com.example.cleanrecovery"
+        applicationId "com.example.cleanrecovery.musicapp"
         minSdk 23
         targetSdk 35
         versionCode 1
