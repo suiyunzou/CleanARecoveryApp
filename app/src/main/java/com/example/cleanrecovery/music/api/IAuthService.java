@@ -31,4 +31,10 @@ public interface IAuthService {
 
     /** Call after init to retrieve cached token. */
     String getToken();
+
+    /** Current user id (null when not logged in). */
+    String getUserId();
+
+    /** Device fingerprint id used at login time (null when not logged in). */
+    String getDfid();
 }

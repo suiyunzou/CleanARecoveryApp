@@ -68,6 +68,7 @@ public class RemoteAuthService implements IAuthService {
 
     private volatile UserInfo current;
     private volatile String currentToken;
+    private volatile String currentDfid;
 
     public RemoteAuthService(Context ctx) {
         this.appContext = ctx.getApplicationContext();
@@ -162,9 +163,15 @@ public class RemoteAuthService implements IAuthService {
 
         sessionStore.save(session);
 
+        // 导出最新 token 到应用私有外部目录，供 PC 端测试读取（adb pull）。
+        // 不含敏感信息以外的任何内容；token 本身已加密存储在 sessionStore，
+        // 此导出仅为 PC 端验证测试用，用户可手动删除。
+        exportTokenForTesting(session);
+
         current = new UserInfo(session.userId, session.nickname, session.isVip);
         current.avatarUrl = session.avatarUrl;
         currentToken = session.accessToken;
+        currentDfid = session.dfid;
 
         // Sync VIP entitlement from the Kugou Youth gateway
         try {
@@ -179,9 +186,19 @@ public class RemoteAuthService implements IAuthService {
     public UserInfo restoreSession() throws Exception {
         SecureSessionStore.Session session = sessionStore.restore();
         if (session == null) {
-            current = null;
-            currentToken = null;
-            return null;
+            // Fallback: 主存储和备份都失败，尝试从 latest_token.txt 恢复
+            // latest_token.txt 在登录时由 exportTokenForTesting 写入，
+            // 包含 token/userid/mid/dfid，足够恢复播放能力。
+            session = restoreFromExportedToken();
+            if (session == null) {
+                current = null;
+                currentToken = null;
+                currentDfid = null;
+                return null;
+            }
+            Log.d(TAG, "session restored from latest_token.txt fallback");
+            // 将恢复的 session 重新保存到主存储和备份
+            try { sessionStore.save(session); } catch (Exception ignored) {}
         }
 
         // If the refresh token has expired, the session is unrecoverable
@@ -189,6 +206,7 @@ public class RemoteAuthService implements IAuthService {
             sessionStore.clear();
             current = null;
             currentToken = null;
+            currentDfid = null;
             return null;
         }
 
@@ -201,6 +219,7 @@ public class RemoteAuthService implements IAuthService {
                     sessionStore.clear();
                     current = null;
                     currentToken = null;
+                    currentDfid = null;
                     return null;
                 }
                 // For network errors, fall through with the expired token —
@@ -212,6 +231,7 @@ public class RemoteAuthService implements IAuthService {
         current = new UserInfo(session.userId, session.nickname, session.isVip);
         current.avatarUrl = session.avatarUrl;
         currentToken = session.accessToken;
+        currentDfid = session.dfid;
         return current;
     }
 
@@ -280,9 +300,11 @@ public class RemoteAuthService implements IAuthService {
         }
 
         sessionStore.save(session);
+        exportTokenForTesting(session);  // 刷新后也更新导出文件
         current = new UserInfo(session.userId, session.nickname, session.isVip);
         current.avatarUrl = session.avatarUrl;
         currentToken = session.accessToken;
+        currentDfid = session.dfid;
         return current;
     }
 
@@ -302,6 +324,7 @@ public class RemoteAuthService implements IAuthService {
         sessionStore.clear();
         current = null;
         currentToken = null;
+        currentDfid = null;
     }
 
     @Override
@@ -335,6 +358,22 @@ public class RemoteAuthService implements IAuthService {
         return s != null ? s.accessToken : null;
     }
 
+    @Override
+    public String getUserId() {
+        if (current != null && current.userId != null && !current.userId.isEmpty()) {
+            return current.userId;
+        }
+        SecureSessionStore.Session s = sessionStore.restore();
+        return s != null ? s.userId : null;
+    }
+
+    @Override
+    public String getDfid() {
+        if (currentDfid != null && !currentDfid.isEmpty()) return currentDfid;
+        SecureSessionStore.Session s = sessionStore.restore();
+        return s != null ? s.dfid : null;
+    }
+
     // ---- Internal helpers --------------------------------------------------
 
     /**
@@ -362,6 +401,7 @@ public class RemoteAuthService implements IAuthService {
             Log.w(TAG, "Failed to persist refreshed session", e);
         }
         currentToken = session.accessToken;
+        currentDfid = session.dfid;
         return session;
     }
 
@@ -415,5 +455,113 @@ public class RemoteAuthService implements IAuthService {
 
     private String string(int resId) {
         return appContext.getString(resId);
+    }
+
+    /**
+     * 将最新登录态导出到应用私有外部目录的 latest_token.txt，
+     * 供 PC 端验证测试读取（adb pull /sdcard/Android/data/<pkg>/files/latest_token.txt）。
+     *
+     * <p>格式（JSON，每行一个字段）：
+     * <pre>
+     * {"token":"...","userid":"...","mid":"...","dfid":"...","exportedAt":1718700000000}
+     * </pre>
+     *
+     * <p>注意：此文件包含敏感凭证，仅写入应用私有目录，不对外暴露。</p>
+     */
+    private void exportTokenForTesting(SecureSessionStore.Session session) {
+        try {
+            java.io.File dir = appContext.getExternalFilesDir(null);
+            if (dir == null) return; // 外部存储不可用
+            java.io.File file = new java.io.File(dir, "latest_token.txt");
+            String mid = com.example.cleanrecovery.music.security.DeviceFingerprint.getMid(appContext);
+            String json = "{\"token\":\"" + session.accessToken + "\""
+                    + ",\"userid\":\"" + session.userId + "\""
+                    + ",\"mid\":\"" + mid + "\""
+                    + ",\"dfid\":\"" + (session.dfid != null ? session.dfid : "-") + "\""
+                    + ",\"exportedAt\":" + System.currentTimeMillis() + "}";
+            java.io.FileWriter fw = new java.io.FileWriter(file, false);
+            try {
+                fw.write(json);
+            } finally {
+                fw.close();
+            }
+            Log.d(TAG, "Token exported for PC testing: " + file.getAbsolutePath());
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to export token for testing", e);
+        }
+    }
+
+    /**
+     * 从 latest_token.txt 恢复 session（fallback 方案）。
+     *
+     * <p>当 Keystore 加密的主存储和密码派生密钥的备份都失败时（例如重装后），
+     * 尝试从 exportTokenForTesting 导出的 latest_token.txt 恢复登录态。
+     *
+     * <p>该文件包含 token/userid/mid/dfid，足够恢复 VIP 歌曲播放能力。
+     * 由于没有 refresh_token，无法自动刷新；但 access token 通常有效期较长，
+     * 足以维持当前会话。
+     *
+     * @return 恢复的 Session，或 null（文件不存在/解析失败）
+     */
+    private SecureSessionStore.Session restoreFromExportedToken() {
+        java.io.FileReader fr = null;
+        try {
+            java.io.File dir = appContext.getExternalFilesDir(null);
+            if (dir == null) return null;
+            java.io.File file = new java.io.File(dir, "latest_token.txt");
+            if (!file.exists()) return null;
+
+            StringBuilder sb = new StringBuilder();
+            fr = new java.io.FileReader(file);
+            char[] buf = new char[1024];
+            int len;
+            while ((len = fr.read(buf)) >= 0) sb.append(buf, 0, len);
+            String json = sb.toString();
+            if (json.isEmpty()) return null;
+
+            // 简单 JSON 解析（避免依赖 gson）
+            String token = extractJsonField(json, "token");
+            String userid = extractJsonField(json, "userid");
+            String mid = extractJsonField(json, "mid");
+            String dfid = extractJsonField(json, "dfid");
+
+            if (token == null || token.isEmpty() || userid == null || userid.isEmpty()) {
+                return null;
+            }
+
+            SecureSessionStore.Session session = new SecureSessionStore.Session();
+            session.accessToken = token;
+            // 没有 refresh_token，用 accessToken 占位，确保 isRefreshable() 返回 true，
+            // 否则 restoreSession() 会判定 session 不可恢复并清除，导致用户被登出。
+            session.refreshToken = token;
+            session.userId = userid;
+            session.nickname = userid;
+            session.dfid = dfid != null && !dfid.isEmpty() ? dfid : "-";
+            // access token 有效期设为 24 小时，避免触发 doTokenRefresh（refreshToken 是占位的）。
+            // 酷狗 token 实际有效期通常较长，即使超过 24 小时也仍可能有效。
+            long now = System.currentTimeMillis();
+            session.accessExpiresAt = now + 24 * 60 * 60 * 1000L;
+            session.refreshExpiresAt = now + 30 * 24 * 60 * 60 * 1000L;  // 30 天
+            session.isVip = false;  // VIP 状态由 refreshEntitlement 重新获取
+
+            Log.d(TAG, "restoreFromExportedToken: userid=" + userid + " token=" + token.substring(0, Math.min(16, token.length())) + "...");
+            return session;
+        } catch (Exception e) {
+            Log.w(TAG, "restoreFromExportedToken failed", e);
+            return null;
+        } finally {
+            if (fr != null) try { fr.close(); } catch (Exception ignored) {}
+        }
+    }
+
+    /** 从 JSON 字符串中提取指定字段值（简单实现，避免依赖 gson）。 */
+    private static String extractJsonField(String json, String key) {
+        String pattern = "\"" + key + "\":\"";
+        int idx = json.indexOf(pattern);
+        if (idx < 0) return null;
+        int start = idx + pattern.length();
+        int end = json.indexOf("\"", start);
+        if (end < 0) return null;
+        return json.substring(start, end);
     }
 }

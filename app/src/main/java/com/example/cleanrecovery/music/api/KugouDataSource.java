@@ -29,6 +29,35 @@ public class KugouDataSource implements IMusicDataSource {
     private static final String TRACKER_URL = "http://trackercdn.kugou.com/i/v2/";
     // Endpoint 3: Web API — more reliable for non-VIP songs, returns JSON with play_url
     private static final String WEB_PLAY_URL = "https://wwwapi.kugou.com/yy/index.php";
+    // Endpoint 4: Concept (lite) privileged play URL via /v5/url.
+    // 概念版通过 appid=3116 + clientver=11440 + 特定 page_id/pid 参数区分，
+    // 不是通过 Cookie。参考 KuGouMusicApi module/song_url.js。
+    private static final String CONCEPT_PLAY_URL = "https://gateway.kugou.com/v5/url";
+    private static final String LITE_SALT = "LnT6xpN3khm36zse0QzvmgTZ3waWdRSA";
+    private static final String LITE_KEY_SALT = "185672dd44712f60bb1736df5a377e82";
+    private static final int LITE_APPID = 3116;
+    private static final int LITE_CLIENTVER = 11440;
+
+    /** Auth context for VIP song URL resolution. Set by MusicApp after login. */
+    private volatile AuthContext auth;
+
+    public static class AuthContext {
+        public final String token;
+        public final String userid;
+        public final String mid;
+        public final String dfid;
+        public AuthContext(String token, String userid, String mid, String dfid) {
+            this.token = token;
+            this.userid = userid;
+            this.mid = mid;
+            this.dfid = dfid;
+        }
+    }
+
+    /** Set the auth context so VIP songs can be resolved with the user's token. */
+    public void setAuthContext(AuthContext ctx) {
+        this.auth = ctx;
+    }
 
     @Override
     public List<SongInfo> search(String keyword, int page) throws Exception {
@@ -54,10 +83,24 @@ public class KugouDataSource implements IMusicDataSource {
     /**
      * Resolve a playable URL by trying multiple endpoints in sequence.
      * The first endpoint that returns a non-empty URL wins.
+     *
+     * For VIP songs, the concept (Youth) endpoint is tried first with the
+     * user's token + userid so the privileged CDN URL is returned.
      */
     @Override
     public String resolvePlayUrl(SongInfo song) throws Exception {
         if (song == null || isEmpty(song.hash)) return null;
+
+        // For VIP songs, try the concept endpoint first (carries token + userid)
+        if (song.vipRequired && auth != null && !isEmpty(auth.token)) {
+            try {
+                String url = tryConceptPlayUrl(song);
+                if (!isEmpty(url)) return url;
+            } catch (Exception e) {
+                android.util.Log.w("KugouDataSource",
+                        "concept play url failed: " + e.getMessage());
+            }
+        }
 
         // Endpoint 1: Legacy getSongInfo.php
         String url = tryLegacyPlayInfo(song.hash);
@@ -162,6 +205,143 @@ public class KugouDataSource implements IMusicDataSource {
         }
     }
 
+    /**
+     * Endpoint 4: Concept (lite) privileged play URL via /v5/url.
+     *
+     * <p>概念版通过 appid=3116 + clientver=11440 + 特定 page_id/pid/ppage_id 参数区分，
+     * 不是通过 Cookie。参考 KuGouMusicApi module/song_url.js 和 util/request.js。</p>
+     *
+     * <p>签名算法：MD5(salt + sorted("k=v" pairs).join("") + bodyJson + salt)，
+     * 概念版盐值 LnT6xpN3khm36zse0QzvmgTZ3waWdRSA。</p>
+     *
+     * <p>key 参数：MD5(hash + "185672dd44712f60bb1736df5a377e82" + appid + mid + userid)。</p>
+     */
+    private String tryConceptPlayUrl(SongInfo song) {
+        try {
+            String hash = song.hash.toLowerCase();
+            String dfid = isEmpty(auth.dfid) ? "-" : auth.dfid;
+            String mid = auth.mid != null ? auth.mid : "";
+            long clienttime = System.currentTimeMillis() / 1000;
+
+            // 构造参数（TreeMap 自动按 key 排序，用于签名）
+            java.util.TreeMap<String, String> params = new java.util.TreeMap<>();
+            params.put("album_audio_id", "0");
+            params.put("album_id", "0");
+            params.put("area_code", "1");
+            params.put("behavior", "play");
+            params.put("cdnBackup", "1");
+            params.put("clienttime", String.valueOf(clienttime));
+            params.put("clientver", String.valueOf(LITE_CLIENTVER));
+            params.put("cmd", "26");
+            params.put("dfid", dfid);
+            params.put("hash", hash);
+            params.put("IsFreePart", "0");
+            params.put("mid", mid);
+            params.put("module", "");
+            params.put("page_id", "967177915");  // 概念版特有
+            params.put("pid", "411");             // 概念版特有（标准版为 2）
+            params.put("pidversion", "3001");
+            params.put("ppage_id", "356753938,823673182,967485191");  // 概念版特有
+            params.put("quality", "128");
+            params.put("ssa_flag", "is_fromtrack");
+            params.put("uuid", "-");
+            params.put("version", "11430");
+
+            // 概念版标识参数
+            params.put("appid", String.valueOf(LITE_APPID));
+
+            // 登录态参数（VIP 歌曲必需）
+            if (!isEmpty(auth.token)) params.put("token", auth.token);
+            if (!isEmpty(auth.userid)) params.put("userid", auth.userid);
+
+            // 生成 key 参数：MD5(hash + keySalt + appid + mid + userid)
+            String keyUserId = isEmpty(auth.userid) ? "0" : auth.userid;
+            String key = md5(hash + LITE_KEY_SALT + LITE_APPID + mid + keyUserId);
+            params.put("key", key);
+
+            // 生成 signature：MD5(salt + sorted("k=v").join("") + bodyJson + salt)
+            // bodyJson 为空（GET 请求无 body）
+            StringBuilder sigBuilder = new StringBuilder(LITE_SALT);
+            for (java.util.Map.Entry<String, String> e : params.entrySet()) {
+                sigBuilder.append(e.getKey()).append("=").append(e.getValue());
+            }
+            sigBuilder.append(LITE_SALT);
+            String signature = md5(sigBuilder.toString());
+            params.put("signature", signature);
+
+            // 构建最终 URL
+            StringBuilder urlBuilder = new StringBuilder(CONCEPT_PLAY_URL).append("?");
+            boolean first = true;
+            for (java.util.Map.Entry<String, String> e : params.entrySet()) {
+                if (!first) urlBuilder.append("&");
+                urlBuilder.append(e.getKey()).append("=").append(encode(e.getValue()));
+                first = false;
+            }
+            String fullUrl = urlBuilder.toString();
+
+            android.util.Log.d("KugouDataSource",
+                    "concept /v5/url hash=" + hash + " userid=" + auth.userid);
+
+            JsonObject resp = getWithHeaders(fullUrl, new String[][]{
+                    {"User-Agent", "Android15-1070-11083-46-0-DiscoveryDRADProtocol-wifi"},
+                    {"x-router", "trackercdn.kugou.com"},
+                    {"dfid", dfid},
+                    {"mid", mid},
+                    {"clienttime", String.valueOf(clienttime)},
+                    {"kg-rc", "1"},
+                    {"kg-thash", "5d816a0"},
+                    {"kg-rec", "1"},
+                    {"kg-rf", "B9EDA08A64250DEFFBCADDEE00F8F25F"}
+            });
+
+            // /v5/url 实际响应格式（经 PC 端验证）：
+            //   成功: {"status":1,"url":["http://...mp3","http://...mp3"],"backupUrl":["..."],"hash":"..."}
+            //   失败: {"status":0,"err_code":20028,"error":"需要VIP权限"}
+            // 注意：url 字段在顶层且是数组（不是 data.url 字符串）。
+            int status = resp.has("status") ? resp.get("status").getAsInt() : -1;
+            int errCode = resp.has("err_code") ? resp.get("err_code").getAsInt() : 0;
+            if (status != 1 || errCode != 0) {
+                String errMsg = resp.has("error") ? resp.get("error").getAsString()
+                        : resp.has("msg") ? resp.get("msg").getAsString()
+                        : resp.has("error_msg") ? resp.get("error_msg").getAsString()
+                        : "status=" + status + " err_code=" + errCode;
+                android.util.Log.w("KugouDataSource",
+                        "concept /v5/url status=" + status + " err_code=" + errCode + " msg=" + errMsg);
+                return null;
+            }
+
+            // 1. 顶层 url 数组（概念版 /v5/url 的标准格式）
+            String urlFromTop = firstUrlFromArray(resp, "url");
+            if (!isEmpty(urlFromTop)) return urlFromTop;
+
+            // 2. 顶层 backupUrl 数组
+            String backupFromTop = firstUrlFromArray(resp, "backupUrl");
+            if (!isEmpty(backupFromTop)) return backupFromTop;
+
+            // 3. data 对象内的 url（兼容旧格式）
+            JsonObject data = object(resp, "data");
+            if (data != null) {
+                String urlInData = firstUrlFromArray(data, "url");
+                if (!isEmpty(urlInData)) return urlInData;
+                String playUrl = str(data, "play_url", "playUrl");
+                if (!isEmpty(playUrl)) return playUrl;
+                JsonArray urls = array(data, "urls");
+                if (urls != null) {
+                    for (JsonElement e : urls) {
+                        if (e.isJsonPrimitive()) {
+                            String u = e.getAsString();
+                            if (!isEmpty(u)) return u;
+                        }
+                    }
+                }
+            }
+            return firstPlayableUrl(resp);
+        } catch (Exception e) {
+            android.util.Log.w("KugouDataSource", "concept /v5/url error: " + e.getMessage());
+            return null;
+        }
+    }
+
     private JsonObject get(String urlStr) throws Exception {
         return getWithHeaders(urlStr, null);
     }
@@ -249,6 +429,10 @@ public class KugouDataSource implements IMusicDataSource {
     }
 
     private String firstPlayableUrl(JsonObject resp) {
+        // 优先处理 url 字段为数组的情况（概念版 /v5/url 的实际格式）
+        String urlFromArray = firstUrlFromArray(resp, "url");
+        if (!isEmpty(urlFromArray)) return urlFromArray;
+
         String url = str(resp, "url", "play_url", "playUrl");
         if (!isEmpty(url)) return url;
 
@@ -306,6 +490,34 @@ public class KugouDataSource implements IMusicDataSource {
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    /**
+     * 从 JSON 对象中提取指定字段的第一个 URL。
+     * 兼容三种格式：
+     *   1. "url": ["http://...", "http://..."]  （数组，概念版 /v5/url 实际格式）
+     *   2. "url": "http://..."                  （字符串）
+     *   3. 字段不存在                           （返回空字符串）
+     */
+    private static String firstUrlFromArray(JsonObject o, String key) {
+        if (o == null || !o.has(key)) return "";
+        try {
+            JsonElement e = o.get(key);
+            if (e == null || e.isJsonNull()) return "";
+            if (e.isJsonArray()) {
+                JsonArray arr = e.getAsJsonArray();
+                for (JsonElement item : arr) {
+                    if (item.isJsonPrimitive()) {
+                        String u = item.getAsString();
+                        if (!isEmpty(u)) return u;
+                    }
+                }
+                return "";
+            }
+            if (e.isJsonPrimitive()) return e.getAsString();
+        } catch (Exception ignored) {
+        }
+        return "";
     }
 
     private static String nestedStr(JsonObject o, String objectKey, String valueKey) {

@@ -4,6 +4,7 @@ import android.media.AudioAttributes;
 import android.media.MediaPlayer;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 
 import com.example.cleanrecovery.music.data.SongInfo;
 
@@ -17,6 +18,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /** Singleton music player — manages playback across the app. */
 public class MusicPlayer {
+
+    private static final String TAG = "MusicPlayer";
 
     public enum Mode { SEQUENTIAL, REPEAT_ALL, REPEAT_ONE, SHUFFLE }
     public enum State { IDLE, LOADING, PLAYING, PAUSED, STOPPED, ERROR }
@@ -155,14 +158,17 @@ public class MusicPlayer {
         int requestId = playRequestId.incrementAndGet();
         setState(State.LOADING);
         for (Callback cb : callbacks) cb.onSongChanged(song);
+        Log.d(TAG, "playCurrent: song=" + song.title + " hash=" + song.hash + " vipRequired=" + song.vipRequired);
 
         resolverExecutor.execute(() -> {
             String url = null;
             String error = null;
             try {
                 url = urlResolver != null ? urlResolver.resolve(song) : null;
+                Log.d(TAG, "resolve url=" + (url != null ? url.substring(0, Math.min(80, url.length())) : "null"));
             } catch (Exception e) {
                 error = e.getMessage();
+                Log.w(TAG, "resolve failed", e);
             }
             String resolvedUrl = url;
             String resolvedError = error;
@@ -173,6 +179,7 @@ public class MusicPlayer {
                     String message = resolvedError != null && !resolvedError.isEmpty()
                             ? resolvedError
                             : "No playable URL for: " + song.title;
+                    Log.w(TAG, "playCurrent: no url, error=" + message);
                     for (Callback cb : callbacks) cb.onError(message);
                     return;
                 }

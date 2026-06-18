@@ -62,7 +62,9 @@ public final class PlaylistDetailActivity extends Activity {
     }
 
     private void onSongClicked(SongInfo song) {
-        if (song.vipRequired && !app.auth.hasVip()) {
+        // 已登录时直接尝试播放（概念版 /v5/url 会带 token 解析 VIP URL）；
+        // 未登录的 VIP 歌曲才提示登录/领取。
+        if (song.vipRequired && !app.auth.isLoggedIn()) {
             new android.app.AlertDialog.Builder(this)
                     .setTitle(app.auth.isLoggedIn()
                             ? R.string.music_vip_prompt_title

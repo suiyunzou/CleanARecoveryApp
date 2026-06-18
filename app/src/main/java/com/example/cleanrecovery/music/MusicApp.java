@@ -19,7 +19,7 @@ public final class MusicApp {
     private static volatile MusicApp instance;
 
     public final IAuthService auth;
-    public final IMusicDataSource dataSource;
+    public final KugouDataSource dataSource;
     public final PlaylistStore playlists;
     public final MusicPlayer player;
     public final Context context;
@@ -35,6 +35,7 @@ public final class MusicApp {
         dataSource = new KugouDataSource();
         playlists = new PlaylistStore(ctx);
         player = MusicPlayer.get();
+        updateDataSourceAuth();
         refreshEntitlementAsync();
         MusicPlayer.setPlayUrlResolver(song -> {
             try {
@@ -63,10 +64,28 @@ public final class MusicApp {
             try {
                 android.util.Log.d("MusicApp", "refreshEntitlementAsync start");
                 auth.refreshEntitlement();
+                updateDataSourceAuth();
                 android.util.Log.d("MusicApp", "refreshEntitlementAsync done");
             } catch (Exception e) {
                 android.util.Log.w("MusicApp", "refreshEntitlementAsync failed", e);
             }
         });
+    }
+
+    /** Push the current auth context (token/userid/mid/dfid) into the data source
+     *  so VIP songs can be resolved via the concept gateway. */
+    private void updateDataSourceAuth() {
+        try {
+            if (!auth.isLoggedIn()) return;
+            String token = auth.getToken();
+            String userid = auth.getUserId();
+            String mid = com.example.cleanrecovery.music.security.DeviceFingerprint.getMid(context);
+            String dfid = auth.getDfid();
+            if (token == null || token.isEmpty() || userid == null || userid.isEmpty()) return;
+            dataSource.setAuthContext(new KugouDataSource.AuthContext(token, userid, mid, dfid));
+            android.util.Log.d("MusicApp", "dataSource auth updated: userid=" + userid);
+        } catch (Exception e) {
+            android.util.Log.w("MusicApp", "updateDataSourceAuth failed", e);
+        }
     }
 }

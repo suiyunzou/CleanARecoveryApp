@@ -170,8 +170,10 @@ public final class MusicPlayerActivity extends Activity implements MusicPlayer.C
     @Override
     public void onError(String msg) {
         // Status text already set by onStateChanged(ERROR).
-        // Also show a Toast for immediate feedback.
-        Toast.makeText(this, R.string.music_playback_failed, Toast.LENGTH_LONG).show();
+        // Show a Toast with the specific error message for easier diagnosis.
+        String display = (msg != null && !msg.isEmpty()) ? msg
+                : getString(R.string.music_playback_failed);
+        Toast.makeText(this, display, Toast.LENGTH_LONG).show();
     }
 
     private static String formatMs(int ms) {

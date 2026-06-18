@@ -142,6 +142,9 @@ public final class MusicLoginActivity extends Activity {
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 app.auth.login(phone, code);
+                // Sync VIP entitlement and push auth context to data source
+                // so VIP songs can be resolved via the concept gateway.
+                app.refreshEntitlementAsync();
                 runOnUiThread(() -> {
                     submitButton.setEnabled(true);
                     showLoggedIn();
