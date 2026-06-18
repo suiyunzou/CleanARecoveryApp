@@ -1,6 +1,8 @@
 package com.example.cleanrecovery.music.ui;
 
 import android.app.Activity;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -14,6 +16,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.core.content.FileProvider;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -34,6 +37,10 @@ public final class DownloadActivity extends Activity implements DownloadManager.
     private SongInfo song;
 
     private TextView songTitle, songArtist, songStatus;
+    private TextView downloadPathText;
+    private View downloadActionButtons;
+    private Button openFileButton;
+    private Button viewFolderButton;
     private RadioGroup qualityGroup;
     private ProgressBar progressBar;
     private TextView progressText;
@@ -57,6 +64,10 @@ public final class DownloadActivity extends Activity implements DownloadManager.
         songTitle = findViewById(R.id.download_song_title);
         songArtist = findViewById(R.id.download_song_artist);
         songStatus = findViewById(R.id.download_song_status);
+        downloadPathText = findViewById(R.id.download_path_text);
+        downloadActionButtons = findViewById(R.id.download_action_buttons);
+        openFileButton = findViewById(R.id.download_open_file_button);
+        viewFolderButton = findViewById(R.id.download_view_folder_button);
         qualityGroup = findViewById(R.id.download_quality_group);
         progressBar = findViewById(R.id.download_progress_bar);
         progressText = findViewById(R.id.download_progress_text);
@@ -75,10 +86,13 @@ public final class DownloadActivity extends Activity implements DownloadManager.
         startButton.setOnClickListener(v -> startDownload());
         cancelButton.setOnClickListener(v -> cancelDownload());
         findViewById(R.id.download_clear_button).setOnClickListener(v -> confirmClearAll());
+        openFileButton.setOnClickListener(v -> openDownloadedFile());
+        viewFolderButton.setOnClickListener(v -> openDownloadFolder());
 
         bindSongInfo();
         refreshDownloaded();
         refreshStorage();
+        showDownloadPath();
     }
 
     @Override
@@ -86,6 +100,7 @@ public final class DownloadActivity extends Activity implements DownloadManager.
         super.onResume();
         refreshDownloaded();
         refreshStorage();
+        showDownloadPath();
         // If the song is already downloaded, reflect that in the status.
         if (song != null && app.downloads.exists(song.hash)) {
             DownloadedSong d = app.downloads.get(song.hash);
@@ -93,6 +108,7 @@ public final class DownloadActivity extends Activity implements DownloadManager.
                 songStatus.setText(getString(R.string.music_download_already, d.qualityLabel(), d.sizeFormatted()));
                 songStatus.setVisibility(View.VISIBLE);
                 startButton.setText(R.string.music_download_redownload);
+                showActionButtons(d.localPath);
             }
         }
     }
@@ -202,6 +218,10 @@ public final class DownloadActivity extends Activity implements DownloadManager.
                 resetButtons();
                 refreshDownloaded();
                 refreshStorage();
+                showDownloadPath();
+                // Show open-file / view-folder buttons for the just-downloaded song
+                DownloadedSong completed = song != null ? app.downloads.get(song.hash) : null;
+                showActionButtons(completed != null ? completed.localPath : null);
                 Toast.makeText(this, R.string.music_download_done, Toast.LENGTH_SHORT).show();
                 break;
             case FAILED:
@@ -243,6 +263,69 @@ public final class DownloadActivity extends Activity implements DownloadManager.
                 formatBytes(app.downloads.usedBytes())));
         storageFree.setText(getString(R.string.music_download_storage_free,
                 formatBytes(app.downloads.availableBytes())));
+    }
+
+    /** 显示下载目录路径，让用户知道文件保存在哪里。 */
+    private void showDownloadPath() {
+        File dir = app.downloads.downloadsDir();
+        downloadPathText.setText(getString(R.string.music_download_path, dir.getAbsolutePath()));
+        downloadPathText.setVisibility(View.VISIBLE);
+    }
+
+    /** 下载完成后显示"打开文件"和"查看文件夹"按钮。 */
+    private void showActionButtons(String localPath) {
+        if (localPath == null || !new File(localPath).exists()) {
+            downloadActionButtons.setVisibility(View.GONE);
+            return;
+        }
+        downloadActionButtons.setVisibility(View.VISIBLE);
+    }
+
+    /** 使用外部应用打开已下载的音频文件。 */
+    private void openDownloadedFile() {
+        if (song == null) return;
+        DownloadedSong d = app.downloads.get(song.hash);
+        if (d == null || d.localPath == null) {
+            Toast.makeText(this, R.string.music_download_open_failed, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        File file = new File(d.localPath);
+        if (!file.exists()) {
+            Toast.makeText(this, R.string.music_download_open_failed, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try {
+            Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", file);
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            String mime = d.localPath.toLowerCase().endsWith(".flac") ? "audio/flac" : "audio/*";
+            intent.setDataAndType(uri, mime);
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(intent);
+        } catch (Exception e) {
+            Toast.makeText(this, R.string.music_download_open_failed, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /** 在系统文件管理器中打开下载目录。 */
+    private void openDownloadFolder() {
+        File dir = app.downloads.downloadsDir();
+        try {
+            Uri uri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", dir);
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(uri, "resource/folder");
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(intent);
+        } catch (Exception e) {
+            // Fallback: try opening the folder with ACTION_GET_CONTENT
+            try {
+                Intent fallback = new Intent(Intent.ACTION_GET_CONTENT);
+                fallback.setDataAndType(Uri.parse(dir.getAbsolutePath()), "audio/*");
+                fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(fallback);
+            } catch (Exception e2) {
+                Toast.makeText(this, R.string.music_download_folder_failed, Toast.LENGTH_SHORT).show();
+            }
+        }
     }
 
     private void onDeleteDownloaded(DownloadedSong d) {

@@ -57,6 +57,6 @@
         android:layout_height="36dp"
         android:background="@android:color/transparent"
         android:contentDescription="@string/music_download_delete"
-        android:src="@drawable/ic_nav_results"
+        android:src="@drawable/ic_delete"
         android:tint="@color/accent_orange" />
 </LinearLayout>

@@ -3,6 +3,9 @@
     <external-path
         name="external_storage"
         path="." />
+    <external-files-path
+        name="music_downloads"
+        path="Music/downloads/" />
     <cache-path
         name="cache"
         path="share/" />

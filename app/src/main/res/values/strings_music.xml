@@ -138,4 +138,9 @@
     <string name="music_download_delete_confirm">Delete \"%1$s\" from downloads?</string>
     <string name="music_download_deleted">Download deleted</string>
     <string name="music_delete">Delete</string>
+    <string name="music_download_path">Download path: %1$s</string>
+    <string name="music_download_open_file">Open file</string>
+    <string name="music_download_view_folder">View folder</string>
+    <string name="music_download_open_failed">No app available to open this file</string>
+    <string name="music_download_folder_failed">Cannot open folder</string>
 </resources>

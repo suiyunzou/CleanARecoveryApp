@@ -245,12 +245,22 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
                 miniPlay = miniPlayer.findViewById(R.id.mini_player_play);
                 miniPlay.setOnClickListener(v -> app.player.toggle());
                 miniPlayer.findViewById(R.id.mini_player_next).setOnClickListener(v -> app.player.next());
-                miniPlayer.setOnClickListener(v ->
-                        startActivity(new Intent(this, MusicPlayerActivity.class)));
+                // bar_mini_player 的根 LinearLayout 设置了 clickable=true，会拦截点击事件，
+                // 因此需要将跳转监听设置在 inflate 后的子视图上，而非父容器 miniPlayer。
+                if (miniPlayer instanceof ViewGroup) {
+                    View miniBar = ((ViewGroup) miniPlayer).getChildAt(0);
+                    if (miniBar != null) {
+                        miniBar.setOnClickListener(v ->
+                                startActivity(new Intent(this, MusicPlayerActivity.class)));
+                    }
+                }
             }
             miniTitle.setText(current.title);
             miniArtist.setText(current.artist);
             miniIcon.setText(current.title.isEmpty() ? "♪" : String.valueOf(current.title.charAt(0)).toUpperCase());
+            miniPlay.setImageResource(
+                    app.player.getState() == MusicPlayer.State.PLAYING
+                            ? R.drawable.ic_pause : R.drawable.ic_play);
             miniPlay.setColorFilter(
                     app.player.getState() == MusicPlayer.State.PLAYING
                             ? getResources().getColor(R.color.brand_primary, getTheme())
