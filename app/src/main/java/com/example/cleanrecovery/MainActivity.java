@@ -798,6 +798,9 @@ public final class MainActivity extends Activity {
             @Override
             public void onPrepareProgress(int countedSoFar, String currentPath) {
                 scanProgressTracker.onPrepareProgress(countedSoFar);
+                if (currentPath != null && !currentPath.isEmpty()) {
+                    scanParticleView.setScanPath(currentPath);
+                }
             }
 
             @Override
@@ -841,6 +844,9 @@ public final class MainActivity extends Activity {
                 lastScannedCount = scanAllMode ? multiTypeCompletedScanned + scannedCount : scannedCount;
                 lastFoundCount = Math.max(lastFoundCount, foundCount);
                 scanProgressTracker.onScanProgress(scannedCount);
+                if (currentPath != null && !currentPath.isEmpty()) {
+                    scanParticleView.setScanPath(currentPath);
+                }
                 updateScanProgressUi();
             }
 
