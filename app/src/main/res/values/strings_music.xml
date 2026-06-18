@@ -65,4 +65,77 @@
     <string name="music_added_to_favorites">Added to Favorites</string>
     <string name="music_removed_from_favorites">Removed from Favorites</string>
     <string name="music_added_to_playlist">Added to \"%1$s\"</string>
+
+    <!-- Playlist management -->
+    <string name="music_playlist_rename">Rename</string>
+    <string name="music_playlist_edit">Edit</string>
+    <string name="music_rename_playlist_title">Rename playlist</string>
+    <string name="music_edit_playlist">Edit playlist</string>
+    <string name="music_delete_playlist_title">Delete playlist</string>
+    <string name="music_move_up">Move up</string>
+    <string name="music_move_down">Move down</string>
+    <string name="music_playlist_done">Done</string>
+    <string name="music_playlist_delete">Delete playlist</string>
+    <string name="music_playlist_delete_confirm">Delete playlist \"%1$s\"? Songs in it will not be removed from your library.</string>
+    <string name="music_playlist_renamed">Playlist renamed</string>
+    <string name="music_playlist_deleted">Playlist deleted</string>
+    <string name="music_playlist_name_empty">Playlist name cannot be empty</string>
+    <string name="music_playlist_protected">Built-in playlists cannot be renamed or deleted</string>
+    <string name="music_playlist_move_up">Move up</string>
+    <string name="music_playlist_move_down">Move down</string>
+    <string name="music_playlist_remove_song">Remove this song</string>
+    <string name="music_playlist_song_removed">Removed from playlist</string>
+    <string name="music_playlist_clear">Clear playlist</string>
+    <string name="music_playlist_clear_confirm">Remove all songs from this playlist?</string>
+    <string name="music_playlist_cleared">Playlist cleared</string>
+    <string name="music_playlist_order_saved">Play order saved</string>
+    <string name="music_removed_from_playlist">Removed from playlist</string>
+    <string name="music_playlist_rename_protected">Built-in playlists cannot be renamed</string>
+    <string name="music_playlist_rename_failed">Rename failed</string>
+    <string name="music_playlist_delete_protected">Built-in playlists cannot be deleted</string>
+    <string name="music_delete_playlist_confirm">Delete playlist \"%1$s\"? Songs in it will not be removed from your library.</string>
+
+    <!-- Lyrics -->
+    <string name="music_lyrics">Lyrics</string>
+    <string name="music_lyrics_empty">No lyrics for this song</string>
+    <string name="music_lyrics_loading">Loading lyrics…</string>
+    <string name="music_lyrics_load_failed">Failed to load lyrics</string>
+    <string name="music_lyrics_font_size">Aa</string>
+    <string name="music_lyrics_color">Color</string>
+    <string name="music_lyrics_font_small">Small</string>
+    <string name="music_lyrics_font_medium">Medium</string>
+    <string name="music_lyrics_font_large">Large</string>
+
+    <!-- Download -->
+    <string name="music_download">Download</string>
+    <string name="music_download_title">Downloads</string>
+    <string name="music_download_no_song">No song selected</string>
+    <string name="music_download_quality">Download quality</string>
+    <string name="music_download_quality_standard">Standard (128 kbps)</string>
+    <string name="music_download_quality_high">High (320 kbps)</string>
+    <string name="music_download_quality_lossless">Lossless (FLAC)</string>
+    <string name="music_download_start">Download</string>
+    <string name="music_download_redownload">Re-download</string>
+    <string name="music_download_cancel">Cancel</string>
+    <string name="music_download_starting">Starting download…</string>
+    <string name="music_download_in_progress">Download already in progress</string>
+    <string name="music_download_no_space">Not enough storage space</string>
+    <string name="music_download_progress_pct">%1$d%% · %2$s / %3$s</string>
+    <string name="music_download_progress_unknown">Downloading… %1$s</string>
+    <string name="music_download_done">Download complete</string>
+    <string name="music_download_failed">Download failed</string>
+    <string name="music_download_cancelled">Download cancelled</string>
+    <string name="music_download_already">Downloaded · %1$s · %2$s</string>
+    <string name="music_download_storage">Storage</string>
+    <string name="music_download_storage_used">Used: %1$s</string>
+    <string name="music_download_storage_free">Available: %1$s</string>
+    <string name="music_download_clear_all">Clear all downloads</string>
+    <string name="music_download_clear_all_confirm">Delete all downloaded songs? This cannot be undone.</string>
+    <string name="music_download_cleared">All downloads cleared</string>
+    <string name="music_download_downloaded">Downloaded songs</string>
+    <string name="music_download_empty">No downloaded songs yet</string>
+    <string name="music_download_delete">Delete</string>
+    <string name="music_download_delete_confirm">Delete \"%1$s\" from downloads?</string>
+    <string name="music_download_deleted">Download deleted</string>
+    <string name="music_delete">Delete</string>
 </resources>

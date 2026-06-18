@@ -71,6 +71,7 @@
         <activity android:name="com.example.cleanrecovery.music.ui.MusicSearchActivity" android:exported="false" />
         <activity android:name="com.example.cleanrecovery.music.ui.MusicPlayerActivity" android:exported="false" />
         <activity android:name="com.example.cleanrecovery.music.ui.PlaylistDetailActivity" android:exported="false" />
+        <activity android:name="com.example.cleanrecovery.music.ui.DownloadActivity" android:exported="false" />
         <activity android:name="com.example.cleanrecovery.music.ui.MusicLoginActivity" android:exported="false" />
         <service android:name="com.example.cleanrecovery.music.player.MusicService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
     </application>

@@ -35,6 +35,10 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
     private View miniPlayer;
     private TextView miniTitle, miniArtist, miniIcon;
     private ImageButton miniPlay;
+    // 保存当前推荐歌曲列表，用于点击时构建播放队列
+    private List<SongInfo> recommendationSongs = new java.util.ArrayList<>();
+    // 保存最近播放列表，用于点击时构建播放队列
+    private List<SongInfo> recentSongs = new java.util.ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -82,6 +86,8 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
 
         loginButton.setOnClickListener(v ->
                 startActivity(new Intent(this, MusicLoginActivity.class)));
+        findViewById(R.id.music_home_download_button).setOnClickListener(v ->
+                startActivity(new Intent(this, DownloadActivity.class)));
     }
 
     private void refreshLoginState() {
@@ -94,21 +100,24 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 List<SongInfo> songs = app.dataSource.getRecommendations(1);
-                new Handler(Looper.getMainLooper()).post(() ->
-                        recList.setAdapter(new SongListAdapter(songs, this::onSongClicked)));
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    recommendationSongs = songs;
+                    recList.setAdapter(new SongListAdapter(songs, this::onRecommendationClicked));
+                });
             } catch (Exception ignored) {}
         });
     }
 
     private void loadRecentPlays() {
         List<SongInfo> recent = app.playlists.getRecentPlays(10);
+        recentSongs = recent;
         if (recent.isEmpty()) {
             findViewById(R.id.music_recent_label).setVisibility(View.GONE);
             recentList.setVisibility(View.GONE);
         } else {
             findViewById(R.id.music_recent_label).setVisibility(View.VISIBLE);
             recentList.setVisibility(View.VISIBLE);
-            recentList.setAdapter(new SongListAdapter(recent, this::onSongClicked));
+            recentList.setAdapter(new SongListAdapter(recent, this::onRecentClicked));
         }
     }
 
@@ -178,7 +187,16 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
                 .show();
     }
 
-    private void onSongClicked(SongInfo song) {
+    private void onRecommendationClicked(SongInfo song) {
+        playFromList(song, recommendationSongs);
+    }
+
+    private void onRecentClicked(SongInfo song) {
+        playFromList(song, recentSongs);
+    }
+
+    /** 从指定列表中播放歌曲，构建完整播放队列使上一首/下一首按钮可用。 */
+    private void playFromList(SongInfo song, List<SongInfo> list) {
         // 已登录时直接尝试播放（概念版 /v5/url 会带 token 解析 VIP URL）；
         // 未登录的 VIP 歌曲才提示登录/领取。
         if (song.vipRequired && !app.auth.isLoggedIn()) {
@@ -186,7 +204,10 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
             return;
         }
         app.playlists.addRecentPlay(song);
-        app.player.playSingle(song);
+        int startIndex = list.indexOf(song);
+        if (startIndex < 0) startIndex = 0;
+        // 传入完整列表作为播放队列
+        app.player.play(new java.util.ArrayList<>(list), startIndex);
         startActivity(new Intent(this, MusicPlayerActivity.class));
     }
 

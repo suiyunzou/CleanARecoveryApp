@@ -7,7 +7,9 @@ import com.example.cleanrecovery.music.api.IAuthService;
 import com.example.cleanrecovery.music.api.IMusicDataSource;
 import com.example.cleanrecovery.music.api.KugouDataSource;
 import com.example.cleanrecovery.music.api.RemoteAuthService;
+import com.example.cleanrecovery.music.data.DownloadStore;
 import com.example.cleanrecovery.music.data.PlaylistStore;
+import com.example.cleanrecovery.music.download.DownloadManager;
 import com.example.cleanrecovery.music.player.MusicPlayer;
 
 import java.util.concurrent.ExecutorService;
@@ -21,6 +23,8 @@ public final class MusicApp {
     public final IAuthService auth;
     public final KugouDataSource dataSource;
     public final PlaylistStore playlists;
+    public final DownloadStore downloadStore;
+    public final DownloadManager downloads;
     public final MusicPlayer player;
     public final Context context;
     private final ExecutorService appExecutor = Executors.newSingleThreadExecutor();
@@ -34,6 +38,8 @@ public final class MusicApp {
         }
         dataSource = new KugouDataSource();
         playlists = new PlaylistStore(ctx);
+        downloadStore = new DownloadStore(ctx);
+        downloads = new DownloadManager(ctx, dataSource, downloadStore);
         player = MusicPlayer.get();
         updateDataSourceAuth();
         refreshEntitlementAsync();

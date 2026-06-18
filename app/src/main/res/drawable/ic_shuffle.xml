@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 随机播放图标：交叉箭头（Material Design shuffle） -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/text_secondary"
+        android:pathData="M10.59,9.17 L5.41,4 L4,5.41 L9.17,10.58 L10.59,9.17 Z M14.5,4 L16.5,6 L4,18.5 L5.41,19.91 L17.91,7.41 L19.91,9.5 L19.91,4 Z M14.83,13.41 L13.41,14.82 L16.91,18.32 L14.91,20.32 L20.91,20.32 L20.91,14.32 L18.91,16.32 Z" />
+</vector>

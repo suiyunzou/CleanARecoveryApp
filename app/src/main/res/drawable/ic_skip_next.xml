@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 下一首图标：右三角 + 竖线（Material Design skip_next） -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/text_primary"
+        android:pathData="M16,6 L18,6 L18,18 L16,18 Z M4,6 L15,12 L4,18 Z" />
+</vector>

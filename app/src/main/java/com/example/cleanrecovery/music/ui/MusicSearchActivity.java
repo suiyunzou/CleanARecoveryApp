@@ -142,7 +142,10 @@ public final class MusicSearchActivity extends Activity {
             return;
         }
         app.playlists.addRecentPlay(song);
-        app.player.playSingle(song);
+        // 传入完整搜索结果列表作为播放队列，使上一首/下一首按钮可用
+        int startIndex = items.indexOf(song);
+        if (startIndex < 0) startIndex = 0;
+        app.player.play(new ArrayList<>(items), startIndex);
         startActivity(new android.content.Intent(this, MusicPlayerActivity.class));
     }
 }

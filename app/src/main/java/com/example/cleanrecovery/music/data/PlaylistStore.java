@@ -16,7 +16,10 @@ import java.util.List;
 public class PlaylistStore extends SQLiteOpenHelper {
 
     private static final String DB = "music_playlists.db";
-    private static final int VERSION = 1;
+    private static final int VERSION = 2;
+    /** Reserved playlist names that cannot be deleted or renamed. */
+    private static final java.util.Set<String> PROTECTED =
+            new java.util.HashSet<>(java.util.Arrays.asList("Favorites", "Listen Later", "Recently Played"));
 
     public PlaylistStore(Context ctx) {
         super(ctx, DB, null, VERSION);
@@ -44,7 +47,16 @@ public class PlaylistStore extends SQLiteOpenHelper {
                 "FOREIGN KEY(playlist_id) REFERENCES playlists(id) ON DELETE CASCADE)");
     }
 
-    @Override public void onUpgrade(SQLiteDatabase db, int o, int n) {}
+    @Override
+    public void onUpgrade(SQLiteDatabase db, int o, int n) {
+        // v1 → v2: no schema change needed (position column already existed);
+        // added reorder/rename helpers. Keep data intact.
+    }
+
+    /** True for built-in playlists that cannot be renamed or deleted. */
+    public boolean isProtected(String name) {
+        return PROTECTED.contains(name);
+    }
 
     private void ensureDefaults() {
         if (listPlaylists().isEmpty()) {
@@ -75,6 +87,27 @@ public class PlaylistStore extends SQLiteOpenHelper {
         db.delete("songs", "playlist_id=(SELECT id FROM playlists WHERE name=?)",
                 new String[]{name});
         db.delete("playlists", "name=?", new String[]{name});
+    }
+
+    /** Rename a playlist. Returns false if the new name is taken or playlist is protected. */
+    public boolean renamePlaylist(String oldName, String newName) {
+        if (isProtected(oldName)) return false;
+        if (newName == null || newName.trim().isEmpty()) return false;
+        if (playlistId(newName) > 0) return false; // name already exists
+        long pid = playlistId(oldName);
+        if (pid < 0) return false;
+        ContentValues cv = new ContentValues();
+        cv.put("name", newName.trim());
+        return getWritableDatabase().update("playlists", cv,
+                "id=?", new String[]{String.valueOf(pid)}) > 0;
+    }
+
+    /** Remove all songs from a playlist but keep the playlist itself. */
+    public void clearPlaylist(String name) {
+        long pid = playlistId(name);
+        if (pid < 0) return;
+        getWritableDatabase().delete("songs", "playlist_id=?",
+                new String[]{String.valueOf(pid)});
     }
 
     public long playlistId(String name) {
@@ -125,6 +158,47 @@ public class PlaylistStore extends SQLiteOpenHelper {
                 "SELECT 1 FROM songs WHERE playlist_id=? AND hash=?",
                 new String[]{String.valueOf(pid), song.hash})) {
             return c.moveToFirst();
+        }
+    }
+
+    /**
+     * Move a song within a playlist from {@code fromPos} to {@code toPos}
+     * (0-based positions in the current ordered list). Other songs shift to
+     * fill the gap. Positions are re-sequenced starting from 1.
+     */
+    public void moveSong(String playlistName, int fromPos, int toPos) {
+        long pid = playlistId(playlistName);
+        if (pid < 0) return;
+        List<SongInfo> songs = getSongs(playlistName);
+        if (fromPos < 0 || fromPos >= songs.size() || toPos < 0 || toPos >= songs.size()) return;
+        if (fromPos == toPos) return;
+        SongInfo moved = songs.remove(fromPos);
+        songs.add(toPos, moved);
+        resequence(pid, songs);
+    }
+
+    /** Persist the given order (by hash) for a playlist. Used by drag-to-reorder UIs. */
+    public void setOrder(String playlistName, List<SongInfo> ordered) {
+        long pid = playlistId(playlistName);
+        if (pid < 0) return;
+        resequence(pid, ordered);
+    }
+
+    private void resequence(long pid, List<SongInfo> ordered) {
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        try {
+            for (int i = 0; i < ordered.size(); i++) {
+                SongInfo s = ordered.get(i);
+                if (s.hash == null || s.hash.isEmpty()) continue;
+                ContentValues cv = new ContentValues();
+                cv.put("position", i + 1);
+                db.update("songs", cv, "playlist_id=? AND hash=?",
+                        new String[]{String.valueOf(pid), s.hash});
+            }
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
         }
     }
 

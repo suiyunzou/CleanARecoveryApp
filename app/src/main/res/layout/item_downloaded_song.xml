@@ -1,14 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="64dp"
-    android:background="@color/music_mini_player_bg"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_card"
     android:gravity="center_vertical"
+    android:minHeight="64dp"
     android:orientation="horizontal"
     android:paddingHorizontal="@dimen/space_md"
-    android:elevation="4dp"
-    android:clickable="true"
-    android:focusable="true">
+    android:paddingVertical="@dimen/space_sm">
 
     <FrameLayout
         android:layout_width="40dp"
@@ -16,12 +15,13 @@
         android:background="@drawable/bg_card">
 
         <TextView
-            android:id="@+id/mini_player_icon"
+            android:id="@+id/downloaded_row_icon"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:text="🎵"
-            android:textSize="18sp" />
+            android:text="♪"
+            android:textColor="@color/brand_primary"
+            android:textSize="16sp" />
     </FrameLayout>
 
     <LinearLayout
@@ -32,8 +32,8 @@
         android:orientation="vertical">
 
         <TextView
-            android:id="@+id/mini_player_title"
-            android:layout_width="wrap_content"
+            android:id="@+id/downloaded_row_title"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="1"
@@ -41,31 +41,22 @@
             android:textSize="@dimen/text_body" />
 
         <TextView
-            android:id="@+id/mini_player_artist"
-            android:layout_width="wrap_content"
+            android:id="@+id/downloaded_row_subtitle"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="@color/text_secondary"
+            android:textColor="@color/text_muted"
             android:textSize="@dimen/text_caption" />
     </LinearLayout>
 
     <ImageButton
-        android:id="@+id/mini_player_play"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
+        android:id="@+id/downloaded_row_delete"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
         android:background="@android:color/transparent"
-        android:contentDescription="@string/preview_play"
-        android:src="@drawable/ic_play"
-        android:tint="@color/brand_primary" />
-
-    <ImageButton
-        android:id="@+id/mini_player_next"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_marginStart="@dimen/space_xs"
-        android:background="@android:color/transparent"
-        android:contentDescription="@string/preview_next"
-        android:src="@drawable/ic_skip_next"
-        android:tint="@color/text_secondary" />
+        android:contentDescription="@string/music_download_delete"
+        android:src="@drawable/ic_nav_results"
+        android:tint="@color/accent_orange" />
 </LinearLayout>

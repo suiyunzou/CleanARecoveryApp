@@ -1,5 +1,6 @@
 package com.example.cleanrecovery.music.api;
 
+import com.example.cleanrecovery.music.data.Lyrics;
 import com.example.cleanrecovery.music.data.SongInfo;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -37,6 +38,10 @@ public class KugouDataSource implements IMusicDataSource {
     private static final String LITE_KEY_SALT = "185672dd44712f60bb1736df5a377e82";
     private static final int LITE_APPID = 3116;
     private static final int LITE_CLIENTVER = 11440;
+
+    // Lyrics endpoints — search for a candidate, then download the LRC body.
+    private static final String LYRIC_SEARCH_URL = "http://lyrics.kugou.com/search";
+    private static final String LYRIC_DOWNLOAD_URL = "http://lyrics.kugou.com/download";
 
     /** Auth context for VIP song URL resolution. Set by MusicApp after login. */
     private volatile AuthContext auth;
@@ -123,6 +128,205 @@ public class KugouDataSource implements IMusicDataSource {
         // For now, fall back to the standard resolution — VIP songs without
         // entitlement will return null, which the UI handles gracefully.
         return resolvePlayUrl(song);
+    }
+
+    /**
+     * 获取同步歌词。
+     *
+     * <p>实现策略（按优先级回退）：</p>
+     * <ol>
+     *   <li><b>优先获取 LRC 格式</b>：调用 {@code lyrics.kugou.com/download?fmt=lrc}
+     *       获取明文 LRC 歌词。LRC 为标准行同步格式，仅 Base64 传输编码，未加密。</li>
+     *   <li><b>KRC 回退</b>：当 LRC 获取失败或内容为空时，调用 {@code fmt=krc}
+     *       获取 KRC 二进制数据，通过 {@link KrcDecoder} 进行 XOR + zlib 解码。
+     *       KRC 为酷狗逐字歌词格式，毫秒级精度。</li>
+     *   <li><b>返回空歌词</b>：当两种格式均不可用时返回 {@link Lyrics#empty()}。</li>
+     * </ol>
+     *
+     * <p>技术原理参考调研报告：
+     * LRC 未加密可直接获取；KRC 加密但密钥固定可逆（16 字节 XOR 密钥 + zlib 压缩）。</p>
+     *
+     * @param song 歌曲信息，需包含 hash 字段
+     * @return 解析后的歌词对象，无歌词时返回空对象（非 null）
+     */
+    @Override
+    public Lyrics getLyrics(SongInfo song) throws Exception {
+        if (song == null || isEmpty(song.hash)) return Lyrics.empty();
+
+        // Step 1: 搜索匹配的歌词候选
+        LyricCandidate candidate = searchLyricCandidate(song);
+        if (candidate == null) {
+            return Lyrics.empty();
+        }
+
+        // Step 2: 优先下载 LRC 格式（明文，未加密）
+        Lyrics lrc = downloadLrc(candidate);
+        if (lrc != null && !lrc.isEmpty()) {
+            return lrc;
+        }
+
+        // Step 3: LRC 不可用时回退到 KRC 格式（加密，需解码）
+        Lyrics krc = downloadAndDecodeKrc(candidate);
+        if (krc != null && !krc.isEmpty()) {
+            android.util.Log.d("KugouDataSource",
+                    "LRC unavailable, fell back to KRC for hash=" + song.hash);
+            return krc;
+        }
+
+        return Lyrics.empty();
+    }
+
+    /**
+     * 搜索歌词候选，返回排名第一的候选（服务器已按匹配度排序）。
+     *
+     * @param song 歌曲信息
+     * @return 歌词候选，无匹配返回 null
+     */
+    private LyricCandidate searchLyricCandidate(SongInfo song) throws Exception {
+        String searchUrl = LYRIC_SEARCH_URL
+                + "?ver=1&man=yes&client=pc&keyword=" + encode(buildLyricKeyword(song))
+                + "&duration=" + Math.max(0, song.duration * 1000)
+                + "&hash=" + encode(song.hash.toLowerCase());
+        JsonObject resp = get(searchUrl);
+        int status = num(resp, "status");
+        // candidates 是数组，不是对象。早期版本可能返回 candidates.list，这里两种都兼容。
+        JsonArray list = null;
+        JsonElement candidatesElem = resp.get("candidates");
+        if (candidatesElem != null && candidatesElem.isJsonArray()) {
+            list = candidatesElem.getAsJsonArray();
+        } else if (candidatesElem != null && candidatesElem.isJsonObject()) {
+            list = array(candidatesElem.getAsJsonObject(), "list");
+        }
+        if (status != 200 || list == null || list.size() == 0) {
+            return null;
+        }
+        JsonObject best = list.get(0).getAsJsonObject();
+        String id = str(best, "id", "lrcid");
+        String accesskey = str(best, "accesskey");
+        if (isEmpty(id) || isEmpty(accesskey)) return null;
+        return new LyricCandidate(id, accesskey);
+    }
+
+    /**
+     * 下载 LRC 格式歌词。
+     *
+     * <p>调用 {@code lyrics.kugou.com/download?fmt=lrc}，返回的 {@code content}
+     * 字段为 Base64 编码的 UTF-8 LRC 明文文本。LRC 格式未加密，仅做传输编码。</p>
+     *
+     * @param candidate 歌词候选
+     * @return 解析后的歌词对象，获取失败返回 null
+     */
+    private Lyrics downloadLrc(LyricCandidate candidate) {
+        try {
+            String dlUrl = LYRIC_DOWNLOAD_URL
+                    + "?ver=1&client=pc&id=" + encode(candidate.id)
+                    + "&accesskey=" + encode(candidate.accesskey)
+                    + "&fmt=lrc&charset=utf8";
+            JsonObject dl = get(dlUrl);
+            String content = str(dl, "content");
+            if (isEmpty(content)) return null;
+
+            // content 为 Base64 编码的 UTF-8 LRC 明文
+            byte[] bytes = java.util.Base64.getDecoder().decode(content);
+            String lrc = new String(bytes, StandardCharsets.UTF_8);
+            return Lyrics.parse(lrc);
+        } catch (Exception e) {
+            android.util.Log.w("KugouDataSource",
+                    "LRC download failed: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * 下载并解码 KRC 格式歌词。
+     *
+     * <p>调用 {@code lyrics.kugou.com/download?fmt=krc}，返回的 {@code content}
+     * 字段为 Base64 编码的 KRC 二进制数据。KRC 格式采用固定密钥 XOR + zlib 压缩，
+     * 通过 {@link KrcDecoder} 解码后得到 UTF-8 明文逐字歌词。</p>
+     *
+     * <p>解码后的 KRC 明文含逐字时间戳，但格式与 LRC 不完全兼容。
+     * 当前实现提取行级时间戳转换为 LRC 兼容格式，保留基本同步功能。
+     * 逐字精度信息在 Lyrics 数据结构中暂未使用，由 LyricsView 自行处理。</p>
+     *
+     * @param candidate 歌词候选
+     * @return 解析后的歌词对象，获取或解码失败返回 null
+     */
+    private Lyrics downloadAndDecodeKrc(LyricCandidate candidate) {
+        try {
+            String dlUrl = LYRIC_DOWNLOAD_URL
+                    + "?ver=1&client=pc&id=" + encode(candidate.id)
+                    + "&accesskey=" + encode(candidate.accesskey)
+                    + "&fmt=krc&charset=utf8";
+            JsonObject dl = get(dlUrl);
+            String content = str(dl, "content");
+            if (isEmpty(content)) return null;
+
+            // 使用 KrcDecoder 解码：Base64 → 跳过文件头 → XOR 解密 → zlib 解压
+            String krcText = KrcDecoder.decodeFromBase64(content);
+            if (isEmpty(krcText)) return null;
+
+            // 将 KRC 逐字格式转换为 LRC 兼容格式
+            String lrcCompatible = KrcToLrcConverter.convert(krcText);
+            return Lyrics.parse(lrcCompatible);
+        } catch (Exception e) {
+            android.util.Log.w("KugouDataSource",
+                    "KRC download/decode failed: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /** 歌词候选信息（id + accesskey 为下载凭证）。 */
+    private static class LyricCandidate {
+        final String id;
+        final String accesskey;
+        LyricCandidate(String id, String accesskey) {
+            this.id = id;
+            this.accesskey = accesskey;
+        }
+    }
+
+    private String buildLyricKeyword(SongInfo song) {
+        // Prefer "title artist"; fall back to title alone.
+        if (!isEmpty(song.artist)) return song.title + " " + song.artist;
+        return song.title;
+    }
+
+    /**
+     * Resolve a download URL at the requested quality. Maps the quality token
+     * to the concept /v5/url "quality" parameter (128 / 320 / flac) and reuses
+     * the privileged endpoint when auth is available. Falls back to the standard
+     * play URL resolution for 128 kbps.
+     */
+    @Override
+    public String resolveDownloadUrl(SongInfo song, String quality) throws Exception {
+        if (song == null || isEmpty(song.hash)) return null;
+        String q = normalizeQuality(quality);
+        // Try the concept endpoint with the requested quality first (works for
+        // both VIP and non-VIP when auth is present).
+        if (auth != null && !isEmpty(auth.token)) {
+            try {
+                String url = tryConceptPlayUrl(song, q);
+                if (!isEmpty(url)) return url;
+            } catch (Exception e) {
+                android.util.Log.w("KugouDataSource",
+                        "download url concept failed: " + e.getMessage());
+            }
+        }
+        // For standard quality, the regular play URL is acceptable.
+        if ("128".equals(q)) {
+            return resolvePlayUrl(song);
+        }
+        // Higher qualities require entitlement — return null so the UI can
+        // prompt the user.
+        return null;
+    }
+
+    private static String normalizeQuality(String quality) {
+        if (quality == null) return "128";
+        String q = quality.toLowerCase();
+        if (q.contains("flac") || q.contains("lossless") || q.contains("sq")) return "flac";
+        if (q.contains("320") || q.contains("high") || q.contains("hq")) return "320";
+        return "128";
     }
 
     // ---- Play URL endpoints ------------------------------------------------
@@ -217,6 +421,15 @@ public class KugouDataSource implements IMusicDataSource {
      * <p>key 参数：MD5(hash + "185672dd44712f60bb1736df5a377e82" + appid + mid + userid)。</p>
      */
     private String tryConceptPlayUrl(SongInfo song) {
+        return tryConceptPlayUrl(song, "128");
+    }
+
+    /**
+     * Same as {@link #tryConceptPlayUrl(SongInfo)} but allows specifying a
+     * quality token ("128", "320", "flac"). Used by the download module to
+     * request higher-bitrate streams.
+     */
+    private String tryConceptPlayUrl(SongInfo song, String quality) {
         try {
             String hash = song.hash.toLowerCase();
             String dfid = isEmpty(auth.dfid) ? "-" : auth.dfid;
@@ -242,7 +455,7 @@ public class KugouDataSource implements IMusicDataSource {
             params.put("pid", "411");             // 概念版特有（标准版为 2）
             params.put("pidversion", "3001");
             params.put("ppage_id", "356753938,823673182,967485191");  // 概念版特有
-            params.put("quality", "128");
+            params.put("quality", quality == null ? "128" : quality);
             params.put("ssa_flag", "is_fromtrack");
             params.put("uuid", "-");
             params.put("version", "11430");

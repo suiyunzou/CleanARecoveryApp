@@ -18,6 +18,13 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+
+    testOptions {
+        unitTests {
+            // 让 android.util.Log 等 Android 框架方法在单元测试中返回默认值而非抛异常
+            returnDefaultValues = true
+        }
+    }
 }
 
 dependencies {
@@ -25,4 +32,40 @@ dependencies {
     implementation "androidx.recyclerview:recyclerview:1.3.2"
     implementation "com.google.code.gson:gson:2.10.1"
     testImplementation "junit:junit:4.13.2"
+}
+
+/**
+ * 真实数据测试任务：在电脑端 JVM 直接运行酷狗 API 真实数据测试。
+ *
+ * <p>使用方式：{@code gradlew.bat runRealDataTest}</p>
+ *
+ * <p>本任务编译主源代码后，使用 JavaExec 直接运行 RealDataTestMain，
+ * 绕过 Android 框架依赖（RealDataTestMain 不依赖 android.util.Log）。</p>
+ */
+task runRealDataTest(type: JavaExec, dependsOn: 'compileDebugJavaWithJavac') {
+    group = 'verification'
+    description = '在电脑端 JVM 直接运行酷狗 API 真实数据测试'
+
+    // 主源代码编译输出目录
+    def classesDir = file('build/intermediates/javac/debug/compileDebugJavaWithJavac/classes')
+
+    // classpath 在执行阶段解析（doFirst 中），避免配置阶段访问 debugRuntimeClasspath
+    doFirst {
+        def runtimeFiles = configurations.debugRuntimeClasspath.files.findAll { f ->
+            f.name.startsWith('gson-')
+                    || (f.name.startsWith('core-') && f.name.endsWith('.jar'))
+                    || f.name.startsWith('collection-')
+                    || f.name.startsWith('annotation-jvm')
+                    || f.name.startsWith('core-common')
+        }
+        classpath = files([classesDir] + runtimeFiles)
+    }
+
+    mainClass = 'com.example.cleanrecovery.music.api.RealDataTestMain'
+    workingDir = rootProject.projectDir
+
+    // 标准输入输出直通
+    standardInput = System.in
+    standardOutput = System.out
+    errorOutput = System.err
 }

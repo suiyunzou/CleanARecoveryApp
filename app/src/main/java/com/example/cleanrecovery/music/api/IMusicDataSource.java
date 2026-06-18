@@ -1,5 +1,6 @@
 package com.example.cleanrecovery.music.api;
 
+import com.example.cleanrecovery.music.data.Lyrics;
 import com.example.cleanrecovery.music.data.SongInfo;
 import java.util.List;
 
@@ -17,4 +18,18 @@ public interface IMusicDataSource {
 
     /** Resolve a shortened trial URL when VIP is unavailable. */
     String resolveTrialUrl(SongInfo song) throws Exception;
+
+    /**
+     * Fetch time-synced lyrics (LRC) for the given song. Returns an empty
+     * (non-null) Lyrics object when no lyrics are available.
+     */
+    Lyrics getLyrics(SongInfo song) throws Exception;
+
+    /**
+     * Resolve a download URL for the given song at the requested quality.
+     * Quality is one of: "128", "320", "flac" (best-effort). Returns null
+     * when the requested quality is unavailable (e.g. VIP-only).
+     */
+    String resolveDownloadUrl(SongInfo song, String quality) throws Exception;
 }
+
