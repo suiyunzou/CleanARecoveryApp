@@ -173,7 +173,7 @@
     <string name="about_title">About</string>
     <string name="about_tagline">Find what you lost — no root, no damage, no data collected.</string>
     <string name="about_version">Version %1$s</string>
-    <string name="about_body">Scans accessible shared storage and copies selected photos, videos, audio, and documents to public DataRecovery folders. Methods are transparent and user-controlled.</string>
+    <string name="about_body">The photos you thought were gone, the songs that slipped away, the notes you never saved — they never truly left. We simply gather them gently and place them back within your reach, untouched, unharmed, like a breeze that leaves behind only what was found.</string>
     <string name="about_feature_1">  •  Only scans files the system allows apps to read</string>
     <string name="about_feature_2">  •  Copies files — never deletes or alters originals</string>
     <string name="about_feature_3">  •  Works offline; no data is ever collected or uploaded</string>

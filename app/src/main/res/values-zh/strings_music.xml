@@ -18,6 +18,7 @@
     <string name="music_add_to_playlist">添加到歌单</string>
     <string name="music_save_to_playlist">保存到歌单</string>
     <string name="music_remove_from_playlist">从歌单移除</string>
+    <string name="music_mini_player_empty_favorites">「我喜欢的」歌单为空，请先添加歌曲</string>
     <string name="music_play">播放</string>
     <string name="music_pause">暂停</string>
     <string name="music_mode">播放模式</string>

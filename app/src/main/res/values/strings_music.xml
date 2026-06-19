@@ -18,6 +18,7 @@
     <string name="music_add_to_playlist">Add to playlist</string>
     <string name="music_save_to_playlist">Save to playlist</string>
     <string name="music_remove_from_playlist">Remove from playlist</string>
+    <string name="music_mini_player_empty_favorites">Your Favorites is empty. Add some songs first.</string>
     <string name="music_play">Play</string>
     <string name="music_pause">Pause</string>
     <string name="music_mode">Play mode</string>

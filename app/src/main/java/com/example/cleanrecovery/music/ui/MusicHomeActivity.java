@@ -22,6 +22,7 @@ import com.example.cleanrecovery.music.MusicApp;
 import com.example.cleanrecovery.music.data.SongInfo;
 import com.example.cleanrecovery.music.player.MusicPlayer;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
 
@@ -221,9 +222,24 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
             miniCenter = miniPlayer.findViewById(R.id.mini_player_center);
             miniPrev.setOnClickListener(v -> app.player.previous());
             miniNext.setOnClickListener(v -> app.player.next());
-            // 点击中间区域（图标+标题）打开播放器界面
-            miniCenter.setOnClickListener(v ->
-                    startActivity(new Intent(this, MusicPlayerActivity.class)));
+            // 点击中间区域（图标+标题）：正在播放时打开播放器界面；
+            // 空闲时自动播放"Favorites"歌单（为空则提示并跳转歌单页）
+            miniCenter.setOnClickListener(v -> {
+                SongInfo cur = app.player.currentSong();
+                if (cur != null && app.player.getState() != MusicPlayer.State.IDLE) {
+                    startActivity(new Intent(this, MusicPlayerActivity.class));
+                    return;
+                }
+                List<SongInfo> favorites = app.playlists.getSongs("Favorites");
+                if (favorites.isEmpty()) {
+                    Toast.makeText(this, R.string.music_mini_player_empty_favorites,
+                            Toast.LENGTH_SHORT).show();
+                    startActivity(new Intent(this, PlaylistDetailActivity.class)
+                            .putExtra("playlist", "Favorites"));
+                    return;
+                }
+                app.player.play(new ArrayList<>(favorites), 0);
+            });
         }
 
         SongInfo current = app.player.currentSong();

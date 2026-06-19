@@ -173,7 +173,7 @@
     <string name="about_title">关于</string>
     <string name="about_tagline">找回丢失的美好，只读不删改</string>
     <string name="about_version">版本 %1$s</string>
-    <string name="about_body">扫描可访问的存储空间，将选中的照片、视频、音频和文档复制到 DataRecovery 公开目录。所有方法透明可控，不修改原始文件。</string>
+    <string name="about_body">那些被误删的照片、走失的旋律、来不及保存的文档，其实从未真正离开。我们只是替你轻轻拾起，原封不动地放回你触手可及的地方。不惊动系统，不打扰原文件，像一阵风拂过，只留下找回的温柔。</string>
     <string name="about_feature_1">  •  仅扫描系统允许应用读取的文件</string>
     <string name="about_feature_2">  •  复制文件，不修改也不删除原始文件</string>
     <string name="about_feature_3">  •  完全离线，不收集不上传任何数据</string>
