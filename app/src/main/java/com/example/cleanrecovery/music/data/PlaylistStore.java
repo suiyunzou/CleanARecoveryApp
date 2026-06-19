@@ -59,9 +59,11 @@ public class PlaylistStore extends SQLiteOpenHelper {
     }
 
     private void ensureDefaults() {
-        if (listPlaylists().isEmpty()) {
-            createPlaylist("Favorites");
-            createPlaylist("Listen Later");
+        // 确保所有内置歌单（含最近播放）始终存在，以便在"我的歌单"中统一展示
+        for (String name : PROTECTED) {
+            if (playlistId(name) < 0) {
+                createPlaylist(name);
+            }
         }
     }
 

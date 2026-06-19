@@ -65,4 +65,97 @@
     <string name="music_added_to_favorites">已加入我喜欢</string>
     <string name="music_removed_from_favorites">已从我喜欢移除</string>
     <string name="music_added_to_playlist">已加入「%1$s」</string>
+    <string name="music_download">下载</string>
+
+    <!-- 歌单操作 -->
+    <string name="music_playlist_rename">重命名</string>
+    <string name="music_playlist_edit">编辑</string>
+    <string name="music_rename_playlist_title">重命名歌单</string>
+    <string name="music_edit_playlist">编辑歌单</string>
+    <string name="music_delete_playlist_title">删除歌单</string>
+    <string name="music_move_up">上移</string>
+    <string name="music_move_down">下移</string>
+    <string name="music_playlist_done">完成</string>
+    <string name="music_playlist_delete">删除歌单</string>
+    <string name="music_playlist_delete_confirm">确定删除歌单「%1$s」吗？其中的歌曲不会从本地移除。</string>
+    <string name="music_playlist_renamed">歌单已重命名</string>
+    <string name="music_playlist_deleted">歌单已删除</string>
+    <string name="music_playlist_name_empty">歌单名称不能为空</string>
+    <string name="music_playlist_protected">内置歌单不能重命名或删除</string>
+    <string name="music_playlist_move_up">上移</string>
+    <string name="music_playlist_move_down">下移</string>
+    <string name="music_playlist_remove_song">移除这首歌曲</string>
+    <string name="music_playlist_song_removed">已从歌单移除</string>
+    <string name="music_playlist_clear">清空歌单</string>
+    <string name="music_playlist_clear_confirm">确定移除本歌单中的所有歌曲吗？</string>
+    <string name="music_playlist_cleared">歌单已清空</string>
+    <string name="music_playlist_order_saved">播放顺序已保存</string>
+    <string name="music_removed_from_playlist">已从歌单移除</string>
+    <string name="music_playlist_rename_protected">内置歌单不能重命名</string>
+    <string name="music_playlist_rename_failed">重命名失败</string>
+    <string name="music_playlist_delete_protected">内置歌单不能删除</string>
+    <string name="music_delete_playlist_confirm">确定删除歌单「%1$s」吗？其中的歌曲不会从本地移除。</string>
+
+    <!-- 歌词 -->
+    <string name="music_lyrics">歌词</string>
+    <string name="music_lyrics_empty">这首歌暂无歌词</string>
+    <string name="music_lyrics_loading">歌词加载中…</string>
+    <string name="music_lyrics_load_failed">歌词加载失败</string>
+    <string name="music_lyrics_font_size">字号</string>
+    <string name="music_lyrics_color">配色</string>
+    <string name="music_lyrics_font_small">小</string>
+    <string name="music_lyrics_font_medium">中</string>
+    <string name="music_lyrics_font_large">大</string>
+
+    <!-- 下载页 -->
+    <string name="music_download_title">下载</string>
+    <string name="music_download_no_song">未选择歌曲</string>
+    <string name="music_download_quality">下载音质</string>
+    <string name="music_download_start">开始下载</string>
+    <string name="music_download_redownload">重新下载</string>
+    <string name="music_download_cancel">取消</string>
+    <string name="music_download_starting">正在开始下载…</string>
+    <string name="music_download_in_progress">下载进行中</string>
+    <string name="music_download_no_space">存储空间不足</string>
+    <string name="music_download_progress_pct">%1$d%% · %2$s / %3$s</string>
+    <string name="music_download_progress_unknown">下载中… %1$s</string>
+    <string name="music_download_done">下载完成</string>
+    <string name="music_download_failed">下载失败</string>
+    <string name="music_download_cancelled">下载已取消</string>
+    <string name="music_download_already">已下载 · %1$s · %2$s</string>
+    <string name="music_download_storage">存储</string>
+    <string name="music_download_storage_used">已用：%1$s</string>
+    <string name="music_download_storage_free">可用：%1$s</string>
+    <string name="music_download_clear_all">清空所有下载</string>
+    <string name="music_download_clear_all_confirm">确定删除所有已下载的歌曲吗？此操作不可撤销。</string>
+    <string name="music_download_cleared">所有下载已清空</string>
+    <string name="music_download_downloaded">已下载的歌曲</string>
+    <string name="music_download_empty">还没有下载过歌曲</string>
+    <string name="music_download_delete">删除</string>
+    <string name="music_download_delete_confirm">确定从下载中删除「%1$s」吗？</string>
+    <string name="music_download_deleted">下载已删除</string>
+    <string name="music_delete">删除</string>
+    <string name="music_download_path">下载路径：%1$s</string>
+    <string name="music_download_open_file">打开文件</string>
+    <string name="music_download_view_folder">查看文件夹</string>
+    <string name="music_download_open_failed">没有可打开此文件的应用</string>
+    <string name="music_download_folder_failed">无法打开文件夹</string>
+
+    <!-- Playlist batch / single download -->
+    <string name="music_download_all">批量下载</string>
+    <string name="music_download_quality_title">选择音质</string>
+    <string name="music_download_quality_standard">标准（128 kbps MP3）</string>
+    <string name="music_download_quality_high">高品质（320 kbps MP3）</string>
+    <string name="music_download_quality_lossless">无损（FLAC）</string>
+    <string name="music_download_all_confirm">下载本歌单全部 %1$d 首歌曲？</string>
+    <string name="music_download_single_started">正在下载「%1$s」</string>
+    <string name="music_download_single_done">「%1$s」下载完成</string>
+    <string name="music_download_single_done_with_path">「%1$s」下载完成，已保存到：%2$s</string>
+    <string name="music_download_single_failed">「%1$s」下载失败：%2$s</string>
+    <string name="music_download_batch_started">正在下载 %1$d 首歌曲…</string>
+    <string name="music_download_batch_progress">已下载 %1$d / %2$d</string>
+    <string name="music_download_batch_done">下载完成：%1$d / %2$d</string>
+    <string name="music_download_batch_done_with_path">下载完成：%1$d / %2$d，已保存到：%3$s</string>
+    <string name="music_download_batch_empty">没有可下载的歌曲</string>
+    <string name="music_download_already_exists">已下载</string>
 </resources>

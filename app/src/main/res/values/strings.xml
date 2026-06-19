@@ -182,6 +182,8 @@
     <string name="about_badge_safe">Offline</string>
     <string name="about_share">Share this app</string>
     <string name="about_footer">Made with care · Qingxun Recovery</string>
+    <string name="about_music_desc">Play, search and manage playlists</string>
+    <string name="about_music_open">Open</string>
     <string name="folder_open_failed">No compatible file manager was found. You can open Pictures/DataRecovery from your system Files app.</string>
     <string name="recover_complete_title">Recovery complete</string>
     <string name="open_folder_button">Open folder</string>

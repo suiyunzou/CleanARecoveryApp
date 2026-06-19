@@ -143,4 +143,19 @@
     <string name="music_download_view_folder">View folder</string>
     <string name="music_download_open_failed">No app available to open this file</string>
     <string name="music_download_folder_failed">Cannot open folder</string>
+
+    <!-- Playlist batch / single download -->
+    <string name="music_download_all">Download all</string>
+    <string name="music_download_quality_title">Select quality</string>
+    <string name="music_download_all_confirm">Download all %1$d songs in this playlist?</string>
+    <string name="music_download_single_started">Downloading \"%1$s\"</string>
+    <string name="music_download_single_done">\"%1$s\" downloaded</string>
+    <string name="music_download_single_done_with_path">\"%1$s\" downloaded. Saved to: %2$s</string>
+    <string name="music_download_single_failed">\"%1$s\" download failed: %2$s</string>
+    <string name="music_download_batch_started">Downloading %1$d songs…</string>
+    <string name="music_download_batch_progress">Downloaded %1$d / %2$d</string>
+    <string name="music_download_batch_done">Download complete: %1$d / %2$d</string>
+    <string name="music_download_batch_done_with_path">Download complete: %1$d / %2$d. Saved to: %3$s</string>
+    <string name="music_download_batch_empty">No songs to download</string>
+    <string name="music_download_already_exists">Already downloaded</string>
 </resources>

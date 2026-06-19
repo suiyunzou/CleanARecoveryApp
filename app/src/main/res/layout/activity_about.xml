@@ -150,7 +150,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Play, search and manage playlists"
+                    android:text="@string/about_music_desc"
                     android:textColor="@color/text_secondary"
                     android:textSize="@dimen/text_caption" />
             </LinearLayout>
@@ -162,7 +162,7 @@
                 android:background="@drawable/bg_button_primary"
                 android:backgroundTint="@color/brand_primary"
                 android:paddingHorizontal="@dimen/space_lg"
-                android:text="Open"
+                android:text="@string/about_music_open"
                 android:textAllCaps="false"
                 android:textColor="@color/surface_card"
                 android:textSize="@dimen/text_caption"

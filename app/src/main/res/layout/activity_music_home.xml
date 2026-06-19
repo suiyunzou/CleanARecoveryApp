@@ -104,22 +104,6 @@
                 android:layout_marginTop="@dimen/space_sm"
                 android:nestedScrollingEnabled="false" />
 
-            <!-- Recent plays -->
-            <TextView
-                android:id="@+id/music_recent_label"
-                android:layout_width="wrap_content" android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/space_lg" android:layout_marginTop="@dimen/space_lg"
-                android:text="@string/music_recent"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/text_section" android:textStyle="bold" />
-
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/music_home_recent_list"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_sm"
-                android:nestedScrollingEnabled="false" />
-
             <!-- Playlists -->
             <TextView
                 android:layout_width="wrap_content" android:layout_height="wrap_content"
@@ -139,11 +123,11 @@
         </LinearLayout>
     </ScrollView>
 
-    <!-- Mini player stub (replaced by include at runtime) -->
+    <!-- Mini player stub (replaced by include at runtime) - always visible -->
     <FrameLayout
         android:id="@+id/mini_player_stub"
         android:layout_width="match_parent"
         android:layout_height="@dimen/music_mini_player_height"
-        android:visibility="gone" />
+        android:visibility="visible" />
 
 </LinearLayout>

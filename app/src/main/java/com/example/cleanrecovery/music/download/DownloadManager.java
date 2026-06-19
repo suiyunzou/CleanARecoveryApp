@@ -104,13 +104,33 @@ public class DownloadManager {
 
     // ---- Storage helpers --------------------------------------------------
 
-    /** Root directory for downloaded music. Falls back to cache dir on failure. */
+    /**
+     * Root directory for downloaded music.
+     *
+     * <p>存放在清寻恢复统一目录 {@code /storage/emulated/0/DataRecovery/Music/Downloads/}，
+     * 方便用户在系统文件管理器中查找，与应用恢复产物同根目录。
+     * 若外部存储不可用则回退到应用私有目录。</p>
+     */
     public File downloadsDir() {
-        File base = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC);
-        if (base == null) base = new File(context.getFilesDir(), "music");
-        File dir = new File(base, "downloads");
+        File externalRoot = Environment.getExternalStorageDirectory();
+        if (externalRoot == null || !"mounted".equals(Environment.getExternalStorageState())) {
+            // 外部存储不可用：回退到应用私有目录
+            File base = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC);
+            if (base == null) base = new File(context.getFilesDir(), "music");
+            File dir = new File(base, "downloads");
+            if (!dir.exists() && !dir.mkdirs()) {
+                Log.w(TAG, "downloadsDir mkdirs failed: " + dir.getAbsolutePath());
+            }
+            return dir;
+        }
+        // /storage/emulated/0/DataRecovery/Music/Downloads
+        File dir = new File(new File(new File(externalRoot, "DataRecovery"), "Music"), "Downloads");
         if (!dir.exists() && !dir.mkdirs()) {
             Log.w(TAG, "downloadsDir mkdirs failed: " + dir.getAbsolutePath());
+            // 创建失败时回退到应用私有目录
+            File base = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC);
+            if (base == null) base = new File(context.getFilesDir(), "music");
+            return new File(base, "downloads");
         }
         return dir;
     }

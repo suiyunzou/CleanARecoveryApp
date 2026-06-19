@@ -30,15 +30,13 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
     private MusicApp app;
     private ImageButton loginButton;
     private RecyclerView recList;
-    private RecyclerView recentList;
     private LinearLayout playlistContainer;
     private View miniPlayer;
-    private TextView miniTitle, miniArtist, miniIcon;
-    private ImageButton miniPlay;
+    private TextView miniTitle, miniIcon;
+    private ImageButton miniPrev, miniNext;
+    private View miniCenter;
     // 保存当前推荐歌曲列表，用于点击时构建播放队列
     private List<SongInfo> recommendationSongs = new java.util.ArrayList<>();
-    // 保存最近播放列表，用于点击时构建播放队列
-    private List<SongInfo> recentSongs = new java.util.ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -51,7 +49,6 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
 
         bindViews();
         loadRecommendations();
-        loadRecentPlays();
         loadPlaylists();
     }
 
@@ -59,7 +56,6 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
     protected void onResume() {
         super.onResume();
         refreshLoginState();
-        loadRecentPlays();
         loadPlaylists();
         updateMiniPlayer();
     }
@@ -74,11 +70,9 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
         miniPlayer = findViewById(R.id.mini_player_stub);
         loginButton = findViewById(R.id.music_home_login_button);
         recList = findViewById(R.id.music_home_rec_list);
-        recentList = findViewById(R.id.music_home_recent_list);
         playlistContainer = findViewById(R.id.music_playlist_container);
 
         recList.setLayoutManager(new LinearLayoutManager(this));
-        recentList.setLayoutManager(new LinearLayoutManager(this));
 
         findViewById(R.id.music_back_button).setOnClickListener(v -> finish());
         findViewById(R.id.music_search_bar).setOnClickListener(v ->
@@ -106,19 +100,6 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
                 });
             } catch (Exception ignored) {}
         });
-    }
-
-    private void loadRecentPlays() {
-        List<SongInfo> recent = app.playlists.getRecentPlays(10);
-        recentSongs = recent;
-        if (recent.isEmpty()) {
-            findViewById(R.id.music_recent_label).setVisibility(View.GONE);
-            recentList.setVisibility(View.GONE);
-        } else {
-            findViewById(R.id.music_recent_label).setVisibility(View.VISIBLE);
-            recentList.setVisibility(View.VISIBLE);
-            recentList.setAdapter(new SongListAdapter(recent, this::onRecentClicked));
-        }
     }
 
     private void loadPlaylists() {
@@ -191,10 +172,6 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
         playFromList(song, recommendationSongs);
     }
 
-    private void onRecentClicked(SongInfo song) {
-        playFromList(song, recentSongs);
-    }
-
     /** 从指定列表中播放歌曲，构建完整播放队列使上一首/下一首按钮可用。 */
     private void playFromList(SongInfo song, List<SongInfo> list) {
         // 已登录时直接尝试播放（概念版 /v5/url 会带 token 解析 VIP URL）；
@@ -234,39 +211,43 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
     }
 
     private void updateMiniPlayer() {
+        // 常驻底部：首次调用时 inflate 布局并绑定事件
+        if (miniTitle == null) {
+            LayoutInflater.from(this).inflate(R.layout.bar_mini_player, (ViewGroup) miniPlayer, true);
+            miniTitle = miniPlayer.findViewById(R.id.mini_player_title);
+            miniIcon = miniPlayer.findViewById(R.id.mini_player_icon);
+            miniPrev = miniPlayer.findViewById(R.id.mini_player_prev);
+            miniNext = miniPlayer.findViewById(R.id.mini_player_next);
+            miniCenter = miniPlayer.findViewById(R.id.mini_player_center);
+            miniPrev.setOnClickListener(v -> app.player.previous());
+            miniNext.setOnClickListener(v -> app.player.next());
+            // 点击中间区域（图标+标题）打开播放器界面
+            miniCenter.setOnClickListener(v ->
+                    startActivity(new Intent(this, MusicPlayerActivity.class)));
+        }
+
         SongInfo current = app.player.currentSong();
-        if (current != null && app.player.getState() != MusicPlayer.State.IDLE) {
-            miniPlayer.setVisibility(View.VISIBLE);
-            if (miniTitle == null) {
-                LayoutInflater.from(this).inflate(R.layout.bar_mini_player, (ViewGroup) miniPlayer, true);
-                miniTitle = miniPlayer.findViewById(R.id.mini_player_title);
-                miniArtist = miniPlayer.findViewById(R.id.mini_player_artist);
-                miniIcon = miniPlayer.findViewById(R.id.mini_player_icon);
-                miniPlay = miniPlayer.findViewById(R.id.mini_player_play);
-                miniPlay.setOnClickListener(v -> app.player.toggle());
-                miniPlayer.findViewById(R.id.mini_player_next).setOnClickListener(v -> app.player.next());
-                // bar_mini_player 的根 LinearLayout 设置了 clickable=true，会拦截点击事件，
-                // 因此需要将跳转监听设置在 inflate 后的子视图上，而非父容器 miniPlayer。
-                if (miniPlayer instanceof ViewGroup) {
-                    View miniBar = ((ViewGroup) miniPlayer).getChildAt(0);
-                    if (miniBar != null) {
-                        miniBar.setOnClickListener(v ->
-                                startActivity(new Intent(this, MusicPlayerActivity.class)));
-                    }
-                }
-            }
-            miniTitle.setText(current.title);
-            miniArtist.setText(current.artist);
-            miniIcon.setText(current.title.isEmpty() ? "♪" : String.valueOf(current.title.charAt(0)).toUpperCase());
-            miniPlay.setImageResource(
-                    app.player.getState() == MusicPlayer.State.PLAYING
-                            ? R.drawable.ic_pause : R.drawable.ic_play);
-            miniPlay.setColorFilter(
-                    app.player.getState() == MusicPlayer.State.PLAYING
-                            ? getResources().getColor(R.color.brand_primary, getTheme())
-                            : getResources().getColor(R.color.text_secondary, getTheme()));
+        boolean active = current != null && app.player.getState() != MusicPlayer.State.IDLE;
+
+        if (active) {
+            // 标题行合并显示「歌曲名 - 艺术家」，居中
+            String label = current.artist != null && !current.artist.isEmpty()
+                    ? current.title + " - " + current.artist : current.title;
+            miniTitle.setText(label);
+            miniIcon.setText(current.title.isEmpty() ? "♪"
+                    : String.valueOf(current.title.charAt(0)).toUpperCase());
+            miniPrev.setEnabled(true);
+            miniNext.setEnabled(true);
+            miniPrev.setAlpha(1f);
+            miniNext.setAlpha(1f);
         } else {
-            miniPlayer.setVisibility(View.GONE);
+            // 空闲状态：显示默认图标，禁用上一首/下一首
+            miniTitle.setText("");
+            miniIcon.setText("♪");
+            miniPrev.setEnabled(false);
+            miniNext.setEnabled(false);
+            miniPrev.setAlpha(0.4f);
+            miniNext.setAlpha(0.4f);
         }
     }
 
@@ -283,9 +264,13 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
     public static class SongListAdapter extends RecyclerView.Adapter<SongListAdapter.VH> {
         private final List<SongInfo> items;
         private final OnSongClick listener;
+        private final OnSongClick addToListener; // “添加到歌单”回调，可为 null
         public interface OnSongClick { void onClick(SongInfo s); }
         public SongListAdapter(List<SongInfo> items, OnSongClick listener) {
-            this.items = items; this.listener = listener;
+            this(items, listener, null);
+        }
+        public SongListAdapter(List<SongInfo> items, OnSongClick listener, OnSongClick addToListener) {
+            this.items = items; this.listener = listener; this.addToListener = addToListener;
         }
 
         @Override public VH onCreateViewHolder(ViewGroup parent, int type) {
@@ -300,11 +285,19 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
             h.vipBadge.setVisibility(s.vipRequired ? View.VISIBLE : View.GONE);
             h.icon.setText(s.title.isEmpty() ? "♪" : String.valueOf(s.title.charAt(0)).toUpperCase());
             h.itemView.setOnClickListener(v -> listener.onClick(s));
+            // “添加到歌单”按钮：仅在传入回调时显示
+            if (addToListener != null && h.addBtn != null) {
+                h.addBtn.setVisibility(View.VISIBLE);
+                h.addBtn.setOnClickListener(v -> addToListener.onClick(s));
+            } else if (h.addBtn != null) {
+                h.addBtn.setVisibility(View.GONE);
+            }
         }
         @Override public int getItemCount() { return items.size(); }
 
         static class VH extends RecyclerView.ViewHolder {
             TextView title, artist, duration, vipBadge, icon;
+            ImageButton addBtn;
             VH(View v) {
                 super(v);
                 title = v.findViewById(R.id.song_row_title);
@@ -312,6 +305,7 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
                 duration = v.findViewById(R.id.song_row_duration);
                 vipBadge = v.findViewById(R.id.song_row_vip_badge);
                 icon = v.findViewById(R.id.song_row_icon);
+                addBtn = v.findViewById(R.id.song_row_add);
             }
         }
     }

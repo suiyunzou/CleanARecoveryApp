@@ -81,6 +81,18 @@
         android:textColor="@color/text_muted"
         android:textSize="@dimen/text_caption" />
 
+    <!-- 添加到歌单按钮（搜索结果页显示，默认隐藏）：红色心形 -->
+    <ImageButton
+        android:id="@+id/song_row_add"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_marginStart="@dimen/space_sm"
+        android:background="@android:color/transparent"
+        android:contentDescription="@string/music_add_to_playlist"
+        android:src="@drawable/ic_favorite"
+        android:tint="@color/accent_red"
+        android:visibility="gone" />
+
     <TextView
         android:id="@+id/song_row_arrow"
         android:layout_width="24dp"

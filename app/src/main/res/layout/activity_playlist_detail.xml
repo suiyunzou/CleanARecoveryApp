@@ -35,7 +35,7 @@
             android:layout_width="40dp" android:layout_height="40dp"
             android:background="@drawable/bg_icon_button"
             android:contentDescription="@string/music_rename_playlist_title"
-            android:src="@drawable/ic_nav_about"
+            android:src="@drawable/ic_edit"
             android:tint="@color/text_secondary" />
 
         <ImageButton
@@ -43,7 +43,15 @@
             android:layout_width="40dp" android:layout_height="40dp"
             android:background="@drawable/bg_icon_button"
             android:contentDescription="@string/music_edit_playlist"
-            android:src="@drawable/ic_nav_home"
+            android:src="@drawable/ic_sort"
+            android:tint="@color/text_secondary" />
+
+        <ImageButton
+            android:id="@+id/playlist_detail_download"
+            android:layout_width="40dp" android:layout_height="40dp"
+            android:background="@drawable/bg_icon_button"
+            android:contentDescription="@string/music_download_all"
+            android:src="@drawable/ic_download"
             android:tint="@color/text_secondary" />
 
         <ImageButton
@@ -51,7 +59,7 @@
             android:layout_width="40dp" android:layout_height="40dp"
             android:background="@drawable/bg_icon_button"
             android:contentDescription="@string/music_delete_playlist_title"
-            android:src="@drawable/ic_nav_results"
+            android:src="@drawable/ic_delete"
             android:tint="@color/accent_orange" />
     </LinearLayout>
 

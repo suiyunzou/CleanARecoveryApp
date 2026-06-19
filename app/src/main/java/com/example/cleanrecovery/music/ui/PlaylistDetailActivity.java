@@ -19,6 +19,7 @@ import com.example.cleanrecovery.R;
 import com.example.cleanrecovery.SystemUiHelper;
 import com.example.cleanrecovery.music.MusicApp;
 import com.example.cleanrecovery.music.data.SongInfo;
+import com.example.cleanrecovery.music.download.DownloadManager;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -49,13 +50,14 @@ public final class PlaylistDetailActivity extends Activity {
         emptyView = findViewById(R.id.playlist_detail_empty);
         list.setLayoutManager(new LinearLayoutManager(this));
         adapter = new EditableSongAdapter(items, this::onSongClicked,
-                this::onMoveUp, this::onMoveDown, this::onRemove);
+                this::onMoveUp, this::onMoveDown, this::onRemove, this::onDownloadSingle);
         list.setAdapter(adapter);
 
         findViewById(R.id.playlist_detail_back).setOnClickListener(v -> finish());
         findViewById(R.id.playlist_detail_delete).setOnClickListener(v -> confirmDelete());
         findViewById(R.id.playlist_detail_edit).setOnClickListener(v -> toggleEditMode());
         findViewById(R.id.playlist_detail_rename).setOnClickListener(v -> promptRename());
+        findViewById(R.id.playlist_detail_download).setOnClickListener(v -> downloadAll());
     }
 
     @Override
@@ -191,6 +193,128 @@ public final class PlaylistDetailActivity extends Activity {
         startActivity(new Intent(this, MusicPlayerActivity.class));
     }
 
+    // ---- Download (single + batch) --------------------------------------
+
+    /** 质量选项数组（与 QUALITY_* 常量一一对应）。 */
+    private static final String[] QUALITY_VALUES = {
+            DownloadManager.QUALITY_STANDARD,
+            DownloadManager.QUALITY_HIGH,
+            DownloadManager.QUALITY_LOSSLESS
+    };
+
+    /** 质量选择回调（避免使用 java.util.function.Consumer 以兼容 minSdk 23）。 */
+    private interface QualityCallback { void onPicked(String quality); }
+
+    /** 弹出音质选择对话框，选择后回调 quality。默认选中标准音质。 */
+    private void showQualityPicker(String title, QualityCallback onPicked) {
+        String[] labels = {
+                getString(R.string.music_download_quality_standard),
+                getString(R.string.music_download_quality_high),
+                getString(R.string.music_download_quality_lossless)
+        };
+        final int[] selected = {0};
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(title)
+                .setSingleChoiceItems(labels, 0, (d, which) -> selected[0] = which)
+                .setPositiveButton(R.string.music_download,
+                        (d, w) -> onPicked.onPicked(QUALITY_VALUES[selected[0]]))
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void onDownloadSingle(SongInfo song) {
+        if (song == null || song.hash == null) return;
+        if (app.downloads.exists(song.hash)) {
+            Toast.makeText(this, R.string.music_download_already_exists, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (app.downloads.isDownloading(song.hash)) {
+            Toast.makeText(this, getString(R.string.music_download_single_started, song.title),
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        showQualityPicker(getString(R.string.music_download_quality_title),
+                quality -> startSingleDownload(song, quality));
+    }
+
+    private void startSingleDownload(SongInfo song, String quality) {
+        Toast.makeText(this, getString(R.string.music_download_single_started, song.title),
+                Toast.LENGTH_SHORT).show();
+        app.downloads.enqueue(song, quality,
+                (s, state, done, total, msg) -> {
+                    if (state == DownloadManager.State.COMPLETED) {
+                        Toast.makeText(this,
+                                getString(R.string.music_download_single_done_with_path,
+                                        song.title, app.downloads.downloadsDir().getAbsolutePath()),
+                                Toast.LENGTH_LONG).show();
+                    } else if (state == DownloadManager.State.FAILED) {
+                        Toast.makeText(this,
+                                getString(R.string.music_download_single_failed, song.title,
+                                        msg != null ? msg : ""),
+                                Toast.LENGTH_LONG).show();
+                    }
+                });
+    }
+
+    private void downloadAll() {
+        if (items.isEmpty()) {
+            Toast.makeText(this, R.string.music_download_batch_empty, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        // Filter out already-downloaded and currently-downloading songs
+        List<SongInfo> toDownload = new ArrayList<>();
+        for (SongInfo s : items) {
+            if (!app.downloads.exists(s.hash) && !app.downloads.isDownloading(s.hash)) {
+                toDownload.add(s);
+            }
+        }
+        if (toDownload.isEmpty()) {
+            Toast.makeText(this, R.string.music_download_already_exists, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(R.string.music_download_all)
+                .setMessage(getString(R.string.music_download_all_confirm, toDownload.size()))
+                .setPositiveButton(R.string.music_download,
+                        (d, w) -> showQualityPicker(getString(R.string.music_download_quality_title),
+                                quality -> startBatchDownload(toDownload, quality)))
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    private void startBatchDownload(List<SongInfo> songs, String quality) {
+        Toast.makeText(this, getString(R.string.music_download_batch_started, songs.size()),
+                Toast.LENGTH_SHORT).show();
+        final int total = songs.size();
+        final int[] completed = {0};
+        final int[] index = {0};
+        downloadNext(songs, index, completed, total, quality);
+    }
+
+    private void downloadNext(List<SongInfo> songs, int[] index, int[] completed,
+                              int total, String quality) {
+        if (index[0] >= songs.size()) {
+            Toast.makeText(this,
+                    getString(R.string.music_download_batch_done_with_path, completed[0], total,
+                            app.downloads.downloadsDir().getAbsolutePath()),
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        SongInfo song = songs.get(index[0]);
+        app.downloads.enqueue(song, quality,
+                (s, state, done, totalBytes, msg) -> {
+                    if (state == DownloadManager.State.COMPLETED
+                            || state == DownloadManager.State.FAILED
+                            || state == DownloadManager.State.CANCELLED) {
+                        if (state == DownloadManager.State.COMPLETED) {
+                            completed[0]++;
+                        }
+                        index[0]++;
+                        downloadNext(songs, index, completed, total, quality);
+                    }
+                });
+    }
+
     private String displayPlaylistName(String name) {
         if ("Favorites".equals(name)) return getString(R.string.music_playlist_favorites);
         if ("Listen Later".equals(name)) return getString(R.string.music_playlist_listen_later);
@@ -205,19 +329,22 @@ public final class PlaylistDetailActivity extends Activity {
         private final OnPositionAction moveUp;
         private final OnPositionAction moveDown;
         private final OnPositionAction remove;
+        private final OnSongDownload downloadListener;
         private boolean editMode = false;
 
         interface OnSongClick { void onClick(SongInfo s); }
         interface OnPositionAction { void onAction(int pos); }
+        interface OnSongDownload { void onDownload(SongInfo s); }
 
         EditableSongAdapter(List<SongInfo> items, OnSongClick clickListener,
                             OnPositionAction moveUp, OnPositionAction moveDown,
-                            OnPositionAction remove) {
+                            OnPositionAction remove, OnSongDownload downloadListener) {
             this.items = items;
             this.clickListener = clickListener;
             this.moveUp = moveUp;
             this.moveDown = moveDown;
             this.remove = remove;
+            this.downloadListener = downloadListener;
         }
 
         void setEditMode(boolean mode) { this.editMode = mode; }
@@ -242,6 +369,7 @@ public final class PlaylistDetailActivity extends Activity {
 
             if (editMode) {
                 h.editControls.setVisibility(View.VISIBLE);
+                h.downloadBtn.setVisibility(View.GONE);
                 h.upBtn.setEnabled(pos > 0);
                 h.downBtn.setEnabled(pos < items.size() - 1);
                 h.upBtn.setOnClickListener(v -> {
@@ -259,6 +387,8 @@ public final class PlaylistDetailActivity extends Activity {
                 h.itemView.setOnClickListener(null);
             } else {
                 h.editControls.setVisibility(View.GONE);
+                h.downloadBtn.setVisibility(View.VISIBLE);
+                h.downloadBtn.setOnClickListener(v -> downloadListener.onDownload(s));
                 h.itemView.setOnClickListener(v -> clickListener.onClick(s));
             }
         }
@@ -269,7 +399,7 @@ public final class PlaylistDetailActivity extends Activity {
         static class VH extends RecyclerView.ViewHolder {
             TextView title, artist, duration, vipBadge, icon;
             View editControls;
-            ImageButton upBtn, downBtn, removeBtn;
+            ImageButton upBtn, downBtn, removeBtn, downloadBtn;
             VH(View v) {
                 super(v);
                 title = v.findViewById(R.id.song_row_title);
@@ -281,6 +411,7 @@ public final class PlaylistDetailActivity extends Activity {
                 upBtn = v.findViewById(R.id.song_row_up);
                 downBtn = v.findViewById(R.id.song_row_down);
                 removeBtn = v.findViewById(R.id.song_row_remove);
+                downloadBtn = v.findViewById(R.id.song_row_download);
             }
         }
     }

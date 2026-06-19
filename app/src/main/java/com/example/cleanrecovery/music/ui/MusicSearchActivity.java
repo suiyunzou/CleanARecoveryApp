@@ -51,7 +51,7 @@ public final class MusicSearchActivity extends Activity {
         
         LinearLayoutManager layoutManager = new LinearLayoutManager(this);
         results.setLayoutManager(layoutManager);
-        adapter = new MusicHomeActivity.SongListAdapter(items, this::onSongClicked);
+        adapter = new MusicHomeActivity.SongListAdapter(items, this::onSongClicked, this::onAddToPlaylist);
         results.setAdapter(adapter);
 
         results.addOnScrollListener(new RecyclerView.OnScrollListener() {
@@ -147,5 +147,34 @@ public final class MusicSearchActivity extends Activity {
         if (startIndex < 0) startIndex = 0;
         app.player.play(new ArrayList<>(items), startIndex);
         startActivity(new android.content.Intent(this, MusicPlayerActivity.class));
+    }
+
+    /** 将搜索结果中的歌曲添加到指定歌单，不打断当前播放。 */
+    private void onAddToPlaylist(SongInfo song) {
+        List<String> names = app.playlists.listPlaylists();
+        if (names.isEmpty()) {
+            Toast.makeText(this, R.string.music_playlist_empty, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String[] displayNames = new String[names.size()];
+        for (int i = 0; i < names.size(); i++) {
+            displayNames[i] = displayPlaylistName(names.get(i));
+        }
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(R.string.music_add_to_playlist)
+                .setItems(displayNames, (d, w) -> {
+                    app.playlists.addSong(names.get(w), song);
+                    Toast.makeText(this,
+                            getString(R.string.music_added_to_playlist, displayNames[w]),
+                            Toast.LENGTH_SHORT).show();
+                })
+                .show();
+    }
+
+    private String displayPlaylistName(String name) {
+        if ("Favorites".equals(name)) return getString(R.string.music_playlist_favorites);
+        if ("Listen Later".equals(name)) return getString(R.string.music_playlist_listen_later);
+        if ("Recently Played".equals(name)) return getString(R.string.music_recent);
+        return name;
     }
 }

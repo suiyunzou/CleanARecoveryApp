@@ -182,6 +182,8 @@
     <string name="about_badge_safe">离线安全</string>
     <string name="about_share">分享本应用</string>
     <string name="about_footer">用心打造 · 清寻恢复</string>
+    <string name="about_music_desc">播放、搜索和管理歌单</string>
+    <string name="about_music_open">打开</string>
     <string name="folder_open_failed">没有找到可用的文件管理器。你可以在系统“文件”应用中打开 Pictures/DataRecovery。</string>
     <string name="recover_complete_title">恢复完成</string>
     <string name="open_folder_button">打开文件夹</string>
