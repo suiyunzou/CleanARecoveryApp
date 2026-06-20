@@ -15,6 +15,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="false"
@@ -36,28 +37,28 @@
                 android:resource="@xml/file_paths" />
         </provider>
         <activity
-            android:name=".OnboardingActivity"
+            android:name=".ui.activity.OnboardingActivity"
             android:exported="false" />
         <activity
-            android:name=".AboutActivity"
+            android:name=".ui.activity.AboutActivity"
             android:exported="false" />
         <activity
-            android:name=".RecoverCompleteActivity"
+            android:name=".ui.activity.RecoverCompleteActivity"
             android:exported="false" />
         <activity
-            android:name=".PreviewActivity"
+            android:name=".ui.activity.PreviewActivity"
             android:exported="false" />
         <activity
-            android:name=".TextViewerActivity"
+            android:name=".ui.activity.TextViewerActivity"
             android:exported="false" />
         <activity
-            android:name=".FileBrowserActivity"
+            android:name=".ui.activity.FileBrowserActivity"
             android:exported="false" />
         <activity
-            android:name=".RecycleBinActivity"
+            android:name=".ui.activity.RecycleBinActivity"
             android:exported="false" />
         <activity
-            android:name=".MainActivity"
+            android:name=".ui.activity.MainActivity"
             android:exported="true"
             android:icon="@mipmap/ic_launcher">
             <intent-filter>
@@ -73,6 +74,9 @@
         <activity android:name="com.example.cleanrecovery.music.ui.PlaylistDetailActivity" android:exported="false" />
         <activity android:name="com.example.cleanrecovery.music.ui.DownloadActivity" android:exported="false" />
         <activity android:name="com.example.cleanrecovery.music.ui.MusicLoginActivity" android:exported="false" />
+        <activity android:name="com.example.cleanrecovery.ui.activity.UniversalDownloadActivity" android:exported="true" />
+        <activity android:name="com.example.cleanrecovery.ui.activity.BrowserActivity" android:exported="true" android:configChanges="orientation|screenSize|keyboardHidden" />
+        <service android:name="com.example.cleanrecovery.background.BackgroundDownloadService" android:exported="false" />
         <service android:name="com.example.cleanrecovery.music.player.MusicService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
     </application>
 
