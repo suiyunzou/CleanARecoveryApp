@@ -1,6 +1,6 @@
 package com.example.cleanrecovery.algorithm;
 
-import com.example.cleanrecovery.RecoveryType;
+import com.example.cleanrecovery.recovery.RecoveryType;
 import com.example.cleanrecovery.experiment.RecoveryCandidate;
 
 import org.junit.Test;

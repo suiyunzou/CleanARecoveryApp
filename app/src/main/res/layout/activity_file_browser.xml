@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background_app"
@@ -41,54 +42,14 @@
             android:textStyle="bold" />
 
         <ImageButton
-            android:id="@+id/file_browser_sort"
+            android:id="@+id/file_browser_more"
             android:layout_width="44dp"
             android:layout_height="44dp"
             android:background="@drawable/bg_icon_button"
-            android:contentDescription="@string/file_browser_sort_name"
+            android:contentDescription="@string/file_browser_more_options"
             android:padding="10dp"
             android:scaleType="centerInside"
-            android:src="@drawable/ic_sort" />
-
-        <ImageButton
-            android:id="@+id/file_browser_up"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:background="@drawable/bg_icon_button"
-            android:contentDescription="@string/file_browser_up"
-            android:padding="10dp"
-            android:scaleType="centerInside"
-            android:src="@drawable/ic_up" />
-
-        <ImageButton
-            android:id="@+id/file_browser_new_folder"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:background="@drawable/bg_icon_button"
-            android:contentDescription="@string/file_browser_new_folder"
-            android:padding="10dp"
-            android:scaleType="centerInside"
-            android:src="@drawable/ic_new_folder" />
-
-        <ImageButton
-            android:id="@+id/file_browser_recycle_bin"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:background="@drawable/bg_icon_button"
-            android:contentDescription="@string/file_browser_recycle_bin"
-            android:padding="10dp"
-            android:scaleType="centerInside"
-            android:src="@drawable/ic_recycle_bin" />
-
-        <ImageButton
-            android:id="@+id/file_browser_select"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:background="@drawable/bg_icon_button"
-            android:contentDescription="@string/file_browser_select"
-            android:padding="10dp"
-            android:scaleType="centerInside"
-            android:src="@drawable/ic_select" />
+            android:src="@drawable/ic_more_vert" />
     </LinearLayout>
 
     <LinearLayout
@@ -168,7 +129,7 @@
             android:orientation="horizontal" />
     </HorizontalScrollView>
 
-    <EditText
+    <androidx.appcompat.widget.SearchView
         android:id="@+id/file_browser_search"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -176,17 +137,10 @@
         android:layout_marginEnd="@dimen/space_md"
         android:layout_marginBottom="@dimen/space_sm"
         android:background="@drawable/bg_card"
-        android:hint="@string/file_browser_search_hint"
-        android:imeOptions="actionDone"
-        android:inputType="text"
-        android:maxLines="1"
-        android:paddingStart="@dimen/space_md"
-        android:paddingTop="@dimen/space_sm"
-        android:paddingEnd="@dimen/space_md"
-        android:paddingBottom="@dimen/space_sm"
-        android:textColor="@color/text_primary"
-        android:textColorHint="@color/text_muted"
-        android:textSize="@dimen/text_body" />
+        android:minHeight="48dp"
+        android:visibility="gone"
+        app:iconifiedByDefault="false"
+        app:queryHint="@string/file_browser_search_hint" />
 
     <FrameLayout
         android:layout_width="match_parent"
@@ -227,4 +181,129 @@
                 android:textSize="@dimen/text_body" />
         </LinearLayout>
     </FrameLayout>
+
+    <!-- 文件管理 V2：多选模式底部操作栏 -->
+    <LinearLayout
+        android:id="@+id/file_browser_bottom_action_bar"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/bottom_nav_height"
+        android:background="@drawable/bg_bottom_action_bar"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/space_sm"
+        android:paddingEnd="@dimen/space_sm"
+        android:visibility="gone">
+
+        <!-- 移动 -->
+        <LinearLayout
+            android:id="@+id/file_browser_batch_move"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="?android:attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_move"
+                android:tint="@color/text_primary" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/file_browser_move"
+                android:textColor="@color/text_primary"
+                android:textSize="@dimen/text_caption" />
+        </LinearLayout>
+
+        <!-- 复制 -->
+        <LinearLayout
+            android:id="@+id/file_browser_batch_copy"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="?android:attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_copy"
+                android:tint="@color/text_primary" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/file_browser_copy"
+                android:textColor="@color/text_primary"
+                android:textSize="@dimen/text_caption" />
+        </LinearLayout>
+
+        <!-- 分享 -->
+        <LinearLayout
+            android:id="@+id/file_browser_batch_share"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="?android:attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_share"
+                android:tint="@color/text_primary" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/file_browser_share"
+                android:textColor="@color/text_primary"
+                android:textSize="@dimen/text_caption" />
+        </LinearLayout>
+
+        <!-- 删除（破坏性） -->
+        <LinearLayout
+            android:id="@+id/file_browser_batch_delete_bottom"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="?android:attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_delete"
+                android:tint="@color/accent_red" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="@string/file_browser_delete"
+                android:textColor="@color/accent_red"
+                android:textSize="@dimen/text_caption" />
+        </LinearLayout>
+    </LinearLayout>
 </LinearLayout>

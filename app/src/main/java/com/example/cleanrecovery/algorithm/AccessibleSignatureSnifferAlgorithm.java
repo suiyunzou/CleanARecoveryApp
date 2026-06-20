@@ -3,7 +3,7 @@ package com.example.cleanrecovery.algorithm;
 import android.os.Environment;
 
 import com.example.cleanrecovery.R;
-import com.example.cleanrecovery.RecoveryType;
+import com.example.cleanrecovery.recovery.RecoveryType;
 
 import java.io.File;
 

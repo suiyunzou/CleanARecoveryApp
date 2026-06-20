@@ -11,7 +11,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.example.cleanrecovery.R;
-import com.example.cleanrecovery.SystemUiHelper;
+import com.example.cleanrecovery.ui.widget.SystemUiHelper;
 import com.example.cleanrecovery.music.MusicApp;
 import com.example.cleanrecovery.music.api.AuthException;
 import com.example.cleanrecovery.music.data.UserInfo;

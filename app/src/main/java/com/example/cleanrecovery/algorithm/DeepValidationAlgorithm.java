@@ -3,8 +3,8 @@ package com.example.cleanrecovery.algorithm;
 import android.os.Build;
 
 import com.example.cleanrecovery.R;
-import com.example.cleanrecovery.RecoveryType;
-import com.example.cleanrecovery.ScanDiagnostics;
+import com.example.cleanrecovery.recovery.RecoveryType;
+import com.example.cleanrecovery.scan.ScanDiagnostics;
 import com.example.cleanrecovery.experiment.CandidateSourceKind;
 import com.example.cleanrecovery.experiment.RecoveryCandidate;
 

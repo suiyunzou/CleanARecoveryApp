@@ -3,7 +3,7 @@ package com.example.cleanrecovery.algorithm;
 import android.os.Build;
 
 import com.example.cleanrecovery.R;
-import com.example.cleanrecovery.RecoveryType;
+import com.example.cleanrecovery.recovery.RecoveryType;
 import com.example.cleanrecovery.experiment.RecoveryCandidate;
 import com.example.cleanrecovery.experiment.mediastore.MediaStoreExperimentScanner;
 

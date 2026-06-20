@@ -2,7 +2,7 @@ package com.example.cleanrecovery.algorithm;
 
 import android.os.Build;
 
-import com.example.cleanrecovery.RecoveryType;
+import com.example.cleanrecovery.recovery.RecoveryType;
 
 import java.util.ArrayList;
 import java.util.Arrays;

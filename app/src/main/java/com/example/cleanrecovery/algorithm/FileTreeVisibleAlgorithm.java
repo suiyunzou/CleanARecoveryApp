@@ -1,9 +1,9 @@
 package com.example.cleanrecovery.algorithm;
 
 import com.example.cleanrecovery.R;
-import com.example.cleanrecovery.RecoveryItem;
-import com.example.cleanrecovery.RecoveryScanner;
-import com.example.cleanrecovery.RecoveryType;
+import com.example.cleanrecovery.recovery.RecoveryItem;
+import com.example.cleanrecovery.recovery.RecoveryScanner;
+import com.example.cleanrecovery.recovery.RecoveryType;
 import com.example.cleanrecovery.experiment.CandidateSourceKind;
 import com.example.cleanrecovery.experiment.RecoveryCandidate;
 

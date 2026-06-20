@@ -1,7 +1,7 @@
 package com.example.cleanrecovery.algorithm;
 
 import com.example.cleanrecovery.R;
-import com.example.cleanrecovery.RecoveryType;
+import com.example.cleanrecovery.recovery.RecoveryType;
 
 /**
  * Registry placeholder: JPEG carving runs inside {@link CacheProfileAlgorithm}.

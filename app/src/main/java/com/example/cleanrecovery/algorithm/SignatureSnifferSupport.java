@@ -2,8 +2,8 @@ package com.example.cleanrecovery.algorithm;
 
 import android.os.Environment;
 
-import com.example.cleanrecovery.RecoveryScanner;
-import com.example.cleanrecovery.ScanLimits;
+import com.example.cleanrecovery.recovery.RecoveryScanner;
+import com.example.cleanrecovery.scan.ScanLimits;
 import com.example.cleanrecovery.experiment.CandidateSourceKind;
 import com.example.cleanrecovery.experiment.RecoveryCandidate;
 

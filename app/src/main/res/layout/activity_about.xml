@@ -169,6 +169,65 @@
                 android:visibility="gone" />
         </LinearLayout>
 
+        <!-- Universal download entry -->
+        <LinearLayout
+            android:id="@+id/about_universal_download_card"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/space_xl"
+            android:layout_marginTop="@dimen/space_md"
+            android:layout_marginEnd="@dimen/space_xl"
+            android:background="@drawable/bg_card"
+            android:elevation="@dimen/elevation_card"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="@dimen/space_lg">
+
+            <ImageView
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:contentDescription="@string/universal_download_title"
+                android:src="@drawable/ic_download"
+                android:tint="@color/brand_accent" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_md"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/universal_download_title"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/text_section"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/about_universal_download_desc"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="@dimen/text_caption" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/about_universal_download_entry"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:background="@drawable/bg_button_primary"
+                android:backgroundTint="@color/brand_accent"
+                android:paddingHorizontal="@dimen/space_lg"
+                android:text="@string/about_music_open"
+                android:textAllCaps="false"
+                android:textColor="@color/surface_card"
+                android:textSize="@dimen/text_caption" />
+        </LinearLayout>
+
+        <!-- Built-in browser entry removed: downloads now go through Universal Download -->
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

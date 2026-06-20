@@ -21,7 +21,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.cleanrecovery.R;
-import com.example.cleanrecovery.SystemUiHelper;
+import com.example.cleanrecovery.ui.widget.SystemUiHelper;
 import com.example.cleanrecovery.music.MusicApp;
 import com.example.cleanrecovery.music.data.DownloadedSong;
 import com.example.cleanrecovery.music.data.SongInfo;

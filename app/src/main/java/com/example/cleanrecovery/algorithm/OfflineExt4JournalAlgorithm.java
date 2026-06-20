@@ -1,7 +1,7 @@
 package com.example.cleanrecovery.algorithm;
 
 import com.example.cleanrecovery.R;
-import com.example.cleanrecovery.RecoveryType;
+import com.example.cleanrecovery.recovery.RecoveryType;
 
 public final class OfflineExt4JournalAlgorithm implements RecoveryAlgorithm {
     public static final String ID = "offline_ext4_journal";

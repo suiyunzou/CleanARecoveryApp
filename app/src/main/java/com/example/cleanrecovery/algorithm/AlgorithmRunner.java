@@ -1,8 +1,8 @@
 package com.example.cleanrecovery.algorithm;
 
-import com.example.cleanrecovery.RecoveryType;
-import com.example.cleanrecovery.ScanDiagnostics;
-import com.example.cleanrecovery.ScanProgressTracker;
+import com.example.cleanrecovery.recovery.RecoveryType;
+import com.example.cleanrecovery.scan.ScanDiagnostics;
+import com.example.cleanrecovery.scan.ScanProgressTracker;
 
 import java.util.List;
 

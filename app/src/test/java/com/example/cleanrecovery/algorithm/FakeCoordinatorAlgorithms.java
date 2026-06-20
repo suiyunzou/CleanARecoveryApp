@@ -1,7 +1,7 @@
 package com.example.cleanrecovery.algorithm;
 
-import com.example.cleanrecovery.RecoveryType;
-import com.example.cleanrecovery.ScanProgressTracker;
+import com.example.cleanrecovery.recovery.RecoveryType;
+import com.example.cleanrecovery.scan.ScanProgressTracker;
 import com.example.cleanrecovery.experiment.CandidateSourceKind;
 import com.example.cleanrecovery.experiment.RecoveryCandidate;
 

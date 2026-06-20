@@ -1,7 +1,7 @@
 package com.example.cleanrecovery.algorithm;
 
-import com.example.cleanrecovery.RecoveryType;
-import com.example.cleanrecovery.ScanLimits;
+import com.example.cleanrecovery.recovery.RecoveryType;
+import com.example.cleanrecovery.scan.ScanLimits;
 
 import java.io.File;
 import java.io.FileInputStream;
