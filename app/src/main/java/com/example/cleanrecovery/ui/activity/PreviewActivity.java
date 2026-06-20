@@ -11,11 +11,13 @@ import com.example.cleanrecovery.ui.widget.SystemUiHelper;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
@@ -212,7 +214,7 @@ public final class PreviewActivity extends Activity {
             if (file.lastModified() > 0) {
                 builder.append(" | ").append(DateFormat.getDateTimeInstance().format(new Date(file.lastModified())));
             }
-            builder.append("\n").append(file.getAbsolutePath());
+            builder.append("\n").append(ellipsizeMiddle(file.getAbsolutePath(), 96));
         }
         return builder.toString();
     }
@@ -242,11 +244,13 @@ public final class PreviewActivity extends Activity {
         ));
 
         final TextureView textureView = new TextureView(this);
+        textureView.setOpaque(false);
         textureView.setAlpha(0f);
         previewFrame.addView(textureView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
         ));
+        previewFrame.setOnClickListener(v -> togglePlayback());
         contentHost.addView(previewFrame, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
@@ -262,6 +266,9 @@ public final class PreviewActivity extends Activity {
 
             @Override
             public void onSurfaceTextureSizeChanged(SurfaceTexture surfaceTexture, int width, int height) {
+                if (mediaPlayer != null) {
+                    applyVideoFitTransform(textureView, mediaPlayer.getVideoWidth(), mediaPlayer.getVideoHeight());
+                }
             }
 
             @Override
@@ -288,7 +295,12 @@ public final class PreviewActivity extends Activity {
         playbackButton = controls.findViewById(R.id.playback_button);
         playbackButton.setEnabled(false);
         playbackButton.setOnClickListener(v -> togglePlayback());
-        contentHost.addView(controls);
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        params.setMargins(dp(12), dp(12), dp(12), dp(12));
+        contentHost.addView(controls, params);
     }
 
     private void prepareVideoPlayer(File file, final TextureView textureView, final ImageView posterView) {
@@ -309,9 +321,16 @@ public final class PreviewActivity extends Activity {
             showPlaybackError();
             return;
         }
+        mediaPlayer.setOnVideoSizeChangedListener(new MediaPlayer.OnVideoSizeChangedListener() {
+            @Override
+            public void onVideoSizeChanged(MediaPlayer mp, int width, int height) {
+                applyVideoFitTransform(textureView, width, height);
+            }
+        });
         bindPlayerCallbacks(new Runnable() {
             @Override
             public void run() {
+                applyVideoFitTransform(textureView, mediaPlayer.getVideoWidth(), mediaPlayer.getVideoHeight());
                 textureView.setAlpha(1f);
                 posterView.setVisibility(View.GONE);
             }
@@ -411,6 +430,24 @@ public final class PreviewActivity extends Activity {
         Toast.makeText(this, R.string.preview_playback_error, Toast.LENGTH_SHORT).show();
     }
 
+    private void applyVideoFitTransform(TextureView textureView, int videoWidth, int videoHeight) {
+        int viewWidth = textureView.getWidth();
+        int viewHeight = textureView.getHeight();
+        if (videoWidth <= 0 || videoHeight <= 0 || viewWidth <= 0 || viewHeight <= 0) {
+            textureView.setTransform(null);
+            return;
+        }
+        float scale = Math.min(viewWidth / (float) videoWidth, viewHeight / (float) videoHeight);
+        float displayWidth = videoWidth * scale;
+        float displayHeight = videoHeight * scale;
+        float scaleX = displayWidth / viewWidth;
+        float scaleY = displayHeight / viewHeight;
+
+        Matrix matrix = new Matrix();
+        matrix.setScale(scaleX, scaleY, viewWidth / 2f, viewHeight / 2f);
+        textureView.setTransform(matrix);
+    }
+
     private Bitmap readVideoFrame(File file) {
         MediaMetadataRetriever retriever = new MediaMetadataRetriever();
         try {
@@ -491,5 +528,14 @@ public final class PreviewActivity extends Activity {
             index++;
         } while (value >= 1024.0d && index < units.length - 1);
         return String.format(Locale.US, "%.1f %s", value, units[index]);
+    }
+
+    private static String ellipsizeMiddle(String text, int maxChars) {
+        if (text == null || text.length() <= maxChars) {
+            return text == null ? "" : text;
+        }
+        int keep = Math.max(8, (maxChars - 3) / 2);
+        int tailStart = text.length() - keep;
+        return text.substring(0, keep) + "..." + text.substring(tailStart);
     }
 }

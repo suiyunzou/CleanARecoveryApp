@@ -1,24 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
+    android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:background="@color/overlay_scrim"
-    android:orientation="vertical"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
     android:padding="@dimen/space_sm">
 
     <TextView
         android:id="@+id/playback_state"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginEnd="@dimen/space_sm"
+        android:ellipsize="end"
+        android:maxLines="1"
         android:text="@string/preview_loading"
         android:textColor="@android:color/white"
         android:textSize="@dimen/text_caption" />
 
     <Button
         android:id="@+id/playback_button"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:background="@drawable/bg_button_secondary"
+        android:minWidth="88dp"
+        android:minHeight="40dp"
         android:text="@string/preview_play"
         android:textAllCaps="false" />
 </LinearLayout>
