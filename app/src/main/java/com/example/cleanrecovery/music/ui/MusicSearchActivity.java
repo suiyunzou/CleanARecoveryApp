@@ -18,6 +18,7 @@ import com.example.cleanrecovery.R;
 import com.example.cleanrecovery.ui.widget.SystemUiHelper;
 import com.example.cleanrecovery.music.MusicApp;
 import com.example.cleanrecovery.music.data.SongInfo;
+import com.example.cleanrecovery.music.player.MusicPlayer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -145,7 +146,7 @@ public final class MusicSearchActivity extends Activity {
         // 传入完整搜索结果列表作为播放队列，使上一首/下一首按钮可用
         int startIndex = items.indexOf(song);
         if (startIndex < 0) startIndex = 0;
-        app.player.play(new ArrayList<>(items), startIndex);
+        app.player.play(new ArrayList<>(items), startIndex, MusicPlayer.PlaySource.SEARCH);
         startActivity(new android.content.Intent(this, MusicPlayerActivity.class));
     }
 

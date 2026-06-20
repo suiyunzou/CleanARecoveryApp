@@ -19,6 +19,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.cleanrecovery.R;
 import com.example.cleanrecovery.ui.widget.SystemUiHelper;
 import com.example.cleanrecovery.music.MusicApp;
+import com.example.cleanrecovery.music.data.RemotePlaylist;
 import com.example.cleanrecovery.music.data.SongInfo;
 import com.example.cleanrecovery.music.player.MusicPlayer;
 
@@ -32,6 +33,7 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
     private ImageButton loginButton;
     private RecyclerView recList;
     private LinearLayout playlistContainer;
+    private LinearLayout remotePlaylistContainer;
     private View miniPlayer;
     private TextView miniTitle, miniIcon;
     private ImageButton miniPrev, miniNext;
@@ -51,6 +53,7 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
         bindViews();
         loadRecommendations();
         loadPlaylists();
+        loadRemotePlaylists();
     }
 
     @Override
@@ -58,6 +61,7 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
         super.onResume();
         refreshLoginState();
         loadPlaylists();
+        loadRemotePlaylists();
         updateMiniPlayer();
     }
 
@@ -72,6 +76,7 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
         loginButton = findViewById(R.id.music_home_login_button);
         recList = findViewById(R.id.music_home_rec_list);
         playlistContainer = findViewById(R.id.music_playlist_container);
+        remotePlaylistContainer = findViewById(R.id.music_remote_playlist_container);
 
         recList.setLayoutManager(new LinearLayoutManager(this));
 
@@ -114,6 +119,39 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
         addPlaylistRow(null, getString(R.string.music_new_playlist), null);
     }
 
+    private void loadRemotePlaylists() {
+        remotePlaylistContainer.removeAllViews();
+        if (!app.auth.isLoggedIn()) {
+            addRemoteStatusRow(getString(R.string.music_remote_login_prompt),
+                    getString(R.string.music_login), v ->
+                            startActivity(new Intent(this, MusicLoginActivity.class)));
+            return;
+        }
+
+        addRemoteStatusRow(getString(R.string.music_remote_loading), null, null);
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                app.refreshDataSourceAuth();
+                List<RemotePlaylist> playlists = app.dataSource.getAllUserPlaylists(30);
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    remotePlaylistContainer.removeAllViews();
+                    if (playlists.isEmpty()) {
+                        addRemoteStatusRow(getString(R.string.music_remote_empty), null, null);
+                        return;
+                    }
+                    for (RemotePlaylist playlist : playlists) {
+                        addRemotePlaylistRow(playlist);
+                    }
+                });
+            } catch (Exception e) {
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    remotePlaylistContainer.removeAllViews();
+                    addRemoteStatusRow(getString(R.string.music_remote_load_failed), null, null);
+                });
+            }
+        });
+    }
+
     private void addPlaylistRow(String playlistName, String title, String subtitle) {
         View row = LayoutInflater.from(this).inflate(R.layout.item_music_song, playlistContainer, false);
         TextView titleView = row.findViewById(R.id.song_row_title);
@@ -143,6 +181,47 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
             }
         });
         playlistContainer.addView(row);
+    }
+
+    private void addRemotePlaylistRow(RemotePlaylist playlist) {
+        String subtitle = playlist.songCount > 0
+                ? getString(R.string.music_playlist_song_count, playlist.songCount)
+                : getString(R.string.music_remote_playlist_readonly);
+        View row = createPlaylistLikeRow(playlist.name, subtitle, true);
+        row.setOnClickListener(v -> {
+            Intent intent = new Intent(this, PlaylistDetailActivity.class);
+            intent.putExtra("remote_playlist_id", playlist.id);
+            intent.putExtra("remote_playlist_global_id", playlist.globalCollectionId);
+            intent.putExtra("remote_playlist_listid", playlist.listId);
+            intent.putExtra("remote_playlist_name", playlist.name);
+            intent.putExtra("remote_playlist_count", playlist.songCount);
+            startActivity(intent);
+        });
+        remotePlaylistContainer.addView(row);
+    }
+
+    private void addRemoteStatusRow(String title, String subtitle, View.OnClickListener click) {
+        View row = createPlaylistLikeRow(title, subtitle, click != null);
+        row.setOnClickListener(click);
+        remotePlaylistContainer.addView(row);
+    }
+
+    private View createPlaylistLikeRow(String title, String subtitle, boolean showArrow) {
+        View row = LayoutInflater.from(this).inflate(R.layout.item_music_song, playlistContainer, false);
+        TextView titleView = row.findViewById(R.id.song_row_title);
+        TextView artistView = row.findViewById(R.id.song_row_artist);
+        TextView durationView = row.findViewById(R.id.song_row_duration);
+        TextView arrowView = row.findViewById(R.id.song_row_arrow);
+        titleView.setText(title);
+        if (subtitle == null || subtitle.isEmpty()) {
+            artistView.setVisibility(View.GONE);
+        } else {
+            artistView.setText(subtitle);
+            artistView.setVisibility(View.VISIBLE);
+        }
+        durationView.setVisibility(View.GONE);
+        arrowView.setVisibility(showArrow ? View.VISIBLE : View.GONE);
+        return row;
     }
 
     public String displayPlaylistName(String name) {
@@ -185,7 +264,8 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
         int startIndex = list.indexOf(song);
         if (startIndex < 0) startIndex = 0;
         // 传入完整列表作为播放队列
-        app.player.play(new java.util.ArrayList<>(list), startIndex);
+        app.player.play(new java.util.ArrayList<>(list), startIndex,
+                MusicPlayer.PlaySource.RECOMMENDATION);
         startActivity(new Intent(this, MusicPlayerActivity.class));
     }
 
@@ -238,7 +318,8 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
                             .putExtra("playlist", "Favorites"));
                     return;
                 }
-                app.player.play(new ArrayList<>(favorites), 0);
+                app.player.play(new ArrayList<>(favorites), 0,
+                        MusicPlayer.PlaySource.FAVORITES);
             });
         }
 

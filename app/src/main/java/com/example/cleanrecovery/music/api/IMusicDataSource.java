@@ -1,6 +1,7 @@
 package com.example.cleanrecovery.music.api;
 
 import com.example.cleanrecovery.music.data.Lyrics;
+import com.example.cleanrecovery.music.data.RemotePlaylist;
 import com.example.cleanrecovery.music.data.SongInfo;
 import java.util.List;
 
@@ -12,6 +13,18 @@ public interface IMusicDataSource {
 
     /** Get discovery / recommended songs. */
     List<SongInfo> getRecommendations(int page) throws Exception;
+
+    /** Get logged-in user's read-only Kugou cloud playlists. */
+    List<RemotePlaylist> getUserPlaylists(int page, int pageSize) throws Exception;
+
+    /** Get all logged-in user's read-only Kugou cloud playlists across pages. */
+    List<RemotePlaylist> getAllUserPlaylists(int pageSize) throws Exception;
+
+    /** Get songs from a logged-in user's Kugou cloud playlist. */
+    List<SongInfo> getUserPlaylistSongs(RemotePlaylist playlist, int page, int pageSize) throws Exception;
+
+    /** Get all songs from a logged-in user's Kugou cloud playlist across pages. */
+    List<SongInfo> getAllUserPlaylistSongs(RemotePlaylist playlist, int pageSize) throws Exception;
 
     /** Resolve a playable stream URL for the given song. */
     String resolvePlayUrl(SongInfo song) throws Exception;
@@ -32,4 +45,3 @@ public interface IMusicDataSource {
      */
     String resolveDownloadUrl(SongInfo song, String quality) throws Exception;
 }
-

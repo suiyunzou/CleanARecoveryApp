@@ -80,6 +80,12 @@ public final class MusicApp {
 
     /** Push the current auth context (token/userid/mid/dfid) into the data source
      *  so VIP songs can be resolved via the concept gateway. */
+    public void refreshDataSourceAuth() {
+        updateDataSourceAuth();
+    }
+
+    /** Push the current auth context (token/userid/mid/dfid) into the data source
+     *  so VIP songs can be resolved via the concept gateway. */
     private void updateDataSourceAuth() {
         try {
             if (!auth.isLoggedIn()) return;

@@ -8,6 +8,15 @@
     <string name="music_recommend">Recommended</string>
     <string name="music_recent">Recently played</string>
     <string name="music_playlists">My playlists</string>
+    <string name="music_remote_playlists">Kugou cloud playlists</string>
+    <string name="music_remote_login_prompt">Log in to load your Kugou playlists</string>
+    <string name="music_remote_loading">Loading Kugou playlists…</string>
+    <string name="music_remote_empty">No Kugou playlists found</string>
+    <string name="music_remote_load_failed">Failed to load Kugou playlists</string>
+    <string name="music_remote_playlist_readonly">Cloud playlist</string>
+    <string name="music_remote_import">Import playlist</string>
+    <string name="music_remote_imported">Imported to \"%1$s\"</string>
+    <string name="music_remote_import_failed">Import failed</string>
     <string name="music_playlist_empty">This playlist has no songs yet</string>
     <string name="music_playlist_song_count">%1$d songs</string>
     <string name="music_playlist_favorites">Favorites</string>
@@ -26,6 +35,11 @@
     <string name="music_mode_repeat_all">Repeat all</string>
     <string name="music_mode_repeat_one">Repeat one</string>
     <string name="music_mode_shuffle">Shuffle</string>
+    <string name="music_queue">Playlist</string>
+    <string name="music_queue_empty">No songs in the playlist</string>
+    <string name="music_queue_current_prefix">(Now) </string>
+    <string name="music_more_actions">More</string>
+    <string name="music_download_current">Download current song</string>
     <string name="music_login">Log in</string>
     <string name="music_login_account_hint">Phone number</string>
     <string name="music_login_password_hint">Verification code</string>
@@ -103,9 +117,15 @@
     <string name="music_lyrics_load_failed">Failed to load lyrics</string>
     <string name="music_lyrics_font_size">Aa</string>
     <string name="music_lyrics_color">Color</string>
+    <string name="music_lyrics_settings">Lyrics settings</string>
+    <string name="music_show_disc">Show album view</string>
     <string name="music_lyrics_font_small">Small</string>
     <string name="music_lyrics_font_medium">Medium</string>
     <string name="music_lyrics_font_large">Large</string>
+    <string name="music_lyrics_theme_teal">Teal</string>
+    <string name="music_lyrics_theme_blue">Blue</string>
+    <string name="music_lyrics_theme_amber">Amber</string>
+    <string name="music_lyrics_theme_white">White</string>
 
     <!-- Download -->
     <string name="music_download">Download</string>

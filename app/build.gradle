@@ -76,3 +76,28 @@ task runRealDataTest(type: JavaExec, dependsOn: 'compileDebugJavaWithJavac') {
     standardOutput = System.out
     errorOutput = System.err
 }
+
+task runRemotePlaylistRealDataTest(type: JavaExec, dependsOn: 'compileDebugJavaWithJavac') {
+    group = 'verification'
+    description = '在电脑端 JVM 直接验证酷狗用户云歌单读取（latest_token.txt 存在时执行）'
+
+    def classesDir = file('build/intermediates/javac/debug/compileDebugJavaWithJavac/classes')
+
+    doFirst {
+        def runtimeFiles = configurations.debugRuntimeClasspath.files.findAll { f ->
+            f.name.startsWith('gson-')
+                    || (f.name.startsWith('core-') && f.name.endsWith('.jar'))
+                    || f.name.startsWith('collection-')
+                    || f.name.startsWith('annotation-jvm')
+                    || f.name.startsWith('core-common')
+        }
+        classpath = files([classesDir] + runtimeFiles)
+    }
+
+    mainClass = 'com.example.cleanrecovery.music.api.RemotePlaylistRealDataTestMain'
+    workingDir = rootProject.projectDir
+
+    standardInput = System.in
+    standardOutput = System.out
+    errorOutput = System.err
+}

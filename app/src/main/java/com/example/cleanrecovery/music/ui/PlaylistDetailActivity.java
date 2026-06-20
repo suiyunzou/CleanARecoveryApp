@@ -18,16 +18,21 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.cleanrecovery.R;
 import com.example.cleanrecovery.ui.widget.SystemUiHelper;
 import com.example.cleanrecovery.music.MusicApp;
+import com.example.cleanrecovery.music.data.RemotePlaylist;
 import com.example.cleanrecovery.music.data.SongInfo;
 import com.example.cleanrecovery.music.download.DownloadManager;
+import com.example.cleanrecovery.music.player.MusicPlayer;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executors;
 
 public final class PlaylistDetailActivity extends Activity {
 
     private MusicApp app;
     private String playlistName;
+    private RemotePlaylist remotePlaylist;
+    private boolean remoteMode;
     private RecyclerView list;
     private TextView emptyView;
     private TextView titleView;
@@ -41,7 +46,9 @@ public final class PlaylistDetailActivity extends Activity {
         SystemUiHelper.apply(this);
         setContentView(R.layout.activity_playlist_detail);
         app = MusicApp.init(this);
-        playlistName = getIntent().getStringExtra("playlist_name");
+        remotePlaylist = readRemotePlaylist();
+        remoteMode = remotePlaylist != null;
+        playlistName = remoteMode ? remotePlaylist.name : getIntent().getStringExtra("playlist_name");
         if (playlistName == null) { finish(); return; }
 
         titleView = findViewById(R.id.playlist_detail_title);
@@ -54,10 +61,42 @@ public final class PlaylistDetailActivity extends Activity {
         list.setAdapter(adapter);
 
         findViewById(R.id.playlist_detail_back).setOnClickListener(v -> finish());
-        findViewById(R.id.playlist_detail_delete).setOnClickListener(v -> confirmDelete());
-        findViewById(R.id.playlist_detail_edit).setOnClickListener(v -> toggleEditMode());
-        findViewById(R.id.playlist_detail_rename).setOnClickListener(v -> promptRename());
+        ImageButton renameOrImport = findViewById(R.id.playlist_detail_rename);
+        ImageButton editButton = findViewById(R.id.playlist_detail_edit);
+        ImageButton deleteButton = findViewById(R.id.playlist_detail_delete);
+        if (remoteMode) {
+            renameOrImport.setImageResource(R.drawable.ic_copy);
+            renameOrImport.setContentDescription(getString(R.string.music_remote_import));
+            renameOrImport.setOnClickListener(v -> importRemotePlaylist());
+            editButton.setVisibility(View.GONE);
+            deleteButton.setVisibility(View.GONE);
+        } else {
+            deleteButton.setOnClickListener(v -> confirmDelete());
+            editButton.setOnClickListener(v -> toggleEditMode());
+            renameOrImport.setOnClickListener(v -> promptRename());
+        }
         findViewById(R.id.playlist_detail_download).setOnClickListener(v -> downloadAll());
+    }
+
+    private RemotePlaylist readRemotePlaylist() {
+        String remoteName = getIntent().getStringExtra("remote_playlist_name");
+        String id = getIntent().getStringExtra("remote_playlist_id");
+        String listId = getIntent().getStringExtra("remote_playlist_listid");
+        String globalId = getIntent().getStringExtra("remote_playlist_global_id");
+        if ((remoteName == null || remoteName.isEmpty())
+                && (id == null || id.isEmpty())
+                && (listId == null || listId.isEmpty())
+                && (globalId == null || globalId.isEmpty())) {
+            return null;
+        }
+        RemotePlaylist playlist = new RemotePlaylist();
+        playlist.name = remoteName != null && !remoteName.isEmpty()
+                ? remoteName : getString(R.string.music_remote_playlists);
+        playlist.id = id;
+        playlist.listId = listId;
+        playlist.globalCollectionId = globalId;
+        playlist.songCount = getIntent().getIntExtra("remote_playlist_count", 0);
+        return playlist;
     }
 
     @Override
@@ -67,6 +106,10 @@ public final class PlaylistDetailActivity extends Activity {
     }
 
     private void reload() {
+        if (remoteMode) {
+            reloadRemote();
+            return;
+        }
         items.clear();
         items.addAll(app.playlists.getSongs(playlistName));
         adapter.setEditMode(editMode);
@@ -76,7 +119,38 @@ public final class PlaylistDetailActivity extends Activity {
         list.setVisibility(none ? View.GONE : View.VISIBLE);
     }
 
+    private void reloadRemote() {
+        items.clear();
+        adapter.setEditMode(false);
+        adapter.notifyDataSetChanged();
+        emptyView.setText(R.string.music_remote_loading);
+        emptyView.setVisibility(View.VISIBLE);
+        list.setVisibility(View.GONE);
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                app.refreshDataSourceAuth();
+                List<SongInfo> songs = app.dataSource.getAllUserPlaylistSongs(remotePlaylist, 200);
+                runOnUiThread(() -> {
+                    items.clear();
+                    items.addAll(songs);
+                    adapter.notifyDataSetChanged();
+                    boolean none = items.isEmpty();
+                    emptyView.setText(R.string.music_playlist_empty);
+                    emptyView.setVisibility(none ? View.VISIBLE : View.GONE);
+                    list.setVisibility(none ? View.GONE : View.VISIBLE);
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    emptyView.setText(R.string.music_remote_load_failed);
+                    emptyView.setVisibility(View.VISIBLE);
+                    list.setVisibility(View.GONE);
+                });
+            }
+        });
+    }
+
     private void toggleEditMode() {
+        if (remoteMode) return;
         editMode = !editMode;
         adapter.setEditMode(editMode);
         adapter.notifyDataSetChanged();
@@ -92,6 +166,7 @@ public final class PlaylistDetailActivity extends Activity {
     }
 
     private void onMoveUp(int pos) {
+        if (remoteMode) return;
         if (pos <= 0) return;
         SongInfo s = items.remove(pos);
         items.add(pos - 1, s);
@@ -100,6 +175,7 @@ public final class PlaylistDetailActivity extends Activity {
     }
 
     private void onMoveDown(int pos) {
+        if (remoteMode) return;
         if (pos >= items.size() - 1) return;
         SongInfo s = items.remove(pos);
         items.add(pos + 1, s);
@@ -108,6 +184,7 @@ public final class PlaylistDetailActivity extends Activity {
     }
 
     private void onRemove(int pos) {
+        if (remoteMode) return;
         if (pos < 0 || pos >= items.size()) return;
         SongInfo removed = items.remove(pos);
         app.playlists.removeSong(playlistName, removed);
@@ -121,6 +198,7 @@ public final class PlaylistDetailActivity extends Activity {
     }
 
     private void promptRename() {
+        if (remoteMode) return;
         if (app.playlists.isProtected(playlistName)) {
             Toast.makeText(this, R.string.music_playlist_rename_protected, Toast.LENGTH_SHORT).show();
             return;
@@ -149,6 +227,7 @@ public final class PlaylistDetailActivity extends Activity {
     }
 
     private void confirmDelete() {
+        if (remoteMode) return;
         if (app.playlists.isProtected(playlistName)) {
             Toast.makeText(this, R.string.music_playlist_delete_protected, Toast.LENGTH_SHORT).show();
             return;
@@ -162,6 +241,40 @@ public final class PlaylistDetailActivity extends Activity {
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
+    }
+
+    private void importRemotePlaylist() {
+        if (!remoteMode) return;
+        if (items.isEmpty()) {
+            Toast.makeText(this, R.string.music_download_batch_empty, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String targetName = uniqueImportedPlaylistName(playlistName);
+        long created = app.playlists.createPlaylist(targetName);
+        if (created < 0 && app.playlists.playlistId(targetName) < 0) {
+            Toast.makeText(this, R.string.music_remote_import_failed, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        for (SongInfo song : items) {
+            app.playlists.addSong(targetName, song);
+        }
+        Toast.makeText(this,
+                getString(R.string.music_remote_imported, displayPlaylistName(targetName)),
+                Toast.LENGTH_SHORT).show();
+    }
+
+    private String uniqueImportedPlaylistName(String baseName) {
+        String base = (baseName == null || baseName.trim().isEmpty())
+                ? getString(R.string.music_remote_playlists) : baseName.trim();
+        if (app.playlists.playlistId(base) < 0) return base;
+        String suffix = " (Kugou)";
+        String candidate = base + suffix;
+        if (app.playlists.playlistId(candidate) < 0) return candidate;
+        for (int i = 2; i < 1000; i++) {
+            candidate = base + " (Kugou " + i + ")";
+            if (app.playlists.playlistId(candidate) < 0) return candidate;
+        }
+        return base + " (Kugou " + System.currentTimeMillis() + ")";
     }
 
     private void onSongClicked(SongInfo song) {
@@ -189,7 +302,9 @@ public final class PlaylistDetailActivity extends Activity {
             return;
         }
         app.playlists.addRecentPlay(song);
-        app.player.play(items, items.indexOf(song));
+        app.player.play(items, items.indexOf(song), remoteMode
+                ? MusicPlayer.PlaySource.REMOTE_PLAYLIST
+                : MusicPlayer.PlaySource.LOCAL_PLAYLIST);
         startActivity(new Intent(this, MusicPlayerActivity.class));
     }
 

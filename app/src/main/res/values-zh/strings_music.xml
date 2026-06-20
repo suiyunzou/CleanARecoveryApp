@@ -8,6 +8,15 @@
     <string name="music_recommend">推荐歌曲</string>
     <string name="music_recent">最近播放</string>
     <string name="music_playlists">我的歌单</string>
+    <string name="music_remote_playlists">酷狗云歌单</string>
+    <string name="music_remote_login_prompt">登录后加载你的酷狗歌单</string>
+    <string name="music_remote_loading">正在加载酷狗歌单…</string>
+    <string name="music_remote_empty">没有找到酷狗歌单</string>
+    <string name="music_remote_load_failed">酷狗歌单加载失败</string>
+    <string name="music_remote_playlist_readonly">云歌单</string>
+    <string name="music_remote_import">导入歌单</string>
+    <string name="music_remote_imported">已导入到「%1$s」</string>
+    <string name="music_remote_import_failed">导入失败</string>
     <string name="music_playlist_empty">这个歌单还没有歌曲</string>
     <string name="music_playlist_song_count">%1$d 首歌曲</string>
     <string name="music_playlist_favorites">我喜欢</string>
@@ -26,6 +35,11 @@
     <string name="music_mode_repeat_all">列表循环</string>
     <string name="music_mode_repeat_one">单曲循环</string>
     <string name="music_mode_shuffle">随机播放</string>
+    <string name="music_queue">播放列表</string>
+    <string name="music_queue_empty">当前播放列表没有歌曲</string>
+    <string name="music_queue_current_prefix">（正在播放）</string>
+    <string name="music_more_actions">更多</string>
+    <string name="music_download_current">下载当前歌曲</string>
     <string name="music_login">登录</string>
     <string name="music_login_account_hint">请输入手机号</string>
     <string name="music_login_password_hint">验证码</string>
@@ -104,9 +118,15 @@
     <string name="music_lyrics_load_failed">歌词加载失败</string>
     <string name="music_lyrics_font_size">字号</string>
     <string name="music_lyrics_color">配色</string>
+    <string name="music_lyrics_settings">歌词设置</string>
+    <string name="music_show_disc">显示唱片页</string>
     <string name="music_lyrics_font_small">小</string>
     <string name="music_lyrics_font_medium">中</string>
     <string name="music_lyrics_font_large">大</string>
+    <string name="music_lyrics_theme_teal">青绿</string>
+    <string name="music_lyrics_theme_blue">蓝色</string>
+    <string name="music_lyrics_theme_amber">琥珀</string>
+    <string name="music_lyrics_theme_white">白色</string>
 
     <!-- 下载页 -->
     <string name="music_download_title">下载</string>

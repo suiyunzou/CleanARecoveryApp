@@ -1,7 +1,9 @@
 package com.example.cleanrecovery.music.api;
 
 import com.example.cleanrecovery.music.data.Lyrics;
+import com.example.cleanrecovery.music.data.RemotePlaylist;
 import com.example.cleanrecovery.music.data.SongInfo;
+import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -9,6 +11,7 @@ import com.google.gson.JsonParser;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -16,6 +19,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 /** Real Kugou metadata data source using lightweight public mobile endpoints. */
 public class KugouDataSource implements IMusicDataSource {
@@ -30,6 +35,10 @@ public class KugouDataSource implements IMusicDataSource {
     private static final String TRACKER_URL = "http://trackercdn.kugou.com/i/v2/";
     // Endpoint 3: Web API — more reliable for non-VIP songs, returns JSON with play_url
     private static final String WEB_PLAY_URL = "https://wwwapi.kugou.com/yy/index.php";
+    private static final String GATEWAY_URL = "https://gateway.kugou.com";
+    private static final String USER_PLAYLIST_PATH = "/v7/get_all_list";
+    private static final String PLAYLIST_TRACKS_PATH = "/v4/get_list_all_file";
+    private static final String PLAYLIST_TRACKS_FALLBACK_PATH = "/pubsongs/v2/get_other_list_file_nofilt";
     // Endpoint 4: Concept (lite) privileged play URL via /v5/url.
     // 概念版通过 appid=3116 + clientver=11440 + 特定 page_id/pid 参数区分，
     // 不是通过 Cookie。参考 KuGouMusicApi module/song_url.js。
@@ -38,6 +47,7 @@ public class KugouDataSource implements IMusicDataSource {
     private static final String LITE_KEY_SALT = "185672dd44712f60bb1736df5a377e82";
     private static final int LITE_APPID = 3116;
     private static final int LITE_CLIENTVER = 11440;
+    private static final Gson GSON = new Gson();
 
     // Lyrics endpoints — search for a candidate, then download the LRC body.
     private static final String LYRIC_SEARCH_URL = "http://lyrics.kugou.com/search";
@@ -85,6 +95,106 @@ public class KugouDataSource implements IMusicDataSource {
         return parseSongList(get(url));
     }
 
+    @Override
+    public List<RemotePlaylist> getUserPlaylists(int page, int pageSize) throws Exception {
+        return getUserPlaylists(page, pageSize, 2);
+    }
+
+    @Override
+    public List<RemotePlaylist> getAllUserPlaylists(int pageSize) throws Exception {
+        int safePageSize = Math.max(1, pageSize);
+        List<RemotePlaylist> result = new ArrayList<>();
+        java.util.HashSet<String> seen = new java.util.HashSet<>();
+        for (int page = 1; page <= 20; page++) {
+            List<RemotePlaylist> batch = getUserPlaylists(page, safePageSize);
+            if (batch.isEmpty()) break;
+            for (RemotePlaylist playlist : batch) {
+                String key = firstNonEmpty(playlist.playableId(), playlist.name);
+                if (seen.add(key)) result.add(playlist);
+            }
+            if (batch.size() < safePageSize) break;
+        }
+        return result;
+    }
+
+    List<RemotePlaylist> getUserPlaylists(int page, int pageSize, int type) throws Exception {
+        ensureAuth();
+        TreeMap<String, Object> body = new TreeMap<>();
+        body.put("userid", auth.userid);
+        body.put("token", auth.token);
+        body.put("total_ver", 979);
+        body.put("type", type);
+        body.put("page", Math.max(1, page));
+        body.put("pagesize", Math.max(1, pageSize));
+
+        TreeMap<String, String> params = new TreeMap<>();
+        params.put("plat", "1");
+        params.put("userid", auth.userid);
+        params.put("token", auth.token);
+
+        JsonObject resp = signedPost(USER_PLAYLIST_PATH, params, body,
+                new String[][]{{"x-router", "cloudlist.service.kugou.com"}});
+        return parseRemotePlaylists(resp);
+    }
+
+    @Override
+    public List<SongInfo> getUserPlaylistSongs(RemotePlaylist playlist, int page, int pageSize) throws Exception {
+        ensureAuth();
+        if (playlist == null) return new ArrayList<>();
+        String listId = firstNonEmpty(playlist.listId, playlist.id, playlist.globalCollectionId);
+        if (isEmpty(listId)) return new ArrayList<>();
+
+        TreeMap<String, Object> body = new TreeMap<>();
+        body.put("listid", listId);
+        body.put("userid", auth.userid);
+        body.put("area_code", 1);
+        body.put("show_relate_goods", 0);
+        body.put("pagesize", Math.max(1, pageSize));
+        body.put("allplatform", 1);
+        body.put("show_cover", 1);
+        body.put("type", 0);
+        body.put("token", auth.token);
+        body.put("page", Math.max(1, page));
+
+        JsonObject resp = signedPost(PLAYLIST_TRACKS_PATH, new TreeMap<>(), body,
+                new String[][]{{"x-router", "cloudlist.service.kugou.com"}});
+        List<SongInfo> songs = parseSongList(resp);
+        if (!songs.isEmpty()) return songs;
+
+        String collectionId = firstNonEmpty(playlist.globalCollectionId, playlist.id, playlist.listId);
+        if (isEmpty(collectionId)) return songs;
+        TreeMap<String, String> params = new TreeMap<>();
+        int safePageSize = Math.max(1, pageSize);
+        params.put("area_code", "1");
+        params.put("begin_idx", String.valueOf((Math.max(1, page) - 1) * safePageSize));
+        params.put("plat", "1");
+        params.put("type", "1");
+        params.put("mode", "1");
+        params.put("personal_switch", "1");
+        params.put("extend_fields", "abtags,hot_cmt,popularization");
+        params.put("pagesize", String.valueOf(safePageSize));
+        params.put("global_collection_id", collectionId);
+        resp = signedGet(PLAYLIST_TRACKS_FALLBACK_PATH, params, null);
+        return parseSongList(resp);
+    }
+
+    @Override
+    public List<SongInfo> getAllUserPlaylistSongs(RemotePlaylist playlist, int pageSize) throws Exception {
+        int safePageSize = Math.max(1, pageSize);
+        List<SongInfo> result = new ArrayList<>();
+        java.util.HashSet<String> seen = new java.util.HashSet<>();
+        for (int page = 1; page <= 50; page++) {
+            List<SongInfo> batch = getUserPlaylistSongs(playlist, page, safePageSize);
+            if (batch.isEmpty()) break;
+            for (SongInfo song : batch) {
+                String key = firstNonEmpty(song.hash, song.title + "|" + song.artist);
+                if (seen.add(key)) result.add(song);
+            }
+            if (batch.size() < safePageSize) break;
+        }
+        return result;
+    }
+
     /**
      * Resolve a playable URL by trying multiple endpoints in sequence.
      * The first endpoint that returns a non-empty URL wins.
@@ -96,14 +206,15 @@ public class KugouDataSource implements IMusicDataSource {
     public String resolvePlayUrl(SongInfo song) throws Exception {
         if (song == null || isEmpty(song.hash)) return null;
 
-        // For VIP songs, try the concept endpoint first (carries token + userid)
-        if (song.vipRequired && auth != null && !isEmpty(auth.token)) {
+        // When logged in, use the concept endpoint first for both free and VIP
+        // songs. Cloud playlist entries often do not expose the same fields as
+        // search results, and the legacy public endpoints may return no URL.
+        if (auth != null && !isEmpty(auth.token)) {
             try {
                 String url = tryConceptPlayUrl(song);
                 if (!isEmpty(url)) return url;
             } catch (Exception e) {
-                android.util.Log.w("KugouDataSource",
-                        "concept play url failed: " + e.getMessage());
+                logW("KugouDataSource", "concept play url failed: " + e.getMessage());
             }
         }
 
@@ -308,8 +419,7 @@ public class KugouDataSource implements IMusicDataSource {
                 String url = tryConceptPlayUrl(song, q);
                 if (!isEmpty(url)) return url;
             } catch (Exception e) {
-                android.util.Log.w("KugouDataSource",
-                        "download url concept failed: " + e.getMessage());
+                logW("KugouDataSource", "download url concept failed: " + e.getMessage());
             }
         }
         // For standard quality, the regular play URL is acceptable.
@@ -492,8 +602,7 @@ public class KugouDataSource implements IMusicDataSource {
             }
             String fullUrl = urlBuilder.toString();
 
-            android.util.Log.d("KugouDataSource",
-                    "concept /v5/url hash=" + hash + " userid=" + auth.userid);
+            logD("KugouDataSource", "concept /v5/url hash=" + hash + " userid=" + auth.userid);
 
             JsonObject resp = getWithHeaders(fullUrl, new String[][]{
                     {"User-Agent", "Android15-1070-11083-46-0-DiscoveryDRADProtocol-wifi"},
@@ -518,7 +627,7 @@ public class KugouDataSource implements IMusicDataSource {
                         : resp.has("msg") ? resp.get("msg").getAsString()
                         : resp.has("error_msg") ? resp.get("error_msg").getAsString()
                         : "status=" + status + " err_code=" + errCode;
-                android.util.Log.w("KugouDataSource",
+                logW("KugouDataSource",
                         "concept /v5/url status=" + status + " err_code=" + errCode + " msg=" + errMsg);
                 return null;
             }
@@ -550,8 +659,131 @@ public class KugouDataSource implements IMusicDataSource {
             }
             return firstPlayableUrl(resp);
         } catch (Exception e) {
-            android.util.Log.w("KugouDataSource", "concept /v5/url error: " + e.getMessage());
+            logW("KugouDataSource", "concept /v5/url error: " + e.getMessage());
             return null;
+        }
+    }
+
+    private void ensureAuth() {
+        if (auth == null || isEmpty(auth.token) || isEmpty(auth.userid)) {
+            throw new IllegalStateException("Kugou login required");
+        }
+    }
+
+    private JsonObject signedPost(String path, TreeMap<String, String> params,
+                                  TreeMap<String, Object> body,
+                                  String[][] headers) throws Exception {
+        String bodyJson = GSON.toJson(body != null ? body : new TreeMap<String, Object>());
+        return signedRequest("POST", path, params, bodyJson, headers);
+    }
+
+    private JsonObject signedGet(String path, TreeMap<String, String> params,
+                                 String[][] headers) throws Exception {
+        return signedRequest("GET", path, params, "", headers);
+    }
+
+    private JsonObject signedRequest(String method, String path, TreeMap<String, String> params,
+                                     String bodyJson, String[][] headers) throws Exception {
+        TreeMap<String, String> allParams = new TreeMap<>();
+        String dfid = auth != null && !isEmpty(auth.dfid) ? auth.dfid : "-";
+        String mid = auth != null && !isEmpty(auth.mid) ? auth.mid : "";
+        String userid = auth != null && !isEmpty(auth.userid) ? auth.userid : "0";
+        String token = auth != null && !isEmpty(auth.token) ? auth.token : "";
+
+        allParams.put("dfid", dfid);
+        allParams.put("mid", mid);
+        allParams.put("uuid", "-");
+        allParams.put("appid", String.valueOf(LITE_APPID));
+        allParams.put("clientver", String.valueOf(LITE_CLIENTVER));
+        allParams.put("clienttime", String.valueOf(System.currentTimeMillis() / 1000));
+        if (!isEmpty(token)) allParams.put("token", token);
+        if (!isEmpty(userid) && !"0".equals(userid)) allParams.put("userid", userid);
+        if (params != null) allParams.putAll(params);
+        allParams.put("signature", signatureAndroidParams(allParams, bodyJson));
+
+        String url = GATEWAY_URL + path + "?" + buildQuery(allParams);
+        HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
+        conn.setRequestMethod(method);
+        conn.setConnectTimeout(10_000);
+        conn.setReadTimeout(15_000);
+        conn.setRequestProperty("User-Agent", "Android15-1070-11083-46-0-DiscoveryDRADProtocol-wifi");
+        conn.setRequestProperty("Accept", "application/json,text/plain,*/*");
+        conn.setRequestProperty("dfid", dfid);
+        conn.setRequestProperty("mid", mid);
+        conn.setRequestProperty("clienttime", allParams.get("clienttime"));
+        conn.setRequestProperty("kg-rc", "1");
+        conn.setRequestProperty("kg-thash", "5d816a0");
+        conn.setRequestProperty("kg-rec", "1");
+        conn.setRequestProperty("kg-rf", "B9EDA08A64250DEFFBCADDEE00F8F25F");
+        if (headers != null) {
+            for (String[] h : headers) {
+                if (h != null && h.length >= 2) conn.setRequestProperty(h[0], h[1]);
+            }
+        }
+        if ("POST".equals(method)) {
+            byte[] bytes = bodyJson.getBytes(StandardCharsets.UTF_8);
+            conn.setDoOutput(true);
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+            conn.setRequestProperty("Content-Length", String.valueOf(bytes.length));
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(bytes);
+            }
+        }
+
+        int code = conn.getResponseCode();
+        StringBuilder sb = new StringBuilder();
+        java.io.InputStream stream = code >= 200 && code < 300
+                ? conn.getInputStream() : conn.getErrorStream();
+        if (stream != null) {
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(stream, StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = br.readLine()) != null) sb.append(line);
+            }
+        }
+        conn.disconnect();
+        if (code != 200) throw new RuntimeException("HTTP " + code);
+        if (sb.length() == 0) return new JsonObject();
+        return JsonParser.parseString(sb.toString()).getAsJsonObject();
+    }
+
+    static String signatureAndroidParams(Map<String, String> params, String data) {
+        StringBuilder sb = new StringBuilder(LITE_SALT);
+        java.util.List<String> keys = new java.util.ArrayList<>(params.keySet());
+        java.util.Collections.sort(keys);
+        for (String key : keys) {
+            if ("signature".equals(key)) continue;
+            sb.append(key).append("=").append(params.get(key));
+        }
+        if (data != null) sb.append(data);
+        sb.append(LITE_SALT);
+        return md5(sb.toString());
+    }
+
+    private static String buildQuery(TreeMap<String, String> params) throws Exception {
+        StringBuilder sb = new StringBuilder();
+        boolean first = true;
+        for (Map.Entry<String, String> e : params.entrySet()) {
+            if (!first) sb.append("&");
+            sb.append(encode(e.getKey())).append("=").append(encode(e.getValue()));
+            first = false;
+        }
+        return sb.toString();
+    }
+
+    private static void logD(String tag, String message) {
+        try {
+            android.util.Log.d(tag, message);
+        } catch (Throwable ignored) {
+            System.out.println(tag + " DEBUG: " + message);
+        }
+    }
+
+    private static void logW(String tag, String message) {
+        try {
+            android.util.Log.w(tag, message);
+        } catch (Throwable ignored) {
+            System.out.println(tag + " WARN: " + message);
         }
     }
 
@@ -588,7 +820,82 @@ public class KugouDataSource implements IMusicDataSource {
         return JsonParser.parseString(sb.toString()).getAsJsonObject();
     }
 
-    private List<SongInfo> parseSongList(JsonObject resp) {
+    static List<RemotePlaylist> parseRemotePlaylists(JsonObject resp) {
+        List<RemotePlaylist> result = new ArrayList<>();
+        JsonArray arr = findRemotePlaylistArray(resp);
+        if (arr == null) return result;
+        for (JsonElement element : arr) {
+            if (!element.isJsonObject()) continue;
+            JsonObject o = element.getAsJsonObject();
+            RemotePlaylist p = parseRemotePlaylist(o);
+            if (!isEmpty(p.name) && !isEmpty(p.playableId())) result.add(p);
+        }
+        return result;
+    }
+
+    private static JsonArray findRemotePlaylistArray(JsonObject resp) {
+        JsonObject data = object(resp, "data");
+        JsonArray arr = firstArrayWithPlaylistShape(data, "info", "list", "lists", "data");
+        if (arr != null) return arr;
+        arr = firstArrayWithPlaylistShape(resp, "info", "list", "lists", "data");
+        if (arr != null) return arr;
+        return findArrayByPlaylistShape(resp);
+    }
+
+    private static JsonArray firstArrayWithPlaylistShape(JsonObject o, String... keys) {
+        if (o == null) return null;
+        for (String key : keys) {
+            JsonArray arr = array(o, key);
+            if (looksLikePlaylistArray(arr)) return arr;
+        }
+        return null;
+    }
+
+    private static JsonArray findArrayByPlaylistShape(JsonElement element) {
+        if (element == null || element.isJsonNull()) return null;
+        if (element.isJsonArray()) {
+            JsonArray arr = element.getAsJsonArray();
+            return looksLikePlaylistArray(arr) ? arr : null;
+        }
+        if (!element.isJsonObject()) return null;
+        for (Map.Entry<String, JsonElement> entry : element.getAsJsonObject().entrySet()) {
+            JsonArray found = findArrayByPlaylistShape(entry.getValue());
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private static boolean looksLikePlaylistArray(JsonArray arr) {
+        if (arr == null || arr.size() == 0) return false;
+        for (JsonElement e : arr) {
+            if (!e.isJsonObject()) continue;
+            JsonObject o = e.getAsJsonObject();
+            boolean hasId = !isEmpty(str(o, "listid", "listId", "global_collection_id",
+                    "globalCollectionId", "id", "specialid"));
+            boolean hasName = !isEmpty(str(o, "name", "listname", "list_name", "title",
+                    "specialname"));
+            if (hasId && hasName) return true;
+        }
+        return false;
+    }
+
+    private static RemotePlaylist parseRemotePlaylist(JsonObject o) {
+        RemotePlaylist p = new RemotePlaylist();
+        p.listId = str(o, "listid", "listId");
+        p.globalCollectionId = str(o, "global_collection_id", "globalCollectionId",
+                "globalid", "globalId");
+        p.id = firstNonEmpty(str(o, "id", "specialid"), p.globalCollectionId, p.listId);
+        p.name = str(o, "name", "listname", "list_name", "title", "specialname");
+        p.coverUrl = normalizeImage(str(o, "cover", "coverUrl", "img", "image", "pic",
+                "list_pic", "sizable_cover"));
+        p.songCount = num(o, "song_count", "songCount", "count", "file_count",
+                "total", "total_count");
+        p.ownerName = str(o, "owner_name", "ownerName", "username", "nickname",
+                "user_name");
+        return p;
+    }
+
+    static List<SongInfo> parseSongList(JsonObject resp) {
         List<SongInfo> result = new ArrayList<>();
         JsonArray arr = findSongArray(resp);
         if (arr == null) return result;
@@ -614,22 +921,32 @@ public class KugouDataSource implements IMusicDataSource {
         return result;
     }
 
-    private JsonArray findSongArray(JsonObject resp) {
+    private static JsonArray findSongArray(JsonObject resp) {
         JsonObject data = object(resp, "data");
-        if (data == null) return null;
-        JsonArray info = array(data, "info");
-        if (info != null) return info;
-        JsonArray lists = array(data, "lists");
-        if (lists != null) return lists;
-        return array(resp, "info");
+        JsonArray arr = firstSongArray(data);
+        if (arr != null) return arr;
+        return firstSongArray(resp);
     }
 
-    private SongInfo parseSong(JsonObject o) {
+    private static JsonArray firstSongArray(JsonObject o) {
+        if (o == null) return null;
+        JsonArray info = array(o, "info");
+        if (info != null) return info;
+        JsonArray lists = array(o, "lists");
+        if (lists != null) return lists;
+        JsonArray list = array(o, "list");
+        if (list != null) return list;
+        JsonArray songs = array(o, "songs");
+        if (songs != null) return songs;
+        return array(o, "files");
+    }
+
+    private static SongInfo parseSong(JsonObject o) {
         SongInfo s = new SongInfo();
         s.hash = upper(str(o, "hash", "Hash", "file_hash"));
-        s.albumId = str(o, "album_id", "albumid", "AlbumID");
-        s.title = str(o, "songname", "songName", "name", "remark", "filename", "fileName");
-        s.artist = str(o, "singername", "singerName", "author_name", "authorName");
+        s.albumId = str(o, "album_id", "albumid", "AlbumID", "album_audio_id");
+        s.title = str(o, "songname", "songName", "audio_name", "name", "remark", "filename", "fileName");
+        s.artist = str(o, "singername", "singerName", "author_name", "authorName", "singer_name");
         if (isEmpty(s.artist)) s.artist = parseAuthors(o);
         s.album = str(o, "album_name", "albumname", "remark");
         s.duration = num(o, "duration", "timeLength", "timelength", "time");
@@ -736,6 +1053,14 @@ public class KugouDataSource implements IMusicDataSource {
     private static String nestedStr(JsonObject o, String objectKey, String valueKey) {
         JsonObject nested = object(o, objectKey);
         return nested == null ? "" : str(nested, valueKey);
+    }
+
+    private static String firstNonEmpty(String... values) {
+        if (values == null) return "";
+        for (String value : values) {
+            if (!isEmpty(value)) return value;
+        }
+        return "";
     }
 
     private static String str(JsonObject o, String... keys) {

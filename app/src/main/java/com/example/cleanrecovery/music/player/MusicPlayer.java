@@ -23,6 +23,15 @@ public class MusicPlayer {
 
     public enum Mode { SEQUENTIAL, REPEAT_ALL, REPEAT_ONE, SHUFFLE }
     public enum State { IDLE, LOADING, PLAYING, PAUSED, STOPPED, ERROR }
+    public enum PlaySource {
+        SEARCH,
+        RECOMMENDATION,
+        LOCAL_PLAYLIST,
+        REMOTE_PLAYLIST,
+        FAVORITES,
+        RECENT,
+        UNKNOWN
+    }
 
     public interface Callback {
         void onStateChanged(State state);
@@ -46,6 +55,7 @@ public class MusicPlayer {
     private int queueIndex = -1;
     private Mode mode = Mode.SEQUENTIAL;
     private State state = State.IDLE;
+    private PlaySource playSource = PlaySource.UNKNOWN;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final List<Callback> callbacks = new ArrayList<>();
     private final ExecutorService resolverExecutor = Executors.newSingleThreadExecutor();
@@ -58,15 +68,20 @@ public class MusicPlayer {
     public void removeCallback(Callback cb) { callbacks.remove(cb); }
 
     public void play(List<SongInfo> songs, int startIndex) {
+        play(songs, startIndex, PlaySource.UNKNOWN);
+    }
+
+    public void play(List<SongInfo> songs, int startIndex, PlaySource source) {
         if (songs == null || songs.isEmpty()) return;
         queue.clear();
         queue.addAll(songs);
         queueIndex = Math.max(0, Math.min(startIndex, songs.size() - 1));
+        playSource = source != null ? source : PlaySource.UNKNOWN;
         playCurrent();
     }
 
     public void playSingle(SongInfo song) {
-        play(Collections.singletonList(song), 0);
+        play(Collections.singletonList(song), 0, playSource);
     }
 
     public void seekTo(int positionMs) {
@@ -115,6 +130,7 @@ public class MusicPlayer {
 
     public State getState() { return state; }
     public Mode getMode() { return mode; }
+    public PlaySource getPlaySource() { return playSource; }
 
     public void setMode(Mode m) {
         mode = m;

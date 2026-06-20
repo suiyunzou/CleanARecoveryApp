@@ -120,6 +120,22 @@
                 android:orientation="vertical"
                 android:paddingHorizontal="@dimen/space_lg" />
 
+            <!-- Kugou cloud playlists -->
+            <TextView
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_lg" android:layout_marginTop="@dimen/space_lg"
+                android:text="@string/music_remote_playlists"
+                android:textColor="@color/text_primary"
+                android:textSize="@dimen/text_section" android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/music_remote_playlist_container"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_sm"
+                android:orientation="vertical"
+                android:paddingHorizontal="@dimen/space_lg" />
+
         </LinearLayout>
     </ScrollView>
 
