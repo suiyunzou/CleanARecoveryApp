@@ -9,23 +9,35 @@ import com.example.cleanrecovery.recovery.RecoveryType;
 import com.example.cleanrecovery.ui.widget.SystemUiHelper;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
+import android.media.AudioManager;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer;
+import android.media.PlaybackParams;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.GestureDetector;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
+import android.view.ViewConfiguration;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ScrollView;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -43,20 +55,65 @@ public final class PreviewActivity extends Activity {
     public static final String EXTRA_SUSPECTED_DELETED = "com.example.cleanrecovery.extra.SUSPECTED_DELETED";
 
     private static final ExecutorService RECOVER_EXECUTOR = Executors.newSingleThreadExecutor();
+    private static final int OVERLAY_HIDE_DELAY_MS = 3000;
+    private static final int PROGRESS_UPDATE_MS = 500;
+    private static final int SEEK_BAR_MAX = 1000;
+    private static final int GESTURE_ZONE_EDGE_PERCENT = 28;
+    private static final int GESTURE_ZONE_LEFT = 1;
+    private static final int GESTURE_ZONE_CENTER = 2;
+    private static final int GESTURE_ZONE_RIGHT = 3;
+    private static final float FAST_PLAYBACK_SPEED = 2.0f;
+
+    private final Handler uiHandler = new Handler(Looper.getMainLooper());
+    private final Runnable hideOverlayRunnable = new Runnable() {
+        @Override
+        public void run() {
+            hideOverlay();
+        }
+    };
+    private final Runnable progressUpdater = new Runnable() {
+        @Override
+        public void run() {
+            updateProgress();
+            if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+                uiHandler.postDelayed(this, PROGRESS_UPDATE_MS);
+            }
+        }
+    };
+    private final Runnable hideGestureFeedbackRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (gestureFeedbackView != null) {
+                gestureFeedbackView.setVisibility(View.GONE);
+            }
+        }
+    };
 
     private FrameLayout contentHost;
+    private View overlayChrome;
+    private View playbackControls;
     private TextView previewIndex;
     private TextView previewFileName;
     private TextView previewMeta;
-    private Button previewPrevButton;
-    private Button previewNextButton;
+    private TextView recoverabilityView;
+    private TextView gestureFeedbackView;
     private Button previewRecoverButton;
+    private ImageButton detailsButton;
+    private AudioManager audioManager;
 
     private MediaPlayer mediaPlayer;
     private Surface mediaSurface;
-    private Button playbackButton;
+    private ImageButton playbackButton;
     private TextView playbackStateView;
+    private TextView playbackTimeView;
+    private SeekBar playbackSeekBar;
     private boolean mediaPrepared;
+    private boolean currentItemIsMedia;
+    private boolean immersivePreview;
+    private boolean userSeeking;
+    private boolean speedBoostActive;
+    private RecoveryItem currentItem;
+    private File currentFile;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,6 +127,7 @@ public final class PreviewActivity extends Activity {
     @Override
     protected void onPause() {
         if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+            stopFastPlayback();
             mediaPlayer.pause();
             updatePlaybackState(false);
         }
@@ -78,77 +136,138 @@ public final class PreviewActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        uiHandler.removeCallbacksAndMessages(null);
         releasePlayer();
         super.onDestroy();
     }
 
     private void bindChrome() {
         contentHost = findViewById(R.id.preview_content_host);
+        overlayChrome = findViewById(R.id.preview_overlay);
         previewIndex = findViewById(R.id.preview_index);
         previewFileName = findViewById(R.id.preview_file_name);
         previewMeta = findViewById(R.id.preview_meta);
-        previewPrevButton = findViewById(R.id.preview_prev_button);
-        previewNextButton = findViewById(R.id.preview_next_button);
+        recoverabilityView = findViewById(R.id.preview_recoverability);
+        gestureFeedbackView = findViewById(R.id.preview_gesture_feedback);
         previewRecoverButton = findViewById(R.id.preview_recover_button);
+        detailsButton = findViewById(R.id.preview_details_button);
+        playbackControls = findViewById(R.id.playback_controls);
+        playbackStateView = findViewById(R.id.playback_state);
+        playbackButton = findViewById(R.id.playback_button);
+        playbackTimeView = findViewById(R.id.playback_time);
+        playbackSeekBar = findViewById(R.id.playback_seek);
         ImageButton backButton = findViewById(R.id.preview_back_button);
+        audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
 
-        previewPrevButton.setOnClickListener(v -> {
-            if (PreviewSession.moveBy(-1)) {
-                renderCurrentItem();
-            }
-        });
-        previewNextButton.setOnClickListener(v -> {
-            if (PreviewSession.moveBy(1)) {
-                renderCurrentItem();
-            }
-        });
         backButton.setOnClickListener(v -> finish());
         previewRecoverButton.setOnClickListener(v -> recoverCurrentItem());
+        detailsButton.setOnClickListener(v -> {
+            showOverlay(false);
+            showFileDetails();
+        });
+        playbackSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                if (fromUser && mediaPrepared && mediaPlayer != null) {
+                    int duration = mediaPlayer.getDuration();
+                    if (duration > 0) {
+                        playbackTimeView.setText(getString(R.string.preview_position_format,
+                                formatDuration((int) ((long) duration * progress / SEEK_BAR_MAX)),
+                                formatDuration(duration)));
+                    }
+                }
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+                userSeeking = true;
+                showOverlay(false);
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                if (mediaPrepared && mediaPlayer != null) {
+                    int duration = mediaPlayer.getDuration();
+                    if (duration > 0) {
+                        mediaPlayer.seekTo((int) ((long) duration * seekBar.getProgress() / SEEK_BAR_MAX));
+                    }
+                }
+                userSeeking = false;
+                updateProgress();
+                scheduleOverlayHide();
+            }
+        });
     }
 
     private void renderCurrentItem() {
+        uiHandler.removeCallbacks(hideOverlayRunnable);
+        uiHandler.removeCallbacks(hideGestureFeedbackRunnable);
+        stopProgressUpdates();
         releasePlayer();
         contentHost.removeAllViews();
-        playbackButton = null;
-        playbackStateView = null;
-
-        RecoveryItem item = PreviewSession.currentItem();
-        if (item == null) {
-            item = itemFromIntent();
+        contentHost.setOnClickListener(null);
+        currentItemIsMedia = false;
+        immersivePreview = false;
+        currentItem = PreviewSession.currentItem();
+        if (currentItem == null) {
+            currentItem = itemFromIntent();
         }
-        if (item == null) {
+        if (currentItem == null) {
             finish();
             return;
         }
 
-        int total = PreviewSession.totalCount();
-        if (total > 0) {
-            previewIndex.setText(getString(R.string.preview_index_format, PreviewSession.currentIndex() + 1, total));
-            previewPrevButton.setEnabled(PreviewSession.currentIndex() > 0);
-            previewNextButton.setEnabled(PreviewSession.currentIndex() < total - 1);
-        } else {
-            previewIndex.setText("1 / 1");
-            previewPrevButton.setEnabled(false);
-            previewNextButton.setEnabled(false);
-        }
+        bindNavigationState();
+        currentFile = currentItem.asFile();
+        previewFileName.setText(currentItem.name);
+        previewMeta.setText(buildMeta(currentFile));
+        setRecoverability(R.string.preview_recoverability_readable);
+        resetPlaybackControls();
 
-        File file = item.asFile();
-        previewFileName.setText(item.name);
-        previewMeta.setText(buildMeta(file, item.suspectedDeleted));
-
-        if (!file.exists() || !file.canRead()) {
+        if (!currentFile.exists() || !currentFile.canRead()) {
+            setRecoverability(R.string.preview_recoverability_unreadable);
+            setPlaybackChromeVisible(false);
             addMessage(getString(R.string.preview_missing));
+            showOverlay(false);
             return;
         }
 
-        if (item.type == RecoveryType.IMAGE) {
-            addImagePreview(file);
-        } else if (item.type == RecoveryType.VIDEO) {
-            addVideoPreview(file);
-        } else if (item.type == RecoveryType.AUDIO) {
-            addAudioPreview(file);
+        if (currentItem.type == RecoveryType.IMAGE) {
+            immersivePreview = true;
+            setPlaybackChromeVisible(false);
+            addImagePreview(currentFile);
+            hideOverlay();
+        } else if (currentItem.type == RecoveryType.VIDEO) {
+            currentItemIsMedia = true;
+            immersivePreview = true;
+            setPlaybackChromeVisible(true);
+            addVideoPreview(currentFile);
+            hideOverlay();
+        } else if (currentItem.type == RecoveryType.AUDIO) {
+            currentItemIsMedia = true;
+            immersivePreview = true;
+            setPlaybackChromeVisible(true);
+            addAudioPreview(currentFile);
+            hideOverlay();
         } else {
-            addDocumentPreview(file);
+            setPlaybackChromeVisible(false);
+            addDocumentPreview(currentFile);
+            showOverlay(false);
+        }
+    }
+
+    private void bindNavigationState() {
+        int total = PreviewSession.totalCount();
+        if (total > 0) {
+            previewIndex.setText(getString(R.string.preview_index_format, PreviewSession.currentIndex() + 1, total));
+        } else {
+            previewIndex.setText("1 / 1");
+        }
+    }
+
+    private void movePreviewBy(int delta) {
+        if (PreviewSession.moveBy(delta)) {
+            renderCurrentItem();
         }
     }
 
@@ -169,7 +288,7 @@ public final class PreviewActivity extends Activity {
     }
 
     private void recoverCurrentItem() {
-        final RecoveryItem item = PreviewSession.currentItem() != null ? PreviewSession.currentItem() : itemFromIntent();
+        final RecoveryItem item = currentItem != null ? currentItem : itemFromIntent();
         if (item == null) {
             return;
         }
@@ -206,17 +325,48 @@ public final class PreviewActivity extends Activity {
         });
     }
 
-    private String buildMeta(File file, boolean suspectedDeleted) {
+    private String buildMeta(File file) {
         StringBuilder builder = new StringBuilder();
-        builder.append(getString(suspectedDeleted ? R.string.status_deleted : R.string.status_existing));
         if (file != null) {
-            builder.append(" | ").append(formatSize(file.length()));
+            builder.append(formatSize(file.length()));
             if (file.lastModified() > 0) {
-                builder.append(" | ").append(DateFormat.getDateTimeInstance().format(new Date(file.lastModified())));
+                builder.append(" · ").append(DateFormat.getDateTimeInstance().format(new Date(file.lastModified())));
             }
-            builder.append("\n").append(ellipsizeMiddle(file.getAbsolutePath(), 96));
         }
         return builder.toString();
+    }
+
+    private void showFileDetails() {
+        if (currentItem == null || currentFile == null) {
+            return;
+        }
+        String typeLabel = typeLabel(currentItem.type);
+        String modified = currentFile.lastModified() > 0
+                ? DateFormat.getDateTimeInstance().format(new Date(currentFile.lastModified()))
+                : "-";
+        String message = getString(R.string.file_browser_detail_name) + ": " + currentItem.name + "\n"
+                + getString(R.string.file_browser_detail_type) + ": " + typeLabel + "\n"
+                + getString(R.string.file_browser_detail_size) + ": " + formatSize(currentFile.length()) + "\n"
+                + getString(R.string.file_browser_detail_modified) + ": " + modified + "\n"
+                + getString(R.string.preview_detail_status) + ": "
+                + getString(currentItem.suspectedDeleted ? R.string.status_deleted : R.string.status_existing) + "\n"
+                + getString(R.string.file_browser_detail_path) + ":\n" + currentFile.getAbsolutePath();
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.preview_details)
+                .setMessage(message)
+                .setPositiveButton(android.R.string.ok, null)
+                .show();
+    }
+
+    private String typeLabel(RecoveryType type) {
+        if (type == RecoveryType.IMAGE) {
+            return getString(R.string.type_images);
+        } else if (type == RecoveryType.VIDEO) {
+            return getString(R.string.type_videos);
+        } else if (type == RecoveryType.AUDIO) {
+            return getString(R.string.type_audio);
+        }
+        return getString(R.string.type_documents);
     }
 
     private void addImagePreview(File file) {
@@ -228,15 +378,54 @@ public final class PreviewActivity extends Activity {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
         ));
+        bindImageGestures(imageView);
+    }
+
+    private void bindImageGestures(View view) {
+        final GestureDetector detector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onDown(MotionEvent event) {
+                return true;
+            }
+
+            @Override
+            public boolean onSingleTapConfirmed(MotionEvent event) {
+                if (overlayChrome.getVisibility() == View.VISIBLE) {
+                    hideOverlay();
+                } else {
+                    showOverlay(false);
+                }
+                return true;
+            }
+
+            @Override
+            public boolean onFling(MotionEvent start, MotionEvent end, float velocityX, float velocityY) {
+                if (start == null || end == null) {
+                    return false;
+                }
+                float dx = end.getX() - start.getX();
+                float dy = end.getY() - start.getY();
+                if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > dp(72)) {
+                    movePreviewBy(dx > 0 ? -1 : 1);
+                    return true;
+                }
+                return false;
+            }
+        });
+        view.setOnTouchListener((touchedView, event) -> detector.onTouchEvent(event));
     }
 
     private void addVideoPreview(final File file) {
         FrameLayout previewFrame = new FrameLayout(this);
+        previewFrame.setBackgroundColor(getResources().getColor(R.color.preview_backdrop, getTheme()));
         final ImageView posterView = new ImageView(this);
         posterView.setScaleType(ImageView.ScaleType.FIT_CENTER);
         Bitmap poster = readVideoFrame(file);
         if (poster != null) {
             posterView.setImageBitmap(poster);
+        } else {
+            posterView.setImageResource(R.drawable.ic_type_video);
+            posterView.setPadding(dp(96), dp(96), dp(96), dp(96));
         }
         previewFrame.addView(posterView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -250,12 +439,11 @@ public final class PreviewActivity extends Activity {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
         ));
-        previewFrame.setOnClickListener(v -> togglePlayback());
+        bindMediaGestures(previewFrame);
         contentHost.addView(previewFrame, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
         ));
-        addPlaybackControlsToHost();
 
         textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
             @Override
@@ -284,34 +472,208 @@ public final class PreviewActivity extends Activity {
     }
 
     private void addAudioPreview(File file) {
-        addMessage(getString(R.string.preview_audio_ready));
-        addPlaybackControlsToHost();
+        FrameLayout audioRoot = new FrameLayout(this);
+        audioRoot.setBackgroundColor(getResources().getColor(R.color.preview_backdrop, getTheme()));
+
+        LinearLayout panel = new LinearLayout(this);
+        panel.setBackgroundResource(R.drawable.bg_preview_audio_panel);
+        panel.setGravity(Gravity.CENTER);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(24), dp(28), dp(24), dp(28));
+
+        ImageView audioIcon = new ImageView(this);
+        audioIcon.setImageResource(R.drawable.ic_type_audio);
+        audioIcon.setAlpha(0.95f);
+        panel.addView(audioIcon, new LinearLayout.LayoutParams(dp(72), dp(72)));
+
+        TextView title = new TextView(this);
+        title.setText(R.string.preview_audio_title);
+        title.setTextColor(getResources().getColor(R.color.text_on_primary, getTheme()));
+        title.setTextSize(18);
+        title.setGravity(Gravity.CENTER);
+        title.setPadding(0, dp(16), 0, dp(4));
+        panel.addView(title, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        TextView type = new TextView(this);
+        type.setText(R.string.type_audio);
+        type.setTextColor(getResources().getColor(R.color.brand_accent_soft, getTheme()));
+        type.setTextSize(12);
+        type.setGravity(Gravity.CENTER);
+        panel.addView(type, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        LinearLayout wave = new LinearLayout(this);
+        wave.setGravity(Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        wave.setOrientation(LinearLayout.HORIZONTAL);
+        wave.setPadding(0, dp(20), 0, 0);
+        int[] heights = {18, 34, 24, 44, 28, 38, 22, 32, 18};
+        for (int height : heights) {
+            View bar = new View(this);
+            bar.setBackgroundResource(R.drawable.bg_preview_wave_bar);
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(5), dp(height));
+            params.setMargins(dp(4), 0, dp(4), 0);
+            wave.addView(bar, params);
+        }
+        panel.addView(wave, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        FrameLayout.LayoutParams panelParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER);
+        panelParams.setMargins(dp(32), 0, dp(32), 0);
+        audioRoot.addView(panel, panelParams);
+        bindMediaGestures(audioRoot);
+        contentHost.addView(audioRoot, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
         prepareAudioPlayer(file);
     }
 
-    private void addPlaybackControlsToHost() {
-        View controls = getLayoutInflater().inflate(R.layout.partial_preview_playback, contentHost, false);
-        playbackStateView = controls.findViewById(R.id.playback_state);
-        playbackButton = controls.findViewById(R.id.playback_button);
-        playbackButton.setEnabled(false);
-        playbackButton.setOnClickListener(v -> togglePlayback());
-        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-        params.setMargins(dp(12), dp(12), dp(12), dp(12));
-        contentHost.addView(controls, params);
+    private void bindMediaGestures(View view) {
+        final MediaGestureTouchListener listener = new MediaGestureTouchListener(view);
+        view.setOnTouchListener(listener);
+    }
+
+    private final class MediaGestureTouchListener implements View.OnTouchListener {
+        private final View targetView;
+        private final GestureDetector detector;
+        private final int touchSlop;
+
+        private int gestureZone;
+        private float gestureStartX;
+        private float gestureStartY;
+        private float startBrightness;
+        private int startVolume;
+        private boolean edgeAdjustmentActive;
+
+        MediaGestureTouchListener(View targetView) {
+            this.targetView = targetView;
+            touchSlop = ViewConfiguration.get(PreviewActivity.this).getScaledTouchSlop();
+            detector = new GestureDetector(PreviewActivity.this, new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onDown(MotionEvent event) {
+                return true;
+            }
+
+            @Override
+            public boolean onSingleTapConfirmed(MotionEvent event) {
+                if (overlayChrome.getVisibility() == View.VISIBLE) {
+                    hideOverlay();
+                } else {
+                    showOverlay(true);
+                }
+                return true;
+            }
+
+            @Override
+            public boolean onDoubleTap(MotionEvent event) {
+                if (gestureZone != GESTURE_ZONE_CENTER) {
+                    return false;
+                }
+                togglePlayback();
+                showOverlay(true);
+                return true;
+            }
+
+                @Override
+                public void onLongPress(MotionEvent event) {
+                    if (gestureZone == GESTURE_ZONE_CENTER) {
+                        startFastPlayback();
+                    }
+                }
+
+                @Override
+                public boolean onFling(MotionEvent start, MotionEvent end, float velocityX, float velocityY) {
+                    if (start == null || end == null || gestureZone != GESTURE_ZONE_CENTER) {
+                        return false;
+                    }
+                    float dx = end.getX() - start.getX();
+                    float dy = end.getY() - start.getY();
+                    if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > dp(72)) {
+                        movePreviewBy(dy < 0 ? 1 : -1);
+                        return true;
+                    }
+                    return false;
+                }
+            });
+        }
+
+        @Override
+        public boolean onTouch(View view, MotionEvent event) {
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    gestureStartX = event.getX();
+                    gestureStartY = event.getY();
+                    gestureZone = resolveGestureZone(view, gestureStartX);
+                    startBrightness = currentWindowBrightness();
+                    startVolume = currentMusicVolume();
+                    edgeAdjustmentActive = false;
+                    detector.onTouchEvent(event);
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    if (edgeAdjustmentActive) {
+                        updateEdgeAdjustment(event.getY());
+                        return true;
+                    }
+                    if (isEdgeAdjustmentGesture(event)) {
+                        edgeAdjustmentActive = true;
+                        targetView.getParent().requestDisallowInterceptTouchEvent(true);
+                        updateEdgeAdjustment(event.getY());
+                        return true;
+                    }
+                    detector.onTouchEvent(event);
+                    return true;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    stopFastPlayback();
+                    if (edgeAdjustmentActive) {
+                        edgeAdjustmentActive = false;
+                        scheduleOverlayHide();
+                        return true;
+                    }
+                    detector.onTouchEvent(event);
+                    return true;
+                default:
+                    return detector.onTouchEvent(event);
+            }
+        }
+
+        private boolean isEdgeAdjustmentGesture(MotionEvent event) {
+            if (gestureZone != GESTURE_ZONE_LEFT && gestureZone != GESTURE_ZONE_RIGHT) {
+                return false;
+            }
+            float dx = event.getX() - gestureStartX;
+            float dy = event.getY() - gestureStartY;
+            return Math.abs(dy) > touchSlop && Math.abs(dy) > Math.abs(dx);
+        }
+
+        private void updateEdgeAdjustment(float currentY) {
+            float delta = (gestureStartY - currentY) / Math.max(1f, targetView.getHeight());
+            if (gestureZone == GESTURE_ZONE_LEFT) {
+                float brightness = clamp(startBrightness + delta, 0.05f, 1f);
+                setWindowBrightness(brightness);
+                showGestureFeedback(getString(R.string.preview_gesture_brightness, Math.round(brightness * 100f)));
+            } else if (gestureZone == GESTURE_ZONE_RIGHT) {
+                int maxVolume = maxMusicVolume();
+                int volume = Math.round(startVolume + delta * maxVolume);
+                volume = Math.max(0, Math.min(maxVolume, volume));
+                setMusicVolume(volume);
+                int percent = maxVolume <= 0 ? 0 : Math.round(volume * 100f / maxVolume);
+                showGestureFeedback(getString(R.string.preview_gesture_volume, percent));
+            }
+        }
     }
 
     private void prepareVideoPlayer(File file, final TextureView textureView, final ImageView posterView) {
         releasePlayerOnly();
         mediaPrepared = false;
-        if (playbackButton != null) {
-            playbackButton.setEnabled(false);
-        }
-        if (playbackStateView != null) {
-            playbackStateView.setText(R.string.preview_loading);
-        }
+        setPlaybackEnabled(false);
+        playbackStateView.setText(R.string.preview_loading);
 
         mediaPlayer = new MediaPlayer();
         try {
@@ -345,12 +707,8 @@ public final class PreviewActivity extends Activity {
     private void prepareAudioPlayer(File file) {
         releasePlayerOnly();
         mediaPrepared = false;
-        if (playbackButton != null) {
-            playbackButton.setEnabled(false);
-        }
-        if (playbackStateView != null) {
-            playbackStateView.setText(R.string.preview_loading);
-        }
+        setPlaybackEnabled(false);
+        playbackStateView.setText(R.string.preview_loading);
         mediaPlayer = new MediaPlayer();
         try {
             mediaPlayer.setDataSource(file.getAbsolutePath());
@@ -372,13 +730,13 @@ public final class PreviewActivity extends Activity {
             public void onPrepared(MediaPlayer mp) {
                 mediaPrepared = true;
                 mp.setLooping(false);
-                if (playbackButton != null) {
-                    playbackButton.setEnabled(true);
-                }
+                setPlaybackEnabled(true);
+                setRecoverability(R.string.preview_recoverability_ready);
                 if (onPreparedExtra != null) {
                     onPreparedExtra.run();
                 }
                 mp.start();
+                updateProgress();
                 updatePlaybackState(true);
             }
         });
@@ -386,6 +744,8 @@ public final class PreviewActivity extends Activity {
             @Override
             public void onCompletion(MediaPlayer mediaPlayer) {
                 updatePlaybackState(false);
+                updateProgress();
+                showOverlay(false);
             }
         });
         mediaPlayer.setOnErrorListener(new MediaPlayer.OnErrorListener() {
@@ -399,8 +759,10 @@ public final class PreviewActivity extends Activity {
 
     private void togglePlayback() {
         if (!mediaPrepared || mediaPlayer == null) {
+            showOverlay(false);
             return;
         }
+        stopFastPlayback();
         if (mediaPlayer.isPlaying()) {
             mediaPlayer.pause();
             updatePlaybackState(false);
@@ -410,24 +772,197 @@ public final class PreviewActivity extends Activity {
         }
     }
 
+    private void startFastPlayback() {
+        if (!isVideoPreview() || !mediaPrepared || mediaPlayer == null || !mediaPlayer.isPlaying()) {
+            return;
+        }
+        if (setMediaPlaybackSpeed(FAST_PLAYBACK_SPEED)) {
+            speedBoostActive = true;
+            playbackStateView.setText(R.string.preview_gesture_speed);
+            showGestureFeedback(R.string.preview_gesture_speed);
+        }
+    }
+
+    private void stopFastPlayback() {
+        if (!speedBoostActive) {
+            return;
+        }
+        speedBoostActive = false;
+        setMediaPlaybackSpeed(1.0f);
+        if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+            playbackStateView.setText(R.string.preview_playing);
+        }
+    }
+
+    private boolean setMediaPlaybackSpeed(float speed) {
+        if (mediaPlayer == null) {
+            return false;
+        }
+        try {
+            PlaybackParams params = mediaPlayer.getPlaybackParams();
+            params.setSpeed(speed);
+            mediaPlayer.setPlaybackParams(params);
+            return true;
+        } catch (RuntimeException exception) {
+            return false;
+        }
+    }
+
+    private boolean isVideoPreview() {
+        return currentItem != null && currentItem.type == RecoveryType.VIDEO;
+    }
+
     private void updatePlaybackState(boolean playing) {
-        if (playbackButton != null) {
-            playbackButton.setText(playing ? R.string.preview_pause : R.string.preview_play);
+        stopProgressUpdates();
+        playbackButton.setImageResource(playing ? R.drawable.ic_pause : R.drawable.ic_play_white);
+        playbackButton.setContentDescription(getString(playing ? R.string.preview_pause : R.string.preview_play));
+        playbackStateView.setText(playing ? R.string.preview_playing : R.string.preview_paused);
+        if (playing) {
+            progressUpdater.run();
+            scheduleOverlayHide();
+        } else {
+            showOverlay(false);
         }
-        if (playbackStateView != null) {
-            playbackStateView.setText(playing ? R.string.preview_playing : R.string.preview_paused);
+    }
+
+    private void updateProgress() {
+        if (mediaPlayer == null || !mediaPrepared || userSeeking) {
+            return;
         }
+        int duration = mediaPlayer.getDuration();
+        int position = mediaPlayer.getCurrentPosition();
+        if (duration <= 0) {
+            playbackSeekBar.setProgress(0);
+            playbackTimeView.setText(R.string.preview_position_zero);
+            return;
+        }
+        playbackSeekBar.setProgress(Math.min(SEEK_BAR_MAX, Math.max(0,
+                (int) ((long) position * SEEK_BAR_MAX / duration))));
+        playbackTimeView.setText(getString(R.string.preview_position_format,
+                formatDuration(position),
+                formatDuration(duration)));
     }
 
     private void showPlaybackError() {
         mediaPrepared = false;
-        if (playbackButton != null) {
-            playbackButton.setEnabled(false);
-        }
-        if (playbackStateView != null) {
-            playbackStateView.setText(R.string.preview_playback_error);
-        }
+        stopProgressUpdates();
+        setPlaybackEnabled(false);
+        setRecoverability(R.string.preview_recoverability_failed);
+        playbackStateView.setText(R.string.preview_playback_error);
+        playbackTimeView.setText(R.string.preview_position_zero);
+        showOverlay(false);
         Toast.makeText(this, R.string.preview_playback_error, Toast.LENGTH_SHORT).show();
+    }
+
+    private int resolveGestureZone(View view, float x) {
+        int width = Math.max(1, view.getWidth());
+        int edgeWidth = width * GESTURE_ZONE_EDGE_PERCENT / 100;
+        if (x <= edgeWidth) {
+            return GESTURE_ZONE_LEFT;
+        }
+        if (x >= width - edgeWidth) {
+            return GESTURE_ZONE_RIGHT;
+        }
+        return GESTURE_ZONE_CENTER;
+    }
+
+    private float currentWindowBrightness() {
+        float brightness = getWindow().getAttributes().screenBrightness;
+        if (brightness < 0f) {
+            return 0.5f;
+        }
+        return clamp(brightness, 0.05f, 1f);
+    }
+
+    private void setWindowBrightness(float brightness) {
+        WindowManager.LayoutParams params = getWindow().getAttributes();
+        params.screenBrightness = clamp(brightness, 0.05f, 1f);
+        getWindow().setAttributes(params);
+    }
+
+    private int currentMusicVolume() {
+        if (audioManager == null) {
+            return 0;
+        }
+        return audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+    }
+
+    private int maxMusicVolume() {
+        if (audioManager == null) {
+            return 0;
+        }
+        return Math.max(1, audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC));
+    }
+
+    private void setMusicVolume(int volume) {
+        if (audioManager != null) {
+            audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, volume, 0);
+        }
+    }
+
+    private void showGestureFeedback(int stringResId) {
+        showGestureFeedback(getString(stringResId));
+    }
+
+    private void showGestureFeedback(String message) {
+        if (gestureFeedbackView == null) {
+            return;
+        }
+        gestureFeedbackView.setText(message);
+        gestureFeedbackView.setVisibility(View.VISIBLE);
+        uiHandler.removeCallbacks(hideGestureFeedbackRunnable);
+        uiHandler.postDelayed(hideGestureFeedbackRunnable, 900);
+    }
+
+    private static float clamp(float value, float min, float max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    private void showOverlay(boolean autoHide) {
+        overlayChrome.setVisibility(View.VISIBLE);
+        uiHandler.removeCallbacks(hideOverlayRunnable);
+        if (autoHide) {
+            scheduleOverlayHide();
+        }
+    }
+
+    private void hideOverlay() {
+        if (immersivePreview) {
+            overlayChrome.setVisibility(View.GONE);
+        }
+    }
+
+    private void scheduleOverlayHide() {
+        uiHandler.removeCallbacks(hideOverlayRunnable);
+        if (currentItemIsMedia && mediaPlayer != null && mediaPlayer.isPlaying()) {
+            uiHandler.postDelayed(hideOverlayRunnable, OVERLAY_HIDE_DELAY_MS);
+        }
+    }
+
+    private void stopProgressUpdates() {
+        uiHandler.removeCallbacks(progressUpdater);
+    }
+
+    private void setPlaybackChromeVisible(boolean visible) {
+        playbackControls.setVisibility(visible ? View.VISIBLE : View.GONE);
+        playbackButton.setVisibility(visible ? View.VISIBLE : View.GONE);
+    }
+
+    private void setPlaybackEnabled(boolean enabled) {
+        playbackSeekBar.setEnabled(enabled);
+    }
+
+    private void resetPlaybackControls() {
+        playbackStateView.setText(R.string.preview_loading);
+        playbackTimeView.setText(R.string.preview_position_zero);
+        playbackSeekBar.setProgress(0);
+        playbackButton.setImageResource(R.drawable.ic_play_white);
+        playbackButton.setContentDescription(getString(R.string.preview_play));
+        setPlaybackEnabled(false);
+    }
+
+    private void setRecoverability(int stringResId) {
+        recoverabilityView.setText(stringResId);
     }
 
     private void applyVideoFitTransform(TextureView textureView, int videoWidth, int videoHeight) {
@@ -467,18 +1002,25 @@ public final class PreviewActivity extends Activity {
         ScrollView scrollView = new ScrollView(this);
         TextView message = new TextView(this);
         message.setText(R.string.preview_document_message);
-        message.setTextColor(getResources().getColor(R.color.text_primary, getTheme()));
-        message.setPadding(0, 0, 0, dp(8));
+        message.setTextColor(getResources().getColor(R.color.text_on_primary, getTheme()));
+        message.setPadding(dp(16), dp(16), dp(16), dp(16));
         scrollView.addView(message);
-        contentHost.addView(scrollView);
+        contentHost.addView(scrollView, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+        contentHost.setOnClickListener(v -> showOverlay(false));
     }
 
     private void addMessage(String message) {
         TextView textView = new TextView(this);
         textView.setText(message);
+        textView.setGravity(Gravity.CENTER);
         textView.setTextColor(getResources().getColor(R.color.status_warning, getTheme()));
         textView.setPadding(dp(16), dp(16), dp(16), dp(16));
-        contentHost.addView(textView);
+        contentHost.addView(textView, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+        contentHost.setOnClickListener(v -> showOverlay(false));
     }
 
     private RecoveryType parseType(String typeName) {
@@ -501,7 +1043,9 @@ public final class PreviewActivity extends Activity {
     }
 
     private void releasePlayerOnly() {
+        speedBoostActive = false;
         mediaPrepared = false;
+        stopProgressUpdates();
         if (mediaPlayer != null) {
             try {
                 mediaPlayer.stop();
@@ -530,12 +1074,10 @@ public final class PreviewActivity extends Activity {
         return String.format(Locale.US, "%.1f %s", value, units[index]);
     }
 
-    private static String ellipsizeMiddle(String text, int maxChars) {
-        if (text == null || text.length() <= maxChars) {
-            return text == null ? "" : text;
-        }
-        int keep = Math.max(8, (maxChars - 3) / 2);
-        int tailStart = text.length() - keep;
-        return text.substring(0, keep) + "..." + text.substring(tailStart);
+    private static String formatDuration(int milliseconds) {
+        int totalSeconds = Math.max(0, milliseconds / 1000);
+        int minutes = totalSeconds / 60;
+        int seconds = totalSeconds % 60;
+        return String.format(Locale.US, "%d:%02d", minutes, seconds);
     }
 }

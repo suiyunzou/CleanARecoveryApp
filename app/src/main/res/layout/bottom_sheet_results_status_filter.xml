@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_bottom_sheet"
+    android:orientation="vertical"
+    android:padding="@dimen/space_lg">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/results_status_filter"
+        android:textColor="@color/text_primary"
+        android:textSize="@dimen/text_section"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/status_filter_all"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="@dimen/space_md"
+        android:background="@drawable/bg_results_filter_row"
+        android:gravity="center_vertical"
+        android:paddingStart="@dimen/space_md"
+        android:paddingEnd="@dimen/space_md"
+        android:text="@string/filter_all"
+        android:textColor="@color/text_primary"
+        android:textSize="@dimen/text_body" />
+
+    <TextView
+        android:id="@+id/status_filter_existing"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="@dimen/space_xs"
+        android:background="@drawable/bg_results_filter_row"
+        android:gravity="center_vertical"
+        android:paddingStart="@dimen/space_md"
+        android:paddingEnd="@dimen/space_md"
+        android:text="@string/filter_existing"
+        android:textColor="@color/text_primary"
+        android:textSize="@dimen/text_body" />
+
+    <TextView
+        android:id="@+id/status_filter_deleted"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="@dimen/space_xs"
+        android:background="@drawable/bg_results_filter_row"
+        android:gravity="center_vertical"
+        android:paddingStart="@dimen/space_md"
+        android:paddingEnd="@dimen/space_md"
+        android:text="@string/filter_deleted"
+        android:textColor="@color/text_primary"
+        android:textSize="@dimen/text_body" />
+</LinearLayout>

@@ -1,114 +1,179 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background_app"
-    android:fitsSystemWindows="true"
-    android:orientation="vertical">
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:minHeight="@dimen/toolbar_height"
-        android:orientation="horizontal"
-        android:paddingStart="@dimen/space_sm"
-        android:paddingEnd="@dimen/space_md">
-
-        <ImageButton
-            android:id="@+id/preview_back_button"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="@drawable/bg_icon_button"
-            android:contentDescription="@string/button_back"
-            android:padding="12dp"
-            android:scaleType="centerInside"
-            android:src="@drawable/ic_back" />
-
-        <Button
-            android:id="@+id/preview_prev_button"
-            android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:layout_marginStart="@dimen/space_xs"
-            android:background="@drawable/bg_button_secondary"
-            android:text="@string/preview_prev"
-            android:textAllCaps="false"
-            android:textColor="@color/brand_primary_dark"
-            android:textSize="@dimen/text_caption" />
-
-        <TextView
-            android:id="@+id/preview_index"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:textColor="@color/text_primary"
-            android:textSize="@dimen/text_body"
-            android:textStyle="bold" />
-
-        <Button
-            android:id="@+id/preview_next_button"
-            android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            android:background="@drawable/bg_button_secondary"
-            android:text="@string/preview_next"
-            android:textAllCaps="false"
-            android:textColor="@color/brand_primary_dark"
-            android:textSize="@dimen/text_caption" />
-    </LinearLayout>
+    android:background="@color/preview_backdrop"
+    android:fitsSystemWindows="true">
 
     <FrameLayout
         android:id="@+id/preview_content_host"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_marginStart="@dimen/space_md"
-        android:layout_marginEnd="@dimen/space_md"
-        android:layout_weight="1"
-        android:background="@color/preview_backdrop"
-        android:clipToOutline="true" />
+        android:layout_height="match_parent"
+        android:background="@color/preview_backdrop" />
 
-    <LinearLayout
-        android:id="@+id/preview_meta_card"
+    <FrameLayout
+        android:id="@+id/preview_overlay"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_margin="@dimen/space_md"
-        android:background="@drawable/bg_card"
-        android:elevation="@dimen/elevation_card"
-        android:orientation="vertical"
-        android:padding="@dimen/space_md">
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_preview_overlay_gradient">
 
-        <TextView
-            android:id="@+id/preview_file_name"
+        <LinearLayout
+            android:id="@+id/preview_top_chrome"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:breakStrategy="balanced"
-            android:ellipsize="middle"
-            android:maxLines="2"
-            android:textColor="@color/text_primary"
-            android:textSize="@dimen/text_section"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/preview_meta"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:maxLines="3"
+            android:layout_gravity="top"
+            android:gravity="center_vertical"
+            android:minHeight="@dimen/toolbar_height"
+            android:orientation="horizontal"
+            android:paddingStart="@dimen/space_sm"
             android:paddingTop="@dimen/space_sm"
-            android:textColor="@color/text_secondary"
-            android:textSize="@dimen/text_caption" />
-    </LinearLayout>
+            android:paddingEnd="@dimen/space_sm">
 
-    <Button
-        android:id="@+id/preview_recover_button"
-        android:layout_width="match_parent"
+            <ImageButton
+                android:id="@+id/preview_back_button"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_preview_icon_button"
+                android:contentDescription="@string/button_back"
+                android:padding="12dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_back"
+                android:tint="@android:color/white" />
+
+            <TextView
+                android:id="@+id/preview_index"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/space_sm"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:textColor="@android:color/white"
+                android:textSize="@dimen/text_body"
+                android:textStyle="bold" />
+
+            <ImageButton
+                android:id="@+id/preview_details_button"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginStart="@dimen/space_sm"
+                android:background="@drawable/bg_preview_icon_button"
+                android:contentDescription="@string/preview_details"
+                android:padding="12dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/ic_info"
+                android:tint="@android:color/white" />
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/playback_button"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:layout_gravity="center"
+            android:background="@drawable/bg_preview_play_button"
+            android:clickable="false"
+            android:contentDescription="@string/preview_play"
+            android:focusable="false"
+            android:padding="20dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_play_white" />
+
+        <LinearLayout
+            android:id="@+id/preview_bottom_chrome"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/space_md"
+            android:paddingEnd="@dimen/space_md"
+            android:paddingBottom="@dimen/space_md">
+
+            <LinearLayout
+                android:id="@+id/preview_meta_card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/space_sm"
+                android:background="@drawable/bg_preview_control_bar"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="@dimen/space_md"
+                android:paddingTop="@dimen/space_sm"
+                android:paddingEnd="@dimen/space_md"
+                android:paddingBottom="@dimen/space_sm">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/preview_file_name"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="middle"
+                        android:maxLines="1"
+                        android:textColor="@android:color/white"
+                        android:textSize="@dimen/text_section"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/preview_meta"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_xs"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="#D1D5DB"
+                        android:textSize="@dimen/text_caption" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/preview_recoverability"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/space_sm"
+                    android:background="@drawable/bg_recoverability_badge"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:paddingStart="@dimen/space_sm"
+                    android:paddingTop="@dimen/space_xs"
+                    android:paddingEnd="@dimen/space_sm"
+                    android:paddingBottom="@dimen/space_xs"
+                    android:textColor="@android:color/white"
+                    android:textSize="@dimen/text_micro" />
+            </LinearLayout>
+
+            <include layout="@layout/partial_preview_playback" />
+
+            <Button
+                android:id="@+id/preview_recover_button"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_gravity="end"
+                android:layout_marginTop="@dimen/space_sm"
+                android:background="@drawable/bg_button_primary"
+                android:minWidth="112dp"
+                android:paddingStart="@dimen/space_md"
+                android:paddingEnd="@dimen/space_md"
+                android:text="@string/preview_recover_file"
+                android:textAllCaps="false"
+                android:textColor="@color/text_on_primary" />
+        </LinearLayout>
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/preview_gesture_feedback"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="@dimen/space_md"
-        android:layout_marginEnd="@dimen/space_md"
-        android:layout_marginBottom="@dimen/space_md"
-        android:background="@drawable/bg_button_primary"
-        android:minHeight="@dimen/button_min_height"
-        android:text="@string/preview_recover_file"
-        android:textAllCaps="false"
-        android:textColor="@color/text_on_primary" />
-</LinearLayout>
+        android:layout_gravity="center|bottom"
+        android:layout_marginBottom="176dp"
+        android:background="@drawable/bg_preview_control_bar"
+        android:paddingStart="@dimen/space_md"
+        android:paddingTop="@dimen/space_sm"
+        android:paddingEnd="@dimen/space_md"
+        android:paddingBottom="@dimen/space_sm"
+        android:textColor="@android:color/white"
+        android:textSize="@dimen/text_body"
+        android:textStyle="bold"
+        android:visibility="gone" />
+</FrameLayout>

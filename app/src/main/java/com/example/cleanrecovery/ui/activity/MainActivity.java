@@ -6,6 +6,7 @@ import com.example.cleanrecovery.recovery.RecoveryCoordinator;
 import com.example.cleanrecovery.recovery.RecoveryItem;
 import com.example.cleanrecovery.recovery.RecoveryOutputPaths;
 import com.example.cleanrecovery.recovery.RecoveryResultsSession;
+import com.example.cleanrecovery.recovery.RecoveryResultsStore;
 import com.example.cleanrecovery.recovery.RecoveryState;
 import com.example.cleanrecovery.recovery.RecoveryType;
 import com.example.cleanrecovery.recycle.RecycleBin;
@@ -37,8 +38,10 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
+import com.google.android.material.bottomsheet.BottomSheetDialog;
 
 import com.example.cleanrecovery.algorithm.AlgorithmEvent;
 import com.example.cleanrecovery.algorithm.AlgorithmRegistry;
@@ -80,14 +83,15 @@ public final class MainActivity extends Activity {
     private TextView scanPathToggle;
     private TextView scanCurrentPath;
     private TextView resultsCount;
+    private TextView resultsSummaryScope;
+    private TextView resultsSummaryDeleted;
+    private TextView resultsSummaryOutput;
+    private TextView resultsStatusFilterButton;
     private TextView selectedCount;
+    private View selectionActionBar;
     private View resultsEmpty;
     private TextView resultsEmptyMessage;
     private RecyclerView resultsGrid;
-    private TextView filterAllButton;
-    private TextView filterExistingButton;
-    private TextView filterDeletedButton;
-    private ImageButton filterTypeButton;
     private View filterTypeRow;
     private TextView filterTypeAll;
     private TextView filterTypeImages;
@@ -175,6 +179,12 @@ public final class MainActivity extends Activity {
     @Override
     public void onBackPressed() {
         if (resultsPanel.getVisibility() == View.VISIBLE) {
+            if (recoveryState.getSelectedCount() > 0) {
+                recoveryState.setAllSelected(false);
+                gridAdapter.notifyDataSetChanged();
+                updateCounters();
+                return;
+            }
             showPanel(Panel.HOME);
             return;
         }
@@ -226,14 +236,15 @@ public final class MainActivity extends Activity {
         lastScanSummary = findViewById(R.id.last_scan_summary);
         scanParticleView = findViewById(R.id.scan_particle_view);
         resultsCount = findViewById(R.id.results_count);
+        resultsSummaryScope = findViewById(R.id.results_summary_scope);
+        resultsSummaryDeleted = findViewById(R.id.results_summary_deleted);
+        resultsSummaryOutput = findViewById(R.id.results_summary_output);
+        resultsStatusFilterButton = findViewById(R.id.results_status_filter_button);
         selectedCount = findViewById(R.id.selected_count);
+        selectionActionBar = findViewById(R.id.selection_action_bar);
         resultsEmpty = findViewById(R.id.results_empty);
         resultsEmptyMessage = findViewById(R.id.results_empty_message);
         resultsGrid = findViewById(R.id.results_grid);
-        filterAllButton = findViewById(R.id.filter_all_button);
-        filterExistingButton = findViewById(R.id.filter_existing_button);
-        filterDeletedButton = findViewById(R.id.filter_deleted_button);
-        filterTypeButton = findViewById(R.id.filter_type_button);
         filterTypeRow = findViewById(R.id.filter_type_row);
         filterTypeAll = findViewById(R.id.filter_type_all);
         filterTypeImages = findViewById(R.id.filter_type_images);
@@ -259,10 +270,24 @@ public final class MainActivity extends Activity {
 
             @Override
             public void onItemClicked(RecoveryItem item, int position) {
+                if (recoveryState.getSelectedCount() > 0) {
+                    item.selected = !item.selected;
+                    gridAdapter.notifyItemChanged(position);
+                    updateCounters();
+                    return;
+                }
                 openPreview(item, position);
             }
+
+            @Override
+            public boolean onItemLongClicked(RecoveryItem item, int position) {
+                item.selected = !item.selected;
+                gridAdapter.notifyItemChanged(position);
+                updateCounters();
+                return true;
+            }
         });
-        resultsGrid.setLayoutManager(new GridLayoutManager(this, 3));
+        resultsGrid.setLayoutManager(new LinearLayoutManager(this));
         resultsGrid.setAdapter(gridAdapter);
     }
 
@@ -330,10 +355,7 @@ public final class MainActivity extends Activity {
         findViewById(R.id.nav_folder).setOnClickListener(v -> openRecoveryFolder());
         findViewById(R.id.nav_about).setOnClickListener(v ->
                 startActivity(new Intent(MainActivity.this, AboutActivity.class)));
-        filterAllButton.setOnClickListener(v -> setFilter(RecoveryState.FilterMode.ALL));
-        filterExistingButton.setOnClickListener(v -> setFilter(RecoveryState.FilterMode.EXISTING));
-        filterDeletedButton.setOnClickListener(v -> setFilter(RecoveryState.FilterMode.DELETED));
-        filterTypeButton.setOnClickListener(v -> toggleFilterTypeRow());
+        resultsStatusFilterButton.setOnClickListener(v -> showStatusFilterSheet());
         filterTypeAll.setOnClickListener(v -> setTypeFilter(null));
         filterTypeImages.setOnClickListener(v -> setTypeFilter(RecoveryType.IMAGE));
         filterTypeVideos.setOnClickListener(v -> setTypeFilter(RecoveryType.VIDEO));
@@ -537,14 +559,31 @@ public final class MainActivity extends Activity {
     private void openResultsTab() {
         restoreResultsSessionIfNeeded();
         showPanel(Panel.RESULTS);
-        styleFilterTabs();
+        styleStatusFilterButton();
+        styleTypeFilterChips();
+        updateResultsSummary();
         gridAdapter.notifyDataSetChanged();
         updateCounters();
     }
 
     private void restoreResultsSessionIfNeeded() {
-        if (recoveryState.getAllCount() > 0 || !RecoveryResultsSession.hasResults()) {
+        if (recoveryState.getAllCount() > 0) {
             return;
+        }
+        if (!RecoveryResultsSession.hasResults()) {
+            RecoveryResultsStore.Snapshot snapshot = RecoveryResultsStore.read(this);
+            if (snapshot == null) {
+                return;
+            }
+            RecoveryResultsSession.saveFromItems(
+                    snapshot.items,
+                    snapshot.filter,
+                    snapshot.scanType,
+                    snapshot.scanAllMode,
+                    snapshot.experimentalMode,
+                    snapshot.scannedCount,
+                    snapshot.foundCount
+            );
         }
         RecoveryResultsSession.restoreTo(recoveryState);
         scanAllMode = RecoveryResultsSession.isScanAllMode();
@@ -557,14 +596,11 @@ public final class MainActivity extends Activity {
     private void setFilter(RecoveryState.FilterMode mode) {
         recoveryState.setFilter(mode);
         gridAdapter.notifyDataSetChanged();
-        styleFilterTabs();
+        styleStatusFilterButton();
+        styleTypeFilterChips();
+        updateResultsSummary();
         updateCounters();
         updateEmptyState();
-    }
-
-    private void toggleFilterTypeRow() {
-        boolean show = filterTypeRow.getVisibility() != View.VISIBLE;
-        filterTypeRow.setVisibility(show ? View.VISIBLE : View.GONE);
     }
 
     private void setTypeFilter(RecoveryType type) {
@@ -572,39 +608,114 @@ public final class MainActivity extends Activity {
         recoveryState.setTypeFilter(type);
         gridAdapter.notifyDataSetChanged();
         styleTypeFilterChips();
+        updateResultsSummary();
         updateCounters();
         updateEmptyState();
     }
 
     private void styleTypeFilterChips() {
-        styleTypeChip(filterTypeAll, currentTypeFilter == null);
-        styleTypeChip(filterTypeImages, currentTypeFilter == RecoveryType.IMAGE);
-        styleTypeChip(filterTypeVideos, currentTypeFilter == RecoveryType.VIDEO);
-        styleTypeChip(filterTypeAudio, currentTypeFilter == RecoveryType.AUDIO);
-        styleTypeChip(filterTypeDocuments, currentTypeFilter == RecoveryType.DOCUMENT);
+        RecoveryState.FilterMode statusFilter = recoveryState.getFilter();
+        styleTypeChip(filterTypeAll, currentTypeFilter == null,
+                getString(R.string.filter_all),
+                recoveryState.countForFilter(statusFilter));
+        styleTypeChip(filterTypeImages, currentTypeFilter == RecoveryType.IMAGE,
+                getString(R.string.type_images),
+                recoveryState.countByTypeForFilter(RecoveryType.IMAGE, statusFilter));
+        styleTypeChip(filterTypeVideos, currentTypeFilter == RecoveryType.VIDEO,
+                getString(R.string.type_videos),
+                recoveryState.countByTypeForFilter(RecoveryType.VIDEO, statusFilter));
+        styleTypeChip(filterTypeAudio, currentTypeFilter == RecoveryType.AUDIO,
+                getString(R.string.type_audio),
+                recoveryState.countByTypeForFilter(RecoveryType.AUDIO, statusFilter));
+        styleTypeChip(filterTypeDocuments, currentTypeFilter == RecoveryType.DOCUMENT,
+                getString(R.string.type_documents),
+                recoveryState.countByTypeForFilter(RecoveryType.DOCUMENT, statusFilter));
     }
 
-    private void styleTypeChip(TextView chip, boolean active) {
-        chip.setBackgroundResource(active ? R.drawable.bg_tab_selected : R.drawable.bg_tab_unselected);
+    private void styleTypeChip(TextView chip, boolean active, String label, int count) {
+        chip.setText(getString(R.string.results_type_chip_format, label, count));
+        chip.setBackgroundResource(active ? R.drawable.bg_results_chip_selected : R.drawable.bg_results_chip_unselected);
         chip.setTextColor(resolveColorRes(active ? R.color.text_on_primary : R.color.text_secondary));
     }
 
-    private void styleFilterTabs() {
-        styleFilterButton(filterAllButton, recoveryState.getFilter() == RecoveryState.FilterMode.ALL);
-        styleFilterButton(filterExistingButton, recoveryState.getFilter() == RecoveryState.FilterMode.EXISTING);
-        styleFilterButton(filterDeletedButton, recoveryState.getFilter() == RecoveryState.FilterMode.DELETED);
+    private void styleStatusFilterButton() {
+        resultsStatusFilterButton.setText(getString(
+                R.string.results_status_filter_value,
+                labelForStatusFilter(recoveryState.getFilter())));
     }
 
-    private void styleFilterButton(TextView button, boolean active) {
-        button.setBackgroundResource(active ? R.drawable.bg_tab_selected : R.drawable.bg_tab_unselected);
-        button.setTextColor(resolveColorRes(active ? R.color.text_on_primary : R.color.text_secondary));
+    private String labelForStatusFilter(RecoveryState.FilterMode filter) {
+        if (filter == RecoveryState.FilterMode.EXISTING) {
+            return getString(R.string.filter_existing);
+        }
+        if (filter == RecoveryState.FilterMode.DELETED) {
+            return getString(R.string.filter_deleted);
+        }
+        return getString(R.string.filter_all);
+    }
+
+    private void showStatusFilterSheet() {
+        BottomSheetDialog dialog = new BottomSheetDialog(this);
+        View sheet = getLayoutInflater().inflate(R.layout.bottom_sheet_results_status_filter, null);
+        bindStatusFilterOption(dialog, sheet, R.id.status_filter_all, RecoveryState.FilterMode.ALL);
+        bindStatusFilterOption(dialog, sheet, R.id.status_filter_existing, RecoveryState.FilterMode.EXISTING);
+        bindStatusFilterOption(dialog, sheet, R.id.status_filter_deleted, RecoveryState.FilterMode.DELETED);
+        dialog.setContentView(sheet);
+        dialog.show();
+    }
+
+    private void bindStatusFilterOption(
+            BottomSheetDialog dialog,
+            View sheet,
+            int viewId,
+            RecoveryState.FilterMode filter
+    ) {
+        TextView row = sheet.findViewById(viewId);
+        boolean active = recoveryState.getFilter() == filter;
+        row.setText(getString(
+                R.string.results_status_filter_option_format,
+                labelForStatusFilter(filter),
+                recoveryState.countForFilter(filter)));
+        row.setTextColor(resolveColorRes(active ? R.color.brand_primary_dark : R.color.text_primary));
+        row.setTextSize(active ? 16 : 14);
+        row.setTypeface(null, active ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
+        row.setOnClickListener(v -> {
+            dialog.dismiss();
+            setFilter(filter);
+        });
+    }
+
+    private void updateResultsSummary() {
+        resultsSummaryScope.setText(getString(
+                R.string.results_summary_compact,
+                currentScanLabel(),
+                recoveryState.getAllCount(),
+                recoveryState.countSuspectedDeleted()));
+        resultsCount.setText(getString(
+                R.string.results_summary_found,
+                recoveryState.getAllCount()));
+        resultsSummaryDeleted.setText(getString(
+                R.string.results_summary_deleted,
+                recoveryState.countSuspectedDeleted()));
+        resultsSummaryOutput.setText(getString(
+                R.string.results_summary_output,
+                RecoveryOutputPaths.primaryDataRecoveryDir().getAbsolutePath()));
+    }
+
+    private String currentScanLabel() {
+        if (scanAllMode) {
+            return getString(R.string.type_all);
+        }
+        if (currentScanType != null) {
+            return getString(currentScanType.labelResId);
+        }
+        return getString(R.string.type_all);
     }
 
     private void updateCounters() {
-        int visible = recoveryState.getVisibleCount();
-        resultsCount.setText(getResources().getQuantityString(R.plurals.results_count, visible, visible));
         int selected = recoveryState.getSelectedCount();
         selectedCount.setText(getResources().getQuantityString(R.plurals.selected_count, selected, selected));
+        selectionActionBar.setVisibility(selected > 0 ? View.VISIBLE : View.GONE);
         updateEmptyState();
     }
 
@@ -721,11 +832,22 @@ public final class MainActivity extends Activity {
                 scannedCount,
                 foundCount
         );
+        RecoveryResultsStore.saveFrom(
+                this,
+                recoveryState,
+                currentScanType,
+                scanAllMode,
+                experimentalMode,
+                scannedCount,
+                foundCount
+        );
         updateScanProgressUi();
         progressHandler.removeCallbacks(progressTick);
         persistScanHistory();
         gridAdapter.notifyDataSetChanged();
-        styleFilterTabs();
+        styleStatusFilterButton();
+        styleTypeFilterChips();
+        updateResultsSummary();
         updateCounters();
         showPanel(Panel.RESULTS);
     }

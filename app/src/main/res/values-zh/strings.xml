@@ -75,6 +75,18 @@
     <string name="preview_paused">已暂停</string>
     <string name="preview_audio_ready">音频预览已准备好。</string>
     <string name="preview_document_message">暂不内置文档预览。恢复前可先查看下方路径和文件信息。</string>
+    <string name="preview_details">详情</string>
+    <string name="preview_detail_status">状态</string>
+    <string name="preview_position_zero">0:00 / 0:00</string>
+    <string name="preview_position_format">%1$s / %2$s</string>
+    <string name="preview_audio_title">音频预览</string>
+    <string name="preview_recoverability_readable">文件可读</string>
+    <string name="preview_recoverability_ready">预览通过，可尝试恢复</string>
+    <string name="preview_recoverability_failed">预览失败，可能损坏或格式不支持</string>
+    <string name="preview_recoverability_unreadable">文件不可读</string>
+    <string name="preview_gesture_brightness">亮度 %1$d%%</string>
+    <string name="preview_gesture_volume">音量 %1$d%%</string>
+    <string name="preview_gesture_speed">2.0x</string>
     <string name="type_images">图片</string>
     <string name="type_videos">视频</string>
     <string name="type_audio">音频</string>
@@ -89,7 +101,7 @@
     <string name="last_scan_empty">尚未扫描</string>
     <string name="last_scan_summary">%1$s · 已扫描 %2$d · 找到 %3$d</string>
     <string name="last_scan_compact">上次扫描 %1$s · 找到 %2$d 个</string>
-    <string name="results_empty_never_scanned">尚未扫描 — 请从首页开始</string>
+    <string name="results_empty_never_scanned">尚未扫描，请从首页开始；已恢复文件在「文件夹」中查看</string>
     <string name="file_browser_title">文件浏览</string>
     <string name="file_browser_up">上一级</string>
     <string name="file_browser_empty">此文件夹为空</string>
@@ -175,7 +187,8 @@
     <string name="scan_progress_detail">已检查 %1$,d / %2$,d</string>
     <string name="scan_stats_format">找到 %1$d 项</string>
     <string name="scan_percent_format">%1$d%%</string>
-    <string name="empty_results_title">这里还没有内容，试试其他筛选或重新扫描</string>
+    <string name="results_summary_compact">%1$s · 找到 %2$d 项 · 疑似删除 %3$d 项</string>
+    <string name="empty_results_title">这里还没有内容；可换筛选或重新扫描，已恢复文件在「文件夹」中查看</string>
     <string name="rescan_button">重新扫描</string>
     <string name="about_title">关于</string>
     <string name="about_tagline">找回丢失的美好，只读不删改</string>

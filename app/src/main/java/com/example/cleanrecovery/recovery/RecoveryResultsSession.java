@@ -15,6 +15,7 @@ public final class RecoveryResultsSession {
     private static boolean experimentalMode;
     private static int scannedCount;
     private static int foundCount;
+    private static boolean hasSnapshot;
 
     private RecoveryResultsSession() {
     }
@@ -27,17 +28,38 @@ public final class RecoveryResultsSession {
             int scanned,
             int found
     ) {
-        items = copyItems(state.getAllItems());
-        filter = state.getFilter();
+        saveFromItems(
+                state.getAllItems(),
+                state.getFilter(),
+                type,
+                allTypes,
+                experimental,
+                scanned,
+                found
+        );
+    }
+
+    public static void saveFromItems(
+            List<RecoveryItem> sourceItems,
+            RecoveryState.FilterMode savedFilter,
+            RecoveryType type,
+            boolean allTypes,
+            boolean experimental,
+            int scanned,
+            int found
+    ) {
+        items = copyItems(sourceItems);
+        filter = savedFilter == null ? RecoveryState.FilterMode.ALL : savedFilter;
         scanType = type;
         scanAllMode = allTypes;
         experimentalMode = experimental;
         scannedCount = scanned;
         foundCount = found;
+        hasSnapshot = true;
     }
 
     public static boolean hasResults() {
-        return !items.isEmpty();
+        return hasSnapshot;
     }
 
     public static void restoreTo(RecoveryState state) {
@@ -74,6 +96,7 @@ public final class RecoveryResultsSession {
         experimentalMode = false;
         scannedCount = 0;
         foundCount = 0;
+        hasSnapshot = false;
     }
 
     private static List<RecoveryItem> copyItems(List<RecoveryItem> source) {
