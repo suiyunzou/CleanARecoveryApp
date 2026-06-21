@@ -71,6 +71,8 @@
     <string name="preview_loading">正在加载预览&#8230;</string>
     <string name="preview_play">播放</string>
     <string name="preview_pause">暂停</string>
+    <string name="preview_fullscreen">全屏</string>
+    <string name="preview_exit_fullscreen">退出全屏</string>
     <string name="preview_playing">正在播放</string>
     <string name="preview_paused">已暂停</string>
     <string name="preview_audio_ready">音频预览已准备好。</string>
@@ -204,6 +206,8 @@
     <string name="about_footer">用心打造 · 清寻恢复</string>
     <string name="about_music_desc">播放、搜索和管理歌单</string>
     <string name="about_music_open">打开</string>
+    <string name="online_movie_title">在线观影</string>
+    <string name="about_online_movie_desc">使用内置浏览器在线观看视频</string>
 
     <!-- Universal download -->
     <string name="universal_download_title">全网下载</string>

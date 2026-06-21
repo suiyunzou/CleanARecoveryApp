@@ -72,6 +72,8 @@
     <string name="preview_loading">Loading preview&#8230;</string>
     <string name="preview_play">Play</string>
     <string name="preview_pause">Pause</string>
+    <string name="preview_fullscreen">Fullscreen</string>
+    <string name="preview_exit_fullscreen">Exit fullscreen</string>
     <string name="preview_playing">Playing</string>
     <string name="preview_paused">Paused</string>
     <string name="preview_audio_ready">Audio preview is ready.</string>
@@ -245,6 +247,8 @@
     <string name="about_tools_title">TOOLS</string>
     <string name="about_music_desc">Play, search and manage playlists</string>
     <string name="about_music_open">Open</string>
+    <string name="online_movie_title">Online Movies</string>
+    <string name="about_online_movie_desc">Watch online videos in the built-in browser</string>
 
     <!-- Universal download -->
     <string name="universal_download_title">Universal Download</string>

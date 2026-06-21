@@ -12,6 +12,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.graphics.Bitmap;
 import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
@@ -92,6 +93,7 @@ public final class PreviewActivity extends Activity {
     private FrameLayout contentHost;
     private View overlayChrome;
     private View playbackControls;
+    private View previewMetaCard;
     private TextView previewIndex;
     private TextView previewFileName;
     private TextView previewMeta;
@@ -104,14 +106,16 @@ public final class PreviewActivity extends Activity {
     private MediaPlayer mediaPlayer;
     private Surface mediaSurface;
     private ImageButton playbackButton;
-    private TextView playbackStateView;
-    private TextView playbackTimeView;
+    private ImageButton playbackFullscreenButton;
     private SeekBar playbackSeekBar;
     private boolean mediaPrepared;
     private boolean currentItemIsMedia;
     private boolean immersivePreview;
     private boolean userSeeking;
     private boolean speedBoostActive;
+    private boolean videoFullscreen;
+    private boolean playbackChromeVisible;
+    private int originalRequestedOrientation;
     private RecoveryItem currentItem;
     private File currentFile;
 
@@ -122,6 +126,15 @@ public final class PreviewActivity extends Activity {
         setContentView(R.layout.activity_preview);
         bindChrome();
         renderCurrentItem();
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (videoFullscreen) {
+            setVideoFullscreen(false);
+            return;
+        }
+        super.onBackPressed();
     }
 
     @Override
@@ -137,6 +150,9 @@ public final class PreviewActivity extends Activity {
     @Override
     protected void onDestroy() {
         uiHandler.removeCallbacksAndMessages(null);
+        if (videoFullscreen) {
+            setRequestedOrientation(originalRequestedOrientation);
+        }
         releasePlayer();
         super.onDestroy();
     }
@@ -144,6 +160,7 @@ public final class PreviewActivity extends Activity {
     private void bindChrome() {
         contentHost = findViewById(R.id.preview_content_host);
         overlayChrome = findViewById(R.id.preview_overlay);
+        previewMetaCard = findViewById(R.id.preview_meta_card);
         previewIndex = findViewById(R.id.preview_index);
         previewFileName = findViewById(R.id.preview_file_name);
         previewMeta = findViewById(R.id.preview_meta);
@@ -152,12 +169,12 @@ public final class PreviewActivity extends Activity {
         previewRecoverButton = findViewById(R.id.preview_recover_button);
         detailsButton = findViewById(R.id.preview_details_button);
         playbackControls = findViewById(R.id.playback_controls);
-        playbackStateView = findViewById(R.id.playback_state);
         playbackButton = findViewById(R.id.playback_button);
-        playbackTimeView = findViewById(R.id.playback_time);
+        playbackFullscreenButton = findViewById(R.id.playback_fullscreen_button);
         playbackSeekBar = findViewById(R.id.playback_seek);
         ImageButton backButton = findViewById(R.id.preview_back_button);
         audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        originalRequestedOrientation = getRequestedOrientation();
 
         backButton.setOnClickListener(v -> finish());
         previewRecoverButton.setOnClickListener(v -> recoverCurrentItem());
@@ -165,17 +182,14 @@ public final class PreviewActivity extends Activity {
             showOverlay(false);
             showFileDetails();
         });
+        playbackButton.setOnClickListener(v -> {
+            togglePlayback();
+            showOverlay(mediaPlayer != null && mediaPlayer.isPlaying());
+        });
+        playbackFullscreenButton.setOnClickListener(v -> toggleVideoFullscreen());
         playbackSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                if (fromUser && mediaPrepared && mediaPlayer != null) {
-                    int duration = mediaPlayer.getDuration();
-                    if (duration > 0) {
-                        playbackTimeView.setText(getString(R.string.preview_position_format,
-                                formatDuration((int) ((long) duration * progress / SEEK_BAR_MAX)),
-                                formatDuration(duration)));
-                    }
-                }
             }
 
             @Override
@@ -208,6 +222,7 @@ public final class PreviewActivity extends Activity {
         contentHost.setOnClickListener(null);
         currentItemIsMedia = false;
         immersivePreview = false;
+        setVideoFullscreen(false);
         currentItem = PreviewSession.currentItem();
         if (currentItem == null) {
             currentItem = itemFromIntent();
@@ -561,23 +576,14 @@ public final class PreviewActivity extends Activity {
             }
 
             @Override
-            public boolean onSingleTapConfirmed(MotionEvent event) {
-                if (overlayChrome.getVisibility() == View.VISIBLE) {
-                    hideOverlay();
-                } else {
-                    showOverlay(true);
-                }
+            public boolean onSingleTapUp(MotionEvent event) {
+                handleMediaSingleTap();
                 return true;
             }
 
             @Override
             public boolean onDoubleTap(MotionEvent event) {
-                if (gestureZone != GESTURE_ZONE_CENTER) {
-                    return false;
-                }
-                togglePlayback();
-                showOverlay(true);
-                return true;
+                return false;
             }
 
                 @Override
@@ -673,7 +679,6 @@ public final class PreviewActivity extends Activity {
         releasePlayerOnly();
         mediaPrepared = false;
         setPlaybackEnabled(false);
-        playbackStateView.setText(R.string.preview_loading);
 
         mediaPlayer = new MediaPlayer();
         try {
@@ -708,7 +713,6 @@ public final class PreviewActivity extends Activity {
         releasePlayerOnly();
         mediaPrepared = false;
         setPlaybackEnabled(false);
-        playbackStateView.setText(R.string.preview_loading);
         mediaPlayer = new MediaPlayer();
         try {
             mediaPlayer.setDataSource(file.getAbsolutePath());
@@ -772,13 +776,66 @@ public final class PreviewActivity extends Activity {
         }
     }
 
+    private void handleMediaSingleTap() {
+        if (!mediaPrepared || mediaPlayer == null) {
+            showOverlay(false);
+            return;
+        }
+        if (mediaPlayer.isPlaying()) {
+            stopFastPlayback();
+            mediaPlayer.pause();
+            updatePlaybackState(false);
+        }
+        showOverlay(false);
+    }
+
+    private void toggleVideoFullscreen() {
+        if (!isVideoPreview()) {
+            return;
+        }
+        setVideoFullscreen(!videoFullscreen);
+        showOverlay(false);
+    }
+
+    private void setVideoFullscreen(boolean fullscreen) {
+        if (videoFullscreen == fullscreen) {
+            applyFullscreenChromeState();
+            return;
+        }
+        videoFullscreen = fullscreen;
+        setRequestedOrientation(fullscreen
+                ? ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                : originalRequestedOrientation);
+        applyFullscreenChromeState();
+    }
+
+    private void applyFullscreenChromeState() {
+        boolean fullscreenVideo = videoFullscreen && isVideoPreview();
+        if (previewMetaCard != null) {
+            previewMetaCard.setVisibility(fullscreenVideo ? View.GONE : View.VISIBLE);
+        }
+        if (previewRecoverButton != null) {
+            previewRecoverButton.setVisibility(fullscreenVideo ? View.GONE : View.VISIBLE);
+        }
+        if (playbackFullscreenButton != null) {
+            playbackFullscreenButton.setVisibility(playbackChromeVisible && isVideoPreview()
+                    ? View.VISIBLE
+                    : View.GONE);
+            playbackFullscreenButton.setImageResource(fullscreenVideo
+                    ? R.drawable.ic_fullscreen_exit
+                    : R.drawable.ic_fullscreen);
+            playbackFullscreenButton.setContentDescription(getString(fullscreenVideo
+                    ? R.string.preview_exit_fullscreen
+                    : R.string.preview_fullscreen));
+        }
+    }
+
     private void startFastPlayback() {
         if (!isVideoPreview() || !mediaPrepared || mediaPlayer == null || !mediaPlayer.isPlaying()) {
             return;
         }
         if (setMediaPlaybackSpeed(FAST_PLAYBACK_SPEED)) {
             speedBoostActive = true;
-            playbackStateView.setText(R.string.preview_gesture_speed);
             showGestureFeedback(R.string.preview_gesture_speed);
         }
     }
@@ -789,9 +846,6 @@ public final class PreviewActivity extends Activity {
         }
         speedBoostActive = false;
         setMediaPlaybackSpeed(1.0f);
-        if (mediaPlayer != null && mediaPlayer.isPlaying()) {
-            playbackStateView.setText(R.string.preview_playing);
-        }
     }
 
     private boolean setMediaPlaybackSpeed(float speed) {
@@ -816,7 +870,6 @@ public final class PreviewActivity extends Activity {
         stopProgressUpdates();
         playbackButton.setImageResource(playing ? R.drawable.ic_pause : R.drawable.ic_play_white);
         playbackButton.setContentDescription(getString(playing ? R.string.preview_pause : R.string.preview_play));
-        playbackStateView.setText(playing ? R.string.preview_playing : R.string.preview_paused);
         if (playing) {
             progressUpdater.run();
             scheduleOverlayHide();
@@ -833,14 +886,10 @@ public final class PreviewActivity extends Activity {
         int position = mediaPlayer.getCurrentPosition();
         if (duration <= 0) {
             playbackSeekBar.setProgress(0);
-            playbackTimeView.setText(R.string.preview_position_zero);
             return;
         }
         playbackSeekBar.setProgress(Math.min(SEEK_BAR_MAX, Math.max(0,
                 (int) ((long) position * SEEK_BAR_MAX / duration))));
-        playbackTimeView.setText(getString(R.string.preview_position_format,
-                formatDuration(position),
-                formatDuration(duration)));
     }
 
     private void showPlaybackError() {
@@ -848,8 +897,6 @@ public final class PreviewActivity extends Activity {
         stopProgressUpdates();
         setPlaybackEnabled(false);
         setRecoverability(R.string.preview_recoverability_failed);
-        playbackStateView.setText(R.string.preview_playback_error);
-        playbackTimeView.setText(R.string.preview_position_zero);
         showOverlay(false);
         Toast.makeText(this, R.string.preview_playback_error, Toast.LENGTH_SHORT).show();
     }
@@ -944,8 +991,10 @@ public final class PreviewActivity extends Activity {
     }
 
     private void setPlaybackChromeVisible(boolean visible) {
+        playbackChromeVisible = visible;
         playbackControls.setVisibility(visible ? View.VISIBLE : View.GONE);
         playbackButton.setVisibility(visible ? View.VISIBLE : View.GONE);
+        applyFullscreenChromeState();
     }
 
     private void setPlaybackEnabled(boolean enabled) {
@@ -953,8 +1002,6 @@ public final class PreviewActivity extends Activity {
     }
 
     private void resetPlaybackControls() {
-        playbackStateView.setText(R.string.preview_loading);
-        playbackTimeView.setText(R.string.preview_position_zero);
         playbackSeekBar.setProgress(0);
         playbackButton.setImageResource(R.drawable.ic_play_white);
         playbackButton.setContentDescription(getString(R.string.preview_play));
@@ -1074,10 +1121,4 @@ public final class PreviewActivity extends Activity {
         return String.format(Locale.US, "%.1f %s", value, units[index]);
     }
 
-    private static String formatDuration(int milliseconds) {
-        int totalSeconds = Math.max(0, milliseconds / 1000);
-        int minutes = totalSeconds / 60;
-        int seconds = totalSeconds % 60;
-        return String.format(Locale.US, "%d:%02d", minutes, seconds);
-    }
 }
