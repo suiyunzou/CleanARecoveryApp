@@ -85,6 +85,36 @@ public final class RecoveryState {
         return count;
     }
 
+    public int countByTypeForFilter(RecoveryType type, FilterMode filter) {
+        int count = 0;
+        for (RecoveryItem item : allItems) {
+            if (item.type == type && matchesStatusFilter(item, filter)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    public int countForFilter(FilterMode filter) {
+        int count = 0;
+        for (RecoveryItem item : allItems) {
+            if (matchesStatusFilter(item, filter)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    public int countSuspectedDeleted() {
+        int count = 0;
+        for (RecoveryItem item : allItems) {
+            if (item.suspectedDeleted) {
+                count++;
+            }
+        }
+        return count;
+    }
+
     public int getAllCount() {
         return allItems.size();
     }
@@ -127,10 +157,14 @@ public final class RecoveryState {
         if (typeFilter != null && item.type != typeFilter) {
             return false;
         }
-        if (currentFilter == FilterMode.EXISTING) {
+        return matchesStatusFilter(item, currentFilter);
+    }
+
+    private boolean matchesStatusFilter(RecoveryItem item, FilterMode filter) {
+        if (filter == FilterMode.EXISTING) {
             return !item.suspectedDeleted;
         }
-        if (currentFilter == FilterMode.DELETED) {
+        if (filter == FilterMode.DELETED) {
             return item.suspectedDeleted;
         }
         return true;

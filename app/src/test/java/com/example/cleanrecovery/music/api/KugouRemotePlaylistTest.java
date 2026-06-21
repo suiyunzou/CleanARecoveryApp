@@ -76,4 +76,20 @@ public class KugouRemotePlaylistTest {
         assertTrue(song.vipRequired);
         assertFalse(song.durationFormatted().isEmpty());
     }
+
+    @Test
+    public void parsesRemotePlaylistSongDurationVariants() {
+        JsonObject json = JsonParser.parseString("{\"status\":1,\"data\":{\"list\":["
+                + "{\"file_hash\":\"a1\",\"audio_name\":\"Song Ms\",\"author_name\":\"Singer\",\"timelen\":245000},"
+                + "{\"file_hash\":\"a2\",\"audio_name\":\"Song Text\",\"author_name\":\"Singer\",\"time\":\"04:05\"}"
+                + "]}}").getAsJsonObject();
+
+        List<SongInfo> songs = KugouDataSource.parseSongList(json);
+
+        assertEquals(2, songs.size());
+        assertEquals(245, songs.get(0).duration);
+        assertEquals("4:05", songs.get(0).durationFormatted());
+        assertEquals(245, songs.get(1).duration);
+        assertEquals("4:05", songs.get(1).durationFormatted());
+    }
 }

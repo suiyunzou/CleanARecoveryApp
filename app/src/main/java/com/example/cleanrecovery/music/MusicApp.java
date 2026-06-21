@@ -2,6 +2,7 @@ package com.example.cleanrecovery.music;
 
 import android.app.Application;
 import android.content.Context;
+import android.content.SharedPreferences;
 
 import com.example.cleanrecovery.music.api.IAuthService;
 import com.example.cleanrecovery.music.api.IMusicDataSource;
@@ -28,9 +29,19 @@ public final class MusicApp {
     public final MusicPlayer player;
     public final Context context;
     private final ExecutorService appExecutor = Executors.newSingleThreadExecutor();
+    private final SharedPreferences prefs;
+
+    private static final String PREFS = "music_app";
+    private static final String KEY_LAST_MENU_TYPE = "last_menu_type";
+    private static final String KEY_LAST_MENU_NAME = "last_menu_name";
+    private static final String KEY_LAST_MENU_ID = "last_menu_id";
+    private static final String KEY_LAST_MENU_LIST_ID = "last_menu_list_id";
+    private static final String KEY_LAST_MENU_GLOBAL_ID = "last_menu_global_id";
+    private static final String KEY_LAST_MENU_COUNT = "last_menu_count";
 
     private MusicApp(Context ctx) {
         context = ctx.getApplicationContext();
+        prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         auth = new RemoteAuthService(ctx);
         try {
             auth.restoreSession();
@@ -99,5 +110,59 @@ public final class MusicApp {
         } catch (Exception e) {
             android.util.Log.w("MusicApp", "updateDataSourceAuth failed", e);
         }
+    }
+
+    public void rememberLastLocalMenu(String playlistName) {
+        prefs.edit()
+                .putString(KEY_LAST_MENU_TYPE, "local")
+                .putString(KEY_LAST_MENU_NAME, playlistName)
+                .remove(KEY_LAST_MENU_ID)
+                .remove(KEY_LAST_MENU_LIST_ID)
+                .remove(KEY_LAST_MENU_GLOBAL_ID)
+                .remove(KEY_LAST_MENU_COUNT)
+                .apply();
+    }
+
+    public void rememberLastDownloadedMenu() {
+        prefs.edit()
+                .putString(KEY_LAST_MENU_TYPE, "downloaded")
+                .remove(KEY_LAST_MENU_NAME)
+                .remove(KEY_LAST_MENU_ID)
+                .remove(KEY_LAST_MENU_LIST_ID)
+                .remove(KEY_LAST_MENU_GLOBAL_ID)
+                .remove(KEY_LAST_MENU_COUNT)
+                .apply();
+    }
+
+    public void rememberLastRemoteMenu(com.example.cleanrecovery.music.data.RemotePlaylist playlist) {
+        if (playlist == null) return;
+        prefs.edit()
+                .putString(KEY_LAST_MENU_TYPE, "remote")
+                .putString(KEY_LAST_MENU_NAME, playlist.name)
+                .putString(KEY_LAST_MENU_ID, playlist.id)
+                .putString(KEY_LAST_MENU_LIST_ID, playlist.listId)
+                .putString(KEY_LAST_MENU_GLOBAL_ID, playlist.globalCollectionId)
+                .putInt(KEY_LAST_MENU_COUNT, playlist.songCount)
+                .apply();
+    }
+
+    public String lastMenuType() {
+        return prefs.getString(KEY_LAST_MENU_TYPE, "");
+    }
+
+    public String lastMenuName() {
+        return prefs.getString(KEY_LAST_MENU_NAME, "");
+    }
+
+    public com.example.cleanrecovery.music.data.RemotePlaylist lastRemoteMenu() {
+        if (!"remote".equals(lastMenuType())) return null;
+        com.example.cleanrecovery.music.data.RemotePlaylist playlist =
+                new com.example.cleanrecovery.music.data.RemotePlaylist();
+        playlist.name = prefs.getString(KEY_LAST_MENU_NAME, "");
+        playlist.id = prefs.getString(KEY_LAST_MENU_ID, "");
+        playlist.listId = prefs.getString(KEY_LAST_MENU_LIST_ID, "");
+        playlist.globalCollectionId = prefs.getString(KEY_LAST_MENU_GLOBAL_ID, "");
+        playlist.songCount = prefs.getInt(KEY_LAST_MENU_COUNT, 0);
+        return playlist;
     }
 }

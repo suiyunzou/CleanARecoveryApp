@@ -37,8 +37,11 @@ public class KugouDataSource implements IMusicDataSource {
     private static final String WEB_PLAY_URL = "https://wwwapi.kugou.com/yy/index.php";
     private static final String GATEWAY_URL = "https://gateway.kugou.com";
     private static final String USER_PLAYLIST_PATH = "/v7/get_all_list";
+    private static final String PLAYLIST_ADD_PATH = "/cloudlist.service/v5/add_list";
     private static final String PLAYLIST_TRACKS_PATH = "/v4/get_list_all_file";
     private static final String PLAYLIST_TRACKS_FALLBACK_PATH = "/pubsongs/v2/get_other_list_file_nofilt";
+    private static final String PLAYLIST_TRACKS_ADD_PATH = "/cloudlist.service/v6/add_song";
+    private static final String PLAYLIST_TRACKS_DELETE_PATH = "/v4/delete_songs";
     // Endpoint 4: Concept (lite) privileged play URL via /v5/url.
     // 概念版通过 appid=3116 + clientver=11440 + 特定 page_id/pid 参数区分，
     // 不是通过 Cookie。参考 KuGouMusicApi module/song_url.js。
@@ -193,6 +196,109 @@ public class KugouDataSource implements IMusicDataSource {
             if (batch.size() < safePageSize) break;
         }
         return result;
+    }
+
+    @Override
+    public void createUserPlaylist(String name, boolean privatePlaylist) throws Exception {
+        ensureAuth();
+        if (isEmpty(name)) {
+            throw new IllegalArgumentException("Playlist name required");
+        }
+        TreeMap<String, Object> body = new TreeMap<>();
+        body.put("userid", auth.userid);
+        body.put("token", auth.token);
+        body.put("total_ver", 0);
+        body.put("name", name);
+        body.put("type", 0);
+        body.put("source", 1);
+        body.put("is_pri", privatePlaylist ? 1 : 0);
+        body.put("list_create_userid", auth.userid);
+        body.put("list_create_listid", "");
+        body.put("list_create_gid", "");
+        body.put("from_shupinmv", 0);
+
+        TreeMap<String, String> params = new TreeMap<>();
+        params.put("last_time", String.valueOf(System.currentTimeMillis() / 1000));
+        params.put("last_area", "gztx");
+        params.put("userid", auth.userid);
+        params.put("token", auth.token);
+        signedPost(PLAYLIST_ADD_PATH, params, body, null);
+    }
+
+    @Override
+    public void addSongsToUserPlaylist(RemotePlaylist playlist, List<SongInfo> songs) throws Exception {
+        ensureAuth();
+        String listId = playlist == null ? "" : firstNonEmpty(playlist.listId, playlist.id, playlist.globalCollectionId);
+        if (isEmpty(listId) || songs == null || songs.isEmpty()) return;
+        JsonArray resource = new JsonArray();
+        for (SongInfo song : songs) {
+            if (song == null || isEmpty(song.hash)) continue;
+            JsonObject item = new JsonObject();
+            item.addProperty("number", 1);
+            item.addProperty("name", firstNonEmpty(song.title, ""));
+            item.addProperty("hash", song.hash);
+            item.addProperty("size", 0);
+            item.addProperty("sort", 0);
+            item.addProperty("timelen", Math.max(0, song.duration * 1000));
+            item.addProperty("bitrate", 0);
+            item.addProperty("album_id", parseLong(song.albumId));
+            item.addProperty("mixsongid", parseLong(firstNonEmpty(song.mixSongId, song.albumId)));
+            resource.add(item);
+        }
+        if (resource.size() == 0) return;
+
+        TreeMap<String, Object> body = new TreeMap<>();
+        body.put("userid", auth.userid);
+        body.put("token", auth.token);
+        body.put("listid", listId);
+        body.put("list_ver", 0);
+        body.put("type", 0);
+        body.put("slow_upload", 1);
+        body.put("scene", "false;null");
+        body.put("data", resource);
+
+        TreeMap<String, String> params = new TreeMap<>();
+        params.put("last_time", String.valueOf(System.currentTimeMillis() / 1000));
+        params.put("last_area", "gztx");
+        params.put("userid", auth.userid);
+        params.put("token", auth.token);
+        signedPost(PLAYLIST_TRACKS_ADD_PATH, params, body, null);
+    }
+
+    @Override
+    public void deleteSongsFromUserPlaylist(RemotePlaylist playlist, List<SongInfo> songs) throws Exception {
+        ensureAuth();
+        String listId = playlist == null ? "" : firstNonEmpty(playlist.listId, playlist.id, playlist.globalCollectionId);
+        if (isEmpty(listId) || songs == null || songs.isEmpty()) return;
+        JsonArray resource = new JsonArray();
+        for (SongInfo song : songs) {
+            long fileId = parseLong(song == null ? "" : song.fileId);
+            if (fileId <= 0) continue;
+            JsonObject item = new JsonObject();
+            item.addProperty("fileid", fileId);
+            resource.add(item);
+        }
+        if (resource.size() == 0) {
+            throw new IllegalArgumentException("Missing cloud file id");
+        }
+
+        TreeMap<String, Object> body = new TreeMap<>();
+        body.put("listid", listId);
+        body.put("userid", auth.userid);
+        body.put("token", auth.token);
+        body.put("type", 0);
+        body.put("list_ver", 0);
+        body.put("data", resource);
+        signedPost(PLAYLIST_TRACKS_DELETE_PATH, new TreeMap<>(), body,
+                new String[][]{{"x-router", "cloudlist.service.kugou.com"}});
+    }
+
+    @Override
+    public List<SongInfo> getUserListenRanking(int type) {
+        // The documented endpoint requires an additional RSA-encrypted "p"
+        // parameter. Keep the interface seam in place and fall back safely
+        // until the RSA helper is added.
+        return new ArrayList<>();
     }
 
     /**
@@ -548,8 +654,8 @@ public class KugouDataSource implements IMusicDataSource {
 
             // 构造参数（TreeMap 自动按 key 排序，用于签名）
             java.util.TreeMap<String, String> params = new java.util.TreeMap<>();
-            params.put("album_audio_id", "0");
-            params.put("album_id", "0");
+            params.put("album_audio_id", firstNonEmpty(song.mixSongId, song.albumId, "0"));
+            params.put("album_id", firstNonEmpty(song.albumId, "0"));
             params.put("area_code", "1");
             params.put("behavior", "play");
             params.put("cdnBackup", "1");
@@ -945,13 +1051,16 @@ public class KugouDataSource implements IMusicDataSource {
         SongInfo s = new SongInfo();
         s.hash = upper(str(o, "hash", "Hash", "file_hash"));
         s.albumId = str(o, "album_id", "albumid", "AlbumID", "album_audio_id");
+        s.fileId = str(o, "fileid", "file_id", "FileID", "id");
+        s.mixSongId = str(o, "mixsongid", "mix_song_id", "MixSongID", "album_audio_id");
         s.title = str(o, "songname", "songName", "audio_name", "name", "remark", "filename", "fileName");
         s.artist = str(o, "singername", "singerName", "author_name", "authorName", "singer_name");
         if (isEmpty(s.artist)) s.artist = parseAuthors(o);
         s.album = str(o, "album_name", "albumname", "remark");
-        s.duration = num(o, "duration", "timeLength", "timelength", "time");
+        s.duration = durationSeconds(o);
         s.imgUrl = normalizeImage(str(o, "album_sizable_cover", "img", "image", "cover", "imgUrl", "album_img"));
         if (isEmpty(s.imgUrl)) s.imgUrl = normalizeImage(nestedStr(o, "trans_param", "union_cover"));
+        s.playCount = num(o, "play_count", "playcount", "pc", "count");
         s.vipRequired = num(o, "pay_type", "pay_type_320", "pay_type_sq", "privilege") > 0
                 || num(o, "fail_process", "fail_process_320", "fail_process_sq") > 0
                 || num(o, "pkg_price", "pkg_price_320", "pkg_price_sq") > 0;
@@ -1082,11 +1191,63 @@ public class KugouDataSource implements IMusicDataSource {
             if (!o.has(k)) continue;
             try {
                 JsonElement e = o.get(k);
-                if (e != null && !e.isJsonNull()) return e.getAsInt();
+                if (e != null && !e.isJsonNull()) {
+                    if (e.isJsonPrimitive()) {
+                        String raw = e.getAsString();
+                        if (raw != null && raw.contains(".")) {
+                            return (int) Math.round(Double.parseDouble(raw));
+                        }
+                    }
+                    return e.getAsInt();
+                }
             } catch (Exception ignored) {
             }
         }
         return 0;
+    }
+
+    private static int durationSeconds(JsonObject o) {
+        int ms = num(o, "timelen", "time_len", "time_length", "duration_ms", "durationMillis",
+                "duration_millis", "millis", "milliseconds");
+        if (ms > 0) return normalizeDuration(ms, true);
+
+        int value = num(o, "duration", "timeLength", "timelength", "time", "duration_sec",
+                "durationSeconds", "seconds");
+        if (value > 0) return normalizeDuration(value, false);
+
+        return parseClockDuration(str(o, "duration", "timeLength", "timelength", "time"));
+    }
+
+    private static int normalizeDuration(int value, boolean likelyMillis) {
+        if (value <= 0) return 0;
+        if (likelyMillis || value > 1000) {
+            return Math.max(1, Math.round(value / 1000f));
+        }
+        return value;
+    }
+
+    private static int parseClockDuration(String value) {
+        if (isEmpty(value) || !value.contains(":")) return 0;
+        String[] parts = value.split(":");
+        if (parts.length < 2 || parts.length > 3) return 0;
+        try {
+            int seconds = 0;
+            for (String part : parts) {
+                seconds = seconds * 60 + Integer.parseInt(part.trim());
+            }
+            return Math.max(0, seconds);
+        } catch (NumberFormatException ignored) {
+            return 0;
+        }
+    }
+
+    private static long parseLong(String value) {
+        if (isEmpty(value)) return 0L;
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException exception) {
+            return 0L;
+        }
     }
 
     private static String normalizeImage(String url) {

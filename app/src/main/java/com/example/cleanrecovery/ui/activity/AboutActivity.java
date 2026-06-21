@@ -48,12 +48,25 @@ public final class AboutActivity extends Activity {
 
         Button musicEntry = findViewById(R.id.about_music_entry);
         musicEntry.setVisibility(View.VISIBLE);
-        musicEntry.setOnClickListener(view ->
-                startActivity(new Intent(AboutActivity.this, MusicHomeActivity.class)));
+        View musicCard = findViewById(R.id.about_music_card);
+        View.OnClickListener openMusic = view ->
+                startActivity(new Intent(AboutActivity.this, MusicHomeActivity.class));
+        musicEntry.setOnClickListener(openMusic);
+        musicCard.setOnClickListener(openMusic);
 
         Button universalDownloadEntry = findViewById(R.id.about_universal_download_entry);
-        universalDownloadEntry.setOnClickListener(view ->
-                startActivity(new Intent(AboutActivity.this, UniversalDownloadActivity.class)));
+        View universalDownloadCard = findViewById(R.id.about_universal_download_card);
+        View.OnClickListener openUniversalDownload = view ->
+                startActivity(new Intent(AboutActivity.this, UniversalDownloadActivity.class));
+        universalDownloadEntry.setOnClickListener(openUniversalDownload);
+        universalDownloadCard.setOnClickListener(openUniversalDownload);
+
+        Button onlineMovieEntry = findViewById(R.id.about_online_movie_entry);
+        View onlineMovieCard = findViewById(R.id.about_online_movie_card);
+        View.OnClickListener openOnlineMovie = view ->
+                startActivity(new Intent(AboutActivity.this, BrowserActivity.class));
+        onlineMovieEntry.setOnClickListener(openOnlineMovie);
+        onlineMovieCard.setOnClickListener(openOnlineMovie);
     }
 
     private void shareApk() {

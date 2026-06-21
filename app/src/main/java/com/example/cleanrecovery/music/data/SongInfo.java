@@ -4,12 +4,16 @@ package com.example.cleanrecovery.music.data;
 public class SongInfo {
     public String hash;
     public String albumId;
+    public String fileId;
+    public String mixSongId;
     public String title;
     public String artist;
     public String album;
     public int    duration;  // seconds
     public String imgUrl;
     public boolean vipRequired;
+    public String localPath;
+    public int playCount;
 
     public String durationFormatted() {
         int m = duration / 60;

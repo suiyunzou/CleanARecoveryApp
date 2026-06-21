@@ -13,6 +13,7 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
@@ -24,6 +25,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.OpenableColumns;
 import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -43,6 +45,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.text.DateFormat;
 import java.util.Date;
 import java.util.Locale;
@@ -64,6 +70,7 @@ public final class PreviewActivity extends Activity {
     private static final int GESTURE_ZONE_CENTER = 2;
     private static final int GESTURE_ZONE_RIGHT = 3;
     private static final float FAST_PLAYBACK_SPEED = 2.0f;
+    private static final String PREVIEW_CACHE_DIR = "preview_sources";
 
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
     private final Runnable hideOverlayRunnable = new Runnable() {
@@ -118,6 +125,7 @@ public final class PreviewActivity extends Activity {
     private int originalRequestedOrientation;
     private RecoveryItem currentItem;
     private File currentFile;
+    private boolean singleItemPreview;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -223,9 +231,13 @@ public final class PreviewActivity extends Activity {
         currentItemIsMedia = false;
         immersivePreview = false;
         setVideoFullscreen(false);
-        currentItem = PreviewSession.currentItem();
-        if (currentItem == null) {
-            currentItem = itemFromIntent();
+        RecoveryItem intentItem = itemFromIntent();
+        singleItemPreview = intentItem != null;
+        if (singleItemPreview) {
+            PreviewSession.clear();
+            currentItem = intentItem;
+        } else {
+            currentItem = PreviewSession.currentItem();
         }
         if (currentItem == null) {
             finish();
@@ -233,9 +245,9 @@ public final class PreviewActivity extends Activity {
         }
 
         bindNavigationState();
-        currentFile = currentItem.asFile();
+        currentFile = previewFileFor(currentItem);
         previewFileName.setText(currentItem.name);
-        previewMeta.setText(buildMeta(currentFile));
+        previewMeta.setText(buildMeta(currentItem, currentFile));
         setRecoverability(R.string.preview_recoverability_readable);
         resetPlaybackControls();
 
@@ -272,6 +284,10 @@ public final class PreviewActivity extends Activity {
     }
 
     private void bindNavigationState() {
+        if (singleItemPreview) {
+            previewIndex.setText("1 / 1");
+            return;
+        }
         int total = PreviewSession.totalCount();
         if (total > 0) {
             previewIndex.setText(getString(R.string.preview_index_format, PreviewSession.currentIndex() + 1, total));
@@ -281,6 +297,9 @@ public final class PreviewActivity extends Activity {
     }
 
     private void movePreviewBy(int delta) {
+        if (singleItemPreview) {
+            return;
+        }
         if (PreviewSession.moveBy(delta)) {
             renderCurrentItem();
         }
@@ -291,15 +310,21 @@ public final class PreviewActivity extends Activity {
         String name = getIntent().getStringExtra(EXTRA_NAME);
         String typeName = getIntent().getStringExtra(EXTRA_TYPE);
         boolean suspectedDeleted = getIntent().getBooleanExtra(EXTRA_SUSPECTED_DELETED, false);
+        Uri data = getIntent().getData();
         if (path == null) {
-            return null;
+            if (data == null) {
+                return null;
+            }
+            path = data.toString();
         }
         if (name == null || name.isEmpty()) {
-            name = new File(path).getName();
+            name = displayNameFor(path, data);
         }
-        RecoveryType type = parseType(typeName);
+        RecoveryType type = parseType(typeName, path, getIntent().getType());
         File file = new File(path);
-        return new RecoveryItem(type, name, path, file.length(), file.lastModified(), 0, 0, suspectedDeleted);
+        long size = file.exists() ? file.length() : queryContentSize(data);
+        long modified = file.exists() ? file.lastModified() : 0L;
+        return new RecoveryItem(type, name, path, size, modified, 0, 0, suspectedDeleted);
     }
 
     private void recoverCurrentItem() {
@@ -340,12 +365,23 @@ public final class PreviewActivity extends Activity {
         });
     }
 
-    private String buildMeta(File file) {
+    private String buildMeta(RecoveryItem item, File file) {
         StringBuilder builder = new StringBuilder();
-        if (file != null) {
-            builder.append(formatSize(file.length()));
+        if (item != null && item.size > 0) {
+            builder.append(formatSize(item.size));
+            if (item.modifiedAt > 0) {
+                builder.append(" · ").append(DateFormat.getDateTimeInstance().format(new Date(item.modifiedAt)));
+            }
+        } else if (file != null) {
+            long size = file.length();
+            if (size > 0) {
+                builder.append(formatSize(size));
+            }
             if (file.lastModified() > 0) {
-                builder.append(" · ").append(DateFormat.getDateTimeInstance().format(new Date(file.lastModified())));
+                if (builder.length() > 0) {
+                    builder.append(" · ");
+                }
+                builder.append(DateFormat.getDateTimeInstance().format(new Date(file.lastModified())));
             }
         }
         return builder.toString();
@@ -356,16 +392,17 @@ public final class PreviewActivity extends Activity {
             return;
         }
         String typeLabel = typeLabel(currentItem.type);
-        String modified = currentFile.lastModified() > 0
-                ? DateFormat.getDateTimeInstance().format(new Date(currentFile.lastModified()))
+        String modified = currentItem.modifiedAt > 0
+                ? DateFormat.getDateTimeInstance().format(new Date(currentItem.modifiedAt))
                 : "-";
+        long size = currentItem.size > 0 ? currentItem.size : currentFile.length();
         String message = getString(R.string.file_browser_detail_name) + ": " + currentItem.name + "\n"
                 + getString(R.string.file_browser_detail_type) + ": " + typeLabel + "\n"
-                + getString(R.string.file_browser_detail_size) + ": " + formatSize(currentFile.length()) + "\n"
+                + getString(R.string.file_browser_detail_size) + ": " + formatSize(size) + "\n"
                 + getString(R.string.file_browser_detail_modified) + ": " + modified + "\n"
                 + getString(R.string.preview_detail_status) + ": "
                 + getString(currentItem.suspectedDeleted ? R.string.status_deleted : R.string.status_existing) + "\n"
-                + getString(R.string.file_browser_detail_path) + ":\n" + currentFile.getAbsolutePath();
+                + getString(R.string.file_browser_detail_path) + ":\n" + currentItem.path;
         new AlertDialog.Builder(this)
                 .setTitle(R.string.preview_details)
                 .setMessage(message)
@@ -1068,6 +1105,141 @@ public final class PreviewActivity extends Activity {
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
         contentHost.setOnClickListener(v -> showOverlay(false));
+    }
+
+    private File previewFileFor(RecoveryItem item) {
+        if (item == null || item.path == null) {
+            return new File(getCacheDir(), "missing_preview_source");
+        }
+        if (item.path.startsWith("content://")) {
+            try {
+                return cacheContentUri(Uri.parse(item.path), item.name);
+            } catch (IOException exception) {
+                return new File(getCacheDir(), "missing_preview_source");
+            }
+        }
+        return item.asFile();
+    }
+
+    private File cacheContentUri(Uri uri, String name) throws IOException {
+        File directory = new File(getCacheDir(), PREVIEW_CACHE_DIR);
+        if (!directory.exists() && !directory.mkdirs()) {
+            throw new IOException("Cannot create preview cache: " + directory.getAbsolutePath());
+        }
+        clearDirectory(directory);
+        File destination = new File(directory, sanitizeFileName(name));
+        try (InputStream input = getContentResolver().openInputStream(uri);
+             OutputStream output = new FileOutputStream(destination)) {
+            if (input == null) {
+                throw new IOException("Cannot open content URI: " + uri);
+            }
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = input.read(buffer)) >= 0) {
+                output.write(buffer, 0, read);
+            }
+        }
+        return destination;
+    }
+
+    private void clearDirectory(File directory) {
+        File[] files = directory.listFiles();
+        if (files == null) {
+            return;
+        }
+        for (File file : files) {
+            if (file.isFile()) {
+                file.delete();
+            }
+        }
+    }
+
+    private String sanitizeFileName(String name) {
+        String fallback = (name == null || name.trim().isEmpty()) ? "preview_source" : name.trim();
+        return fallback.replaceAll("[\\\\/:*?\"<>|]", "_");
+    }
+
+    private String displayNameFor(String path, Uri data) {
+        if (data != null && "content".equals(data.getScheme())) {
+            try (Cursor cursor = getContentResolver().query(data,
+                    new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+                if (cursor != null && cursor.moveToFirst()) {
+                    int index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                    if (index >= 0) {
+                        String displayName = cursor.getString(index);
+                        if (displayName != null && !displayName.isEmpty()) {
+                            return displayName;
+                        }
+                    }
+                }
+            } catch (RuntimeException ignored) {
+            }
+        }
+        if (path != null && !path.isEmpty()) {
+            String fileName = new File(path).getName();
+            if (fileName != null && !fileName.isEmpty()) {
+                return fileName;
+            }
+        }
+        if (data != null && data.getLastPathSegment() != null) {
+            return data.getLastPathSegment();
+        }
+        return "preview_source";
+    }
+
+    private long queryContentSize(Uri data) {
+        if (data == null || !"content".equals(data.getScheme())) {
+            return 0L;
+        }
+        try (Cursor cursor = getContentResolver().query(data,
+                new String[]{OpenableColumns.SIZE}, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                int index = cursor.getColumnIndex(OpenableColumns.SIZE);
+                if (index >= 0 && !cursor.isNull(index)) {
+                    return Math.max(0L, cursor.getLong(index));
+                }
+            }
+        } catch (RuntimeException ignored) {
+        }
+        return 0L;
+    }
+
+    private RecoveryType parseType(String typeName, String path, String mimeType) {
+        if (typeName != null) {
+            try {
+                return RecoveryType.valueOf(typeName);
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        if (mimeType != null) {
+            String mime = mimeType.toLowerCase(Locale.US);
+            if (mime.startsWith("image/")) {
+                return RecoveryType.IMAGE;
+            }
+            if (mime.startsWith("video/")) {
+                return RecoveryType.VIDEO;
+            }
+            if (mime.startsWith("audio/")) {
+                return RecoveryType.AUDIO;
+            }
+        }
+        String lowerPath = path == null ? "" : path.toLowerCase(Locale.US);
+        if (lowerPath.endsWith(".jpg") || lowerPath.endsWith(".jpeg") || lowerPath.endsWith(".png")
+                || lowerPath.endsWith(".webp") || lowerPath.endsWith(".gif")
+                || lowerPath.endsWith(".bmp") || lowerPath.endsWith(".heic")) {
+            return RecoveryType.IMAGE;
+        }
+        if (lowerPath.endsWith(".mp4") || lowerPath.endsWith(".mkv") || lowerPath.endsWith(".mov")
+                || lowerPath.endsWith(".webm") || lowerPath.endsWith(".3gp")
+                || lowerPath.endsWith(".avi")) {
+            return RecoveryType.VIDEO;
+        }
+        if (lowerPath.endsWith(".mp3") || lowerPath.endsWith(".m4a") || lowerPath.endsWith(".aac")
+                || lowerPath.endsWith(".wav") || lowerPath.endsWith(".flac")
+                || lowerPath.endsWith(".ogg")) {
+            return RecoveryType.AUDIO;
+        }
+        return RecoveryType.DOCUMENT;
     }
 
     private RecoveryType parseType(String typeName) {

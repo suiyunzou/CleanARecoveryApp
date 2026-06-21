@@ -8,6 +8,7 @@ import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewConfiguration;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -41,14 +42,20 @@ public class LyricsView extends RecyclerView {
 
     /** Notifies the host that the user tapped a lyric line to seek. */
     public interface OnSeekListener { void onSeekTo(long positionMs); }
+    public interface OnSingleTapListener { void onSingleTap(); }
 
     private LyricsAdapter adapter;
     private Lyrics lyrics = Lyrics.empty();
     private int activeIndex = -1;
     private FontSize fontSize = FontSize.MEDIUM;
+    private int customFontSizeSp = 16;
     private Theme theme = Theme.TEAL;
     private OnSeekListener seekListener;
+    private OnSingleTapListener singleTapListener;
     private final Handler ui = new Handler(Looper.getMainLooper());
+    private int pendingTapPosition = -1;
+    private long pendingTapAt;
+    private Runnable pendingSingleTap;
 
     public LyricsView(@NonNull Context context) {
         super(context);
@@ -77,6 +84,7 @@ public class LyricsView extends RecyclerView {
     }
 
     public void setOnSeekListener(OnSeekListener l) { this.seekListener = l; }
+    public void setOnSingleTapListener(OnSingleTapListener l) { this.singleTapListener = l; }
 
     public void setLyrics(Lyrics lyrics) {
         this.lyrics = lyrics == null ? Lyrics.empty() : lyrics;
@@ -93,10 +101,18 @@ public class LyricsView extends RecyclerView {
 
     public void setFontSize(FontSize size) {
         this.fontSize = size;
+        this.customFontSizeSp = fontSizeSp(size);
         adapter.notifyDataSetChanged();
     }
 
     public FontSize getFontSize() { return fontSize; }
+
+    public void setCustomFontSizeSp(int sp) {
+        customFontSizeSp = Math.max(12, Math.min(24, sp));
+        adapter.notifyDataSetChanged();
+    }
+
+    public int getCurrentFontSizeSp() { return customFontSizeSp; }
 
     public void cycleFontSize() {
         FontSize[] sizes = FontSize.values();
@@ -152,8 +168,8 @@ public class LyricsView extends RecyclerView {
         lm.startSmoothScroll(scroller);
     }
 
-    private int fontSizeSp() {
-        switch (fontSize) {
+    private int fontSizeSp(FontSize size) {
+        switch (size) {
             case SMALL: return 13;
             case LARGE: return 19;
             case MEDIUM:
@@ -193,16 +209,33 @@ public class LyricsView extends RecyclerView {
             Lyrics.Line line = lyrics.lines().get(position);
             TextView tv = h.text;
             tv.setText(line.text.isEmpty() ? "♪" : line.text);
-            tv.setTextSize(fontSizeSp());
+            tv.setTextSize(customFontSizeSp);
             boolean active = position == activeIndex;
             tv.setTextColor(active ? activeColor() : inactiveColor());
             tv.setTypeface(tv.getTypeface(), active ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
             tv.setAlpha(active ? 1f : 0.55f);
             tv.setOnClickListener(v -> {
-                if (seekListener != null && position >= 0) {
+                long now = System.currentTimeMillis();
+                if (pendingTapPosition == position
+                        && now - pendingTapAt <= ViewConfiguration.getDoubleTapTimeout()) {
+                    if (pendingSingleTap != null) {
+                        ui.removeCallbacks(pendingSingleTap);
+                        pendingSingleTap = null;
+                    }
+                    pendingTapPosition = -1;
                     long t = lyrics.lines().get(position).timeMs;
-                    seekListener.onSeekTo(t);
+                    if (seekListener != null) seekListener.onSeekTo(t);
+                    return;
                 }
+                pendingTapPosition = position;
+                pendingTapAt = now;
+                if (pendingSingleTap != null) ui.removeCallbacks(pendingSingleTap);
+                pendingSingleTap = () -> {
+                    pendingTapPosition = -1;
+                    pendingSingleTap = null;
+                    if (singleTapListener != null) singleTapListener.onSingleTap();
+                };
+                ui.postDelayed(pendingSingleTap, ViewConfiguration.getDoubleTapTimeout());
             });
         }
 

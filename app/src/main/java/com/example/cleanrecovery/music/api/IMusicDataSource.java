@@ -20,11 +20,23 @@ public interface IMusicDataSource {
     /** Get all logged-in user's read-only Kugou cloud playlists across pages. */
     List<RemotePlaylist> getAllUserPlaylists(int pageSize) throws Exception;
 
+    /** Create a logged-in user's Kugou cloud playlist. */
+    void createUserPlaylist(String name, boolean privatePlaylist) throws Exception;
+
     /** Get songs from a logged-in user's Kugou cloud playlist. */
     List<SongInfo> getUserPlaylistSongs(RemotePlaylist playlist, int page, int pageSize) throws Exception;
 
     /** Get all songs from a logged-in user's Kugou cloud playlist across pages. */
     List<SongInfo> getAllUserPlaylistSongs(RemotePlaylist playlist, int pageSize) throws Exception;
+
+    /** Add songs to a logged-in user's Kugou cloud playlist. */
+    void addSongsToUserPlaylist(RemotePlaylist playlist, List<SongInfo> songs) throws Exception;
+
+    /** Delete songs from a logged-in user's Kugou cloud playlist. */
+    void deleteSongsFromUserPlaylist(RemotePlaylist playlist, List<SongInfo> songs) throws Exception;
+
+    /** Get logged-in user's listening ranking. type=0 weekly, type=1 all-time. */
+    List<SongInfo> getUserListenRanking(int type) throws Exception;
 
     /** Resolve a playable stream URL for the given song. */
     String resolvePlayUrl(SongInfo song) throws Exception;

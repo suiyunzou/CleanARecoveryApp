@@ -75,7 +75,7 @@ public final class RecoveryItem {
         return builder.toString();
     }
 
-    private static String formatSize(long bytes) {
+    public static String formatSize(long bytes) {
         if (bytes < 1024L) {
             return bytes + " B";
         }

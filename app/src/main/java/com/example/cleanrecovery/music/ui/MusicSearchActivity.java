@@ -146,13 +146,15 @@ public final class MusicSearchActivity extends Activity {
         // 传入完整搜索结果列表作为播放队列，使上一首/下一首按钮可用
         int startIndex = items.indexOf(song);
         if (startIndex < 0) startIndex = 0;
-        app.player.play(new ArrayList<>(items), startIndex, MusicPlayer.PlaySource.SEARCH);
+        app.player.play(new ArrayList<>(items), startIndex, MusicPlayer.PlaySource.SEARCH,
+                getString(R.string.music_search_hint));
         startActivity(new android.content.Intent(this, MusicPlayerActivity.class));
     }
 
     /** 将搜索结果中的歌曲添加到指定歌单，不打断当前播放。 */
     private void onAddToPlaylist(SongInfo song) {
-        List<String> names = app.playlists.listPlaylists();
+        List<String> names = new ArrayList<>();
+        names.add("Listen Later");
         if (names.isEmpty()) {
             Toast.makeText(this, R.string.music_playlist_empty, Toast.LENGTH_SHORT).show();
             return;

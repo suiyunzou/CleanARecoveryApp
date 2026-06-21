@@ -8,6 +8,7 @@ import android.util.Log;
 
 import com.example.cleanrecovery.music.data.SongInfo;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -28,6 +29,7 @@ public class MusicPlayer {
         RECOMMENDATION,
         LOCAL_PLAYLIST,
         REMOTE_PLAYLIST,
+        DOWNLOADED,
         FAVORITES,
         RECENT,
         UNKNOWN
@@ -56,6 +58,9 @@ public class MusicPlayer {
     private Mode mode = Mode.SEQUENTIAL;
     private State state = State.IDLE;
     private PlaySource playSource = PlaySource.UNKNOWN;
+    private String playSourceName = "";
+    private float playbackSpeed = 1.0f;
+    private int autoSkipFailures;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final List<Callback> callbacks = new ArrayList<>();
     private final ExecutorService resolverExecutor = Executors.newSingleThreadExecutor();
@@ -72,16 +77,38 @@ public class MusicPlayer {
     }
 
     public void play(List<SongInfo> songs, int startIndex, PlaySource source) {
+        play(songs, startIndex, source, "");
+    }
+
+    public void play(List<SongInfo> songs, int startIndex, PlaySource source, String sourceName) {
         if (songs == null || songs.isEmpty()) return;
         queue.clear();
         queue.addAll(songs);
         queueIndex = Math.max(0, Math.min(startIndex, songs.size() - 1));
         playSource = source != null ? source : PlaySource.UNKNOWN;
+        playSourceName = sourceName == null ? "" : sourceName;
+        autoSkipFailures = 0;
         playCurrent();
     }
 
     public void playSingle(SongInfo song) {
         play(Collections.singletonList(song), 0, playSource);
+    }
+
+    public void retryCurrent() {
+        if (currentSong() != null) {
+            playCurrent();
+        }
+    }
+
+    public void playNext(List<SongInfo> songs) {
+        if (songs == null || songs.isEmpty()) return;
+        if (queue.isEmpty() || queueIndex < 0) {
+            play(new ArrayList<>(songs), 0, playSource);
+            return;
+        }
+        int insertAt = Math.min(queue.size(), queueIndex + 1);
+        queue.addAll(insertAt, new ArrayList<>(songs));
     }
 
     public void seekTo(int positionMs) {
@@ -108,6 +135,7 @@ public class MusicPlayer {
 
     public void next() {
         if (queue.isEmpty()) return;
+        autoSkipFailures = 0;
         queueIndex = nextIndex();
         playCurrent();
     }
@@ -119,6 +147,7 @@ public class MusicPlayer {
             seekTo(0);
             return;
         }
+        autoSkipFailures = 0;
         queueIndex = prevIndex();
         playCurrent();
     }
@@ -131,6 +160,8 @@ public class MusicPlayer {
     public State getState() { return state; }
     public Mode getMode() { return mode; }
     public PlaySource getPlaySource() { return playSource; }
+    public String getPlaySourceName() { return playSourceName; }
+    public float getPlaybackSpeed() { return playbackSpeed; }
 
     public void setMode(Mode m) {
         mode = m;
@@ -154,6 +185,40 @@ public class MusicPlayer {
     public List<SongInfo> getQueue() { return new ArrayList<>(queue); }
     public int getQueueIndex() { return queueIndex; }
 
+    public void playQueueIndex(int index) {
+        if (index < 0 || index >= queue.size()) return;
+        autoSkipFailures = 0;
+        queueIndex = index;
+        playCurrent();
+    }
+
+    public void removeQueueIndex(int index) {
+        if (index < 0 || index >= queue.size()) return;
+        boolean removingCurrent = index == queueIndex;
+        queue.remove(index);
+        if (queue.isEmpty()) {
+            release();
+            queueIndex = -1;
+            return;
+        }
+        if (index < queueIndex) {
+            queueIndex--;
+        } else if (index == queueIndex && queueIndex >= queue.size()) {
+            queueIndex = 0;
+        }
+        if (removingCurrent) {
+            playCurrent();
+        } else {
+            for (Callback cb : callbacks) cb.onSongChanged(currentSong());
+        }
+    }
+
+    public void setPlaybackSpeed(float speed) {
+        playbackSpeed = speed <= 0 ? 1.0f : speed;
+        applyPlaybackSpeed();
+        for (Callback cb : callbacks) cb.onStateChanged(state);
+    }
+
     public void release() {
         playRequestId.incrementAndGet();
         handler.removeCallbacks(progressRunnable);
@@ -176,6 +241,12 @@ public class MusicPlayer {
         for (Callback cb : callbacks) cb.onSongChanged(song);
         Log.d(TAG, "playCurrent: song=" + song.title + " hash=" + song.hash + " vipRequired=" + song.vipRequired);
 
+        String localPath = song.localPath;
+        if (localPath != null && !localPath.isEmpty() && new File(localPath).isFile()) {
+            prepareResolvedUrl(song, localPath);
+            return;
+        }
+
         resolverExecutor.execute(() -> {
             String url = null;
             String error = null;
@@ -197,6 +268,7 @@ public class MusicPlayer {
                             : "No playable URL for: " + song.title;
                     Log.w(TAG, "playCurrent: no url, error=" + message);
                     for (Callback cb : callbacks) cb.onError(message);
+                    maybeAutoSkipAfterFailure();
                     return;
                 }
                 prepareResolvedUrl(song, resolvedUrl);
@@ -222,7 +294,9 @@ public class MusicPlayer {
                     .build());
             player.setDataSource(url);
             player.setOnPreparedListener(mp -> {
+                applyPlaybackSpeed();
                 mp.start();
+                autoSkipFailures = 0;
                 setState(State.PLAYING);
                 for (Callback cb : callbacks) {
                     cb.onSongChanged(song);
@@ -240,13 +314,25 @@ public class MusicPlayer {
             player.setOnErrorListener((mp, what, extra) -> {
                 setState(State.ERROR);
                 for (Callback cb : callbacks) cb.onError("Playback error: " + what);
+                maybeAutoSkipAfterFailure();
                 return true;
             });
             player.prepareAsync();
         } catch (IOException e) {
             setState(State.ERROR);
             for (Callback cb : callbacks) cb.onError(e.getMessage());
+            maybeAutoSkipAfterFailure();
         }
+    }
+
+    private void maybeAutoSkipAfterFailure() {
+        if (queue.size() <= 1 || autoSkipFailures >= queue.size()) return;
+        autoSkipFailures++;
+        handler.postDelayed(() -> {
+            if (state != State.ERROR || queue.isEmpty()) return;
+            queueIndex = nextIndex();
+            playCurrent();
+        }, 500);
     }
 
     private void releasePlayer() {
@@ -254,6 +340,14 @@ public class MusicPlayer {
         if (player != null) {
             try { player.release(); } catch (Exception ignored) {}
             player = null;
+        }
+    }
+
+    private void applyPlaybackSpeed() {
+        if (player == null || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.M) return;
+        try {
+            player.setPlaybackParams(player.getPlaybackParams().setSpeed(playbackSpeed));
+        } catch (Exception ignored) {
         }
     }
 

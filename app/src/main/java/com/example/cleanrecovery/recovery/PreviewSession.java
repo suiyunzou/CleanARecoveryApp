@@ -15,6 +15,11 @@ public final class PreviewSession {
         index = Math.max(0, Math.min(startIndex, Math.max(0, items.size() - 1)));
     }
 
+    public static void clear() {
+        items = new ArrayList<>();
+        index = 0;
+    }
+
     public static RecoveryItem currentItem() {
         if (items.isEmpty()) {
             return null;

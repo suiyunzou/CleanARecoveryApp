@@ -18,4 +18,9 @@
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
         <item name="android:windowLightStatusBar">true</item>
     </style>
+
+    <style name="MusicBottomSheetAnimation">
+        <item name="android:windowEnterAnimation">@anim/music_sheet_slide_up</item>
+        <item name="android:windowExitAnimation">@anim/music_sheet_slide_down</item>
+    </style>
 </resources>

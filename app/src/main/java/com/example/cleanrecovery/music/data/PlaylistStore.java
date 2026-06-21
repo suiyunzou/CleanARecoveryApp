@@ -16,7 +16,7 @@ import java.util.List;
 public class PlaylistStore extends SQLiteOpenHelper {
 
     private static final String DB = "music_playlists.db";
-    private static final int VERSION = 2;
+    private static final int VERSION = 3;
     /** Reserved playlist names that cannot be deleted or renamed. */
     private static final java.util.Set<String> PROTECTED =
             new java.util.HashSet<>(java.util.Arrays.asList("Favorites", "Listen Later", "Recently Played"));
@@ -42,6 +42,7 @@ public class PlaylistStore extends SQLiteOpenHelper {
                 "album TEXT," +
                 "duration INTEGER DEFAULT 0," +
                 "img_url TEXT," +
+                "local_path TEXT," +
                 "vip_required INTEGER DEFAULT 0," +
                 "position INTEGER DEFAULT 0," +
                 "FOREIGN KEY(playlist_id) REFERENCES playlists(id) ON DELETE CASCADE)");
@@ -49,8 +50,12 @@ public class PlaylistStore extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int o, int n) {
-        // v1 → v2: no schema change needed (position column already existed);
-        // added reorder/rename helpers. Keep data intact.
+        if (o < 3) {
+            try {
+                db.execSQL("ALTER TABLE songs ADD COLUMN local_path TEXT");
+            } catch (RuntimeException ignored) {
+            }
+        }
     }
 
     /** True for built-in playlists that cannot be renamed or deleted. */
@@ -141,6 +146,7 @@ public class PlaylistStore extends SQLiteOpenHelper {
         cv.put("album", song.album);
         cv.put("duration", song.duration);
         cv.put("img_url", song.imgUrl);
+        cv.put("local_path", song.localPath);
         cv.put("vip_required", song.vipRequired ? 1 : 0);
         cv.put("position", maxPos + 1);
         getWritableDatabase().insert("songs", null, cv);
@@ -209,7 +215,7 @@ public class PlaylistStore extends SQLiteOpenHelper {
         long pid = playlistId(playlistName);
         if (pid < 0) return list;
         try (Cursor c = getReadableDatabase().rawQuery(
-                "SELECT hash,album_id,title,artist,album,duration,img_url,vip_required " +
+                "SELECT hash,album_id,title,artist,album,duration,img_url,local_path,vip_required " +
                         "FROM songs WHERE playlist_id=? ORDER BY position",
                 new String[]{String.valueOf(pid)})) {
             while (c.moveToNext()) {
@@ -221,7 +227,8 @@ public class PlaylistStore extends SQLiteOpenHelper {
                 s.album = c.getString(4);
                 s.duration = c.getInt(5);
                 s.imgUrl = c.getString(6);
-                s.vipRequired = c.getInt(7) == 1;
+                s.localPath = c.getString(7);
+                s.vipRequired = c.getInt(8) == 1;
                 list.add(s);
             }
         }
@@ -241,7 +248,7 @@ public class PlaylistStore extends SQLiteOpenHelper {
     public List<SongInfo> getRecentPlays(int limit) {
         List<SongInfo> list = new ArrayList<>();
         try (Cursor c = getReadableDatabase().rawQuery(
-                "SELECT hash,album_id,title,artist,album,duration,img_url,vip_required " +
+                "SELECT hash,album_id,title,artist,album,duration,img_url,local_path,vip_required " +
                         "FROM songs WHERE playlist_id=(SELECT id FROM playlists WHERE name='Recently Played') " +
                         "ORDER BY id DESC LIMIT " + limit, null)) {
             while (c.moveToNext()) {
@@ -253,7 +260,8 @@ public class PlaylistStore extends SQLiteOpenHelper {
                 s.album = c.getString(4);
                 s.duration = c.getInt(5);
                 s.imgUrl = c.getString(6);
-                s.vipRequired = c.getInt(7) == 1;
+                s.localPath = c.getString(7);
+                s.vipRequired = c.getInt(8) == 1;
                 list.add(s);
             }
         }
@@ -277,6 +285,7 @@ public class PlaylistStore extends SQLiteOpenHelper {
         cv.put("album", song.album);
         cv.put("duration", song.duration);
         cv.put("img_url", song.imgUrl);
+        cv.put("local_path", song.localPath);
         cv.put("vip_required", song.vipRequired ? 1 : 0);
         cv.put("position", 0);
         getWritableDatabase().insert("songs", null, cv);

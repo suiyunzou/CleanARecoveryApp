@@ -2,6 +2,8 @@ package com.example.cleanrecovery.music.ui;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -9,6 +11,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -19,10 +22,14 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.cleanrecovery.R;
 import com.example.cleanrecovery.ui.widget.SystemUiHelper;
 import com.example.cleanrecovery.music.MusicApp;
+import com.example.cleanrecovery.music.data.DownloadedSong;
 import com.example.cleanrecovery.music.data.RemotePlaylist;
 import com.example.cleanrecovery.music.data.SongInfo;
 import com.example.cleanrecovery.music.player.MusicPlayer;
 
+import java.io.File;
+import java.io.InputStream;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
@@ -36,6 +43,7 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
     private LinearLayout remotePlaylistContainer;
     private View miniPlayer;
     private TextView miniTitle, miniIcon;
+    private ImageView miniCover;
     private ImageButton miniPrev, miniNext;
     private View miniCenter;
     // 保存当前推荐歌曲列表，用于点击时构建播放队列
@@ -86,8 +94,6 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
 
         loginButton.setOnClickListener(v ->
                 startActivity(new Intent(this, MusicLoginActivity.class)));
-        findViewById(R.id.music_home_download_button).setOnClickListener(v ->
-                startActivity(new Intent(this, DownloadActivity.class)));
     }
 
     private void refreshLoginState() {
@@ -110,13 +116,12 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
 
     private void loadPlaylists() {
         playlistContainer.removeAllViews();
-        List<String> names = app.playlists.listPlaylists();
-        for (String name : names) {
-            int count = app.playlists.songCount(name);
-            addPlaylistRow(name, displayPlaylistName(name), getString(R.string.music_playlist_song_count, count));
-        }
-        // "New playlist" row
-        addPlaylistRow(null, getString(R.string.music_new_playlist), null);
+        addPlaylistRow(PlaylistDetailActivity.EXTRA_DOWNLOADED_PLAYLIST,
+                getString(R.string.music_download_downloaded),
+                getString(R.string.music_playlist_song_count, downloadedPlayableCount()));
+        addPlaylistRow("Listen Later",
+                getString(R.string.music_playlist_listen_later),
+                getString(R.string.music_playlist_song_count, app.playlists.songCount("Listen Later")));
     }
 
     private void loadRemotePlaylists() {
@@ -135,6 +140,7 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
                 List<RemotePlaylist> playlists = app.dataSource.getAllUserPlaylists(30);
                 new Handler(Looper.getMainLooper()).post(() -> {
                     remotePlaylistContainer.removeAllViews();
+                    addCreateRemotePlaylistRow();
                     if (playlists.isEmpty()) {
                         addRemoteStatusRow(getString(R.string.music_remote_empty), null, null);
                         return;
@@ -172,15 +178,35 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
         }
 
         row.setOnClickListener(v -> {
-            if (subtitle != null) {
-                Intent intent = new Intent(this, PlaylistDetailActivity.class);
-                intent.putExtra("playlist_name", playlistName);
-                startActivity(intent);
+            Intent intent = new Intent(this, PlaylistDetailActivity.class);
+            if (PlaylistDetailActivity.EXTRA_DOWNLOADED_PLAYLIST.equals(playlistName)) {
+                intent.putExtra(PlaylistDetailActivity.EXTRA_DOWNLOADED_PLAYLIST, true);
             } else {
-                promptCreatePlaylist();
+                intent.putExtra("playlist_name", playlistName);
             }
+            startActivity(intent);
         });
         playlistContainer.addView(row);
+    }
+
+    private int downloadedPlayableCount() {
+        java.util.HashSet<String> paths = new java.util.HashSet<>();
+        for (DownloadedSong song : app.downloadStore.all()) {
+            if (song.localPath != null && new File(song.localPath).isFile()) {
+                paths.add(new File(song.localPath).getAbsolutePath());
+            }
+        }
+        File dir = app.downloads.downloadsDir();
+        File[] files = dir.listFiles(file -> file != null
+                && file.isFile()
+                && (file.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".mp3")
+                || file.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".flac")));
+        if (files != null) {
+            for (File file : files) {
+                paths.add(file.getAbsolutePath());
+            }
+        }
+        return paths.size();
     }
 
     private void addRemotePlaylistRow(RemotePlaylist playlist) {
@@ -189,14 +215,16 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
                 : getString(R.string.music_remote_playlist_readonly);
         View row = createPlaylistLikeRow(playlist.name, subtitle, true);
         row.setOnClickListener(v -> {
-            Intent intent = new Intent(this, PlaylistDetailActivity.class);
-            intent.putExtra("remote_playlist_id", playlist.id);
-            intent.putExtra("remote_playlist_global_id", playlist.globalCollectionId);
-            intent.putExtra("remote_playlist_listid", playlist.listId);
-            intent.putExtra("remote_playlist_name", playlist.name);
-            intent.putExtra("remote_playlist_count", playlist.songCount);
-            startActivity(intent);
+            startActivity(remotePlaylistIntent(playlist));
         });
+        remotePlaylistContainer.addView(row);
+    }
+
+    private void addCreateRemotePlaylistRow() {
+        View row = createPlaylistLikeRow(getString(R.string.music_remote_create_playlist), null, true);
+        TextView titleView = row.findViewById(R.id.song_row_title);
+        titleView.setTextColor(getResources().getColor(R.color.brand_accent, getTheme()));
+        row.setOnClickListener(v -> promptCreateRemotePlaylist());
         remotePlaylistContainer.addView(row);
     }
 
@@ -231,7 +259,7 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
         return name;
     }
 
-    private void promptCreatePlaylist() {
+    private void promptCreateRemotePlaylist() {
         android.widget.EditText input = new android.widget.EditText(this);
         input.setHint(R.string.music_create_playlist_hint);
         new android.app.AlertDialog.Builder(this)
@@ -240,12 +268,28 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
                 .setPositiveButton(android.R.string.ok, (d, w) -> {
                     String name = input.getText().toString().trim();
                     if (!name.isEmpty()) {
-                        app.playlists.createPlaylist(name);
-                        loadPlaylists();
+                        createRemotePlaylist(name);
                     }
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
+    }
+
+    private void createRemotePlaylist(String name) {
+        Toast.makeText(this, R.string.music_remote_create_loading, Toast.LENGTH_SHORT).show();
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try {
+                app.refreshDataSourceAuth();
+                app.dataSource.createUserPlaylist(name, false);
+                new Handler(Looper.getMainLooper()).post(() -> {
+                    Toast.makeText(this, R.string.music_remote_create_done, Toast.LENGTH_SHORT).show();
+                    loadRemotePlaylists();
+                });
+            } catch (Exception exception) {
+                new Handler(Looper.getMainLooper()).post(() ->
+                        Toast.makeText(this, R.string.music_remote_create_failed, Toast.LENGTH_SHORT).show());
+            }
+        });
     }
 
     private void onRecommendationClicked(SongInfo song) {
@@ -265,7 +309,7 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
         if (startIndex < 0) startIndex = 0;
         // 传入完整列表作为播放队列
         app.player.play(new java.util.ArrayList<>(list), startIndex,
-                MusicPlayer.PlaySource.RECOMMENDATION);
+                MusicPlayer.PlaySource.RECOMMENDATION, getString(R.string.music_recommend));
         startActivity(new Intent(this, MusicPlayerActivity.class));
     }
 
@@ -297,29 +341,19 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
             LayoutInflater.from(this).inflate(R.layout.bar_mini_player, (ViewGroup) miniPlayer, true);
             miniTitle = miniPlayer.findViewById(R.id.mini_player_title);
             miniIcon = miniPlayer.findViewById(R.id.mini_player_icon);
+            miniCover = miniPlayer.findViewById(R.id.mini_player_cover);
             miniPrev = miniPlayer.findViewById(R.id.mini_player_prev);
             miniNext = miniPlayer.findViewById(R.id.mini_player_next);
             miniCenter = miniPlayer.findViewById(R.id.mini_player_center);
             miniPrev.setOnClickListener(v -> app.player.previous());
             miniNext.setOnClickListener(v -> app.player.next());
-            // 点击中间区域（图标+标题）：正在播放时打开播放器界面；
-            // 空闲时自动播放"Favorites"歌单（为空则提示并跳转歌单页）
             miniCenter.setOnClickListener(v -> {
                 SongInfo cur = app.player.currentSong();
                 if (cur != null && app.player.getState() != MusicPlayer.State.IDLE) {
                     startActivity(new Intent(this, MusicPlayerActivity.class));
                     return;
                 }
-                List<SongInfo> favorites = app.playlists.getSongs("Favorites");
-                if (favorites.isEmpty()) {
-                    Toast.makeText(this, R.string.music_mini_player_empty_favorites,
-                            Toast.LENGTH_SHORT).show();
-                    startActivity(new Intent(this, PlaylistDetailActivity.class)
-                            .putExtra("playlist", "Favorites"));
-                    return;
-                }
-                app.player.play(new ArrayList<>(favorites), 0,
-                        MusicPlayer.PlaySource.FAVORITES);
+                restoreLastPlaybackMenu();
             });
         }
 
@@ -331,8 +365,7 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
             String label = current.artist != null && !current.artist.isEmpty()
                     ? current.title + " - " + current.artist : current.title;
             miniTitle.setText(label);
-            miniIcon.setText(current.title.isEmpty() ? "♪"
-                    : String.valueOf(current.title.charAt(0)).toUpperCase());
+            updateMiniArtwork(current);
             miniPrev.setEnabled(true);
             miniNext.setEnabled(true);
             miniPrev.setAlpha(1f);
@@ -340,12 +373,135 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
         } else {
             // 空闲状态：显示默认图标，禁用上一首/下一首
             miniTitle.setText("");
-            miniIcon.setText("♪");
+            showMiniTextIcon(null);
             miniPrev.setEnabled(false);
             miniNext.setEnabled(false);
             miniPrev.setAlpha(0.4f);
             miniNext.setAlpha(0.4f);
         }
+    }
+
+    private void updateMiniArtwork(SongInfo song) {
+        showMiniTextIcon(song);
+        if (song == null || hasText(song.localPath) || !hasText(song.imgUrl)) {
+            return;
+        }
+        String url = song.imgUrl;
+        miniCover.setTag(url);
+        Executors.newSingleThreadExecutor().execute(() -> {
+            try (InputStream input = new URL(url).openStream()) {
+                Bitmap bitmap = BitmapFactory.decodeStream(input);
+                runOnUiThread(() -> {
+                    SongInfo current = app.player.currentSong();
+                    if (bitmap != null
+                            && current == song
+                            && url.equals(miniCover.getTag())) {
+                        miniCover.setImageBitmap(bitmap);
+                        miniCover.setVisibility(View.VISIBLE);
+                        miniIcon.setVisibility(View.GONE);
+                    }
+                });
+            } catch (Exception ignored) {
+            }
+        });
+    }
+
+    private void showMiniTextIcon(SongInfo song) {
+        if (miniCover != null) {
+            miniCover.setTag(null);
+            miniCover.setVisibility(View.GONE);
+            miniCover.setImageDrawable(null);
+        }
+        if (miniIcon == null) return;
+        String title = song == null ? "" : song.title;
+        miniIcon.setText(hasText(title)
+                ? String.valueOf(title.charAt(0)).toUpperCase()
+                : "♪");
+        miniIcon.setVisibility(View.VISIBLE);
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
+    }
+
+    private void restoreLastPlaybackMenu() {
+        List<SongInfo> currentQueue = app.player.getQueue();
+        if (!currentQueue.isEmpty()) {
+            int index = Math.max(0, app.player.getQueueIndex());
+            app.player.play(currentQueue, index, app.player.getPlaySource(), app.player.getPlaySourceName());
+            startActivity(new Intent(this, MusicPlayerActivity.class));
+            return;
+        }
+
+        String type = app.lastMenuType();
+        if ("downloaded".equals(type)) {
+            List<SongInfo> songs = downloadedSongs();
+            if (songs.isEmpty()) {
+                Toast.makeText(this, R.string.music_playlist_empty, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            app.player.play(songs, 0, MusicPlayer.PlaySource.DOWNLOADED,
+                    getString(R.string.music_download_downloaded));
+            startActivity(new Intent(this, MusicPlayerActivity.class));
+            return;
+        }
+
+        if ("local".equals(type)) {
+            String name = app.lastMenuName();
+            if (name == null || name.isEmpty()) {
+                Toast.makeText(this, R.string.music_playlist_empty, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            List<SongInfo> songs = app.playlists.getSongs(name);
+            if (songs.isEmpty()) {
+                startActivity(new Intent(this, PlaylistDetailActivity.class)
+                        .putExtra("playlist_name", name));
+                return;
+            }
+            app.player.play(songs, 0, MusicPlayer.PlaySource.LOCAL_PLAYLIST,
+                    displayPlaylistName(name));
+            startActivity(new Intent(this, MusicPlayerActivity.class));
+            return;
+        }
+
+        if ("remote".equals(type)) {
+            RemotePlaylist playlist = app.lastRemoteMenu();
+            if (playlist != null) {
+                startActivity(remotePlaylistIntent(playlist));
+                return;
+            }
+        }
+
+        Toast.makeText(this, R.string.music_playlist_empty, Toast.LENGTH_SHORT).show();
+    }
+
+    private List<SongInfo> downloadedSongs() {
+        List<SongInfo> songs = new ArrayList<>();
+        for (DownloadedSong downloaded : app.downloadStore.all()) {
+            if (downloaded.localPath == null || !new File(downloaded.localPath).isFile()) {
+                continue;
+            }
+            SongInfo song = new SongInfo();
+            song.hash = downloaded.hash;
+            song.title = downloaded.title;
+            song.artist = downloaded.artist;
+            song.album = downloaded.album;
+            song.duration = downloaded.duration;
+            song.imgUrl = downloaded.imgUrl;
+            song.localPath = downloaded.localPath;
+            songs.add(song);
+        }
+        return songs;
+    }
+
+    private Intent remotePlaylistIntent(RemotePlaylist playlist) {
+        Intent intent = new Intent(this, PlaylistDetailActivity.class);
+        intent.putExtra("remote_playlist_id", playlist.id);
+        intent.putExtra("remote_playlist_global_id", playlist.globalCollectionId);
+        intent.putExtra("remote_playlist_listid", playlist.listId);
+        intent.putExtra("remote_playlist_name", playlist.name);
+        intent.putExtra("remote_playlist_count", playlist.songCount);
+        return intent;
     }
 
     // MusicPlayer.Callback
