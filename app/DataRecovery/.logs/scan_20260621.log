@@ -1,0 +1,360 @@
+17:36:56.815 I algorithmSkipped id=fake_failing reason=disabled
+17:36:56.817 I algorithmStart id=fake_success type=IMAGE
+17:36:56.818 I algorithmEnd id=fake_success type=IMAGE durationMs=1 processed=0 found=1 duplicatesSkipped=0
+17:37:12.510 I algorithmStart id=fake_failing type=IMAGE
+17:37:12.511 W algorithmError id=fake_failing detail=boom
+17:37:12.511 W algorithm: fake_failing
+null
+17:37:12.512 I algorithmStart id=fake_success type=IMAGE
+17:37:12.512 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+17:37:12.619 D tracker onPrepared total=1000
+17:37:12.620 D tracker onPrepared total=1000
+17:37:12.621 D tracker onPrepared total=1000
+17:37:12.621 D tracker onMediaStorePhaseStart
+17:37:12.622 D tracker onCachePhaseStart estimatedTotal=100
+17:37:12.622 D tracker onPrepared total=1000
+17:37:12.623 D tracker complete scanned=1000
+17:37:12.623 D tracker onPrepared total=1000
+17:37:12.624 D tracker complete scanned=1000
+17:37:14.624 I algorithmSkipped id=fake_failing reason=disabled
+17:37:14.626 I algorithmStart id=fake_success type=IMAGE
+17:37:14.627 I algorithmEnd id=fake_success type=IMAGE durationMs=1 processed=0 found=1 duplicatesSkipped=0
+17:37:29.997 I algorithmStart id=fake_failing type=IMAGE
+17:37:29.997 W algorithmError id=fake_failing detail=boom
+17:37:29.997 W algorithm: fake_failing
+null
+17:37:29.998 I algorithmStart id=fake_success type=IMAGE
+17:37:29.998 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+17:37:30.107 D tracker onPrepared total=1000
+17:37:30.108 D tracker onPrepared total=1000
+17:37:30.109 D tracker onPrepared total=1000
+17:37:30.109 D tracker onMediaStorePhaseStart
+17:37:30.110 D tracker onCachePhaseStart estimatedTotal=100
+17:37:30.110 D tracker onPrepared total=1000
+17:37:30.111 D tracker complete scanned=1000
+17:37:30.111 D tracker onPrepared total=1000
+17:37:30.112 D tracker complete scanned=1000
+17:38:45.721 I algorithmSkipped id=fake_failing reason=disabled
+17:38:45.723 I algorithmStart id=fake_success type=IMAGE
+17:38:45.724 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+17:39:01.335 I algorithmStart id=fake_failing type=IMAGE
+17:39:01.336 W algorithmError id=fake_failing detail=boom
+17:39:01.336 W algorithm: fake_failing
+null
+17:39:01.337 I algorithmStart id=fake_success type=IMAGE
+17:39:01.338 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+17:39:01.443 D tracker onPrepared total=1000
+17:39:01.444 D tracker onPrepared total=1000
+17:39:01.445 D tracker onPrepared total=1000
+17:39:01.445 D tracker onMediaStorePhaseStart
+17:39:01.445 D tracker onCachePhaseStart estimatedTotal=100
+17:39:01.446 D tracker onPrepared total=1000
+17:39:01.446 D tracker complete scanned=1000
+17:39:01.447 D tracker onPrepared total=1000
+17:39:01.447 D tracker complete scanned=1000
+17:39:02.629 I algorithmSkipped id=fake_failing reason=disabled
+17:39:02.631 I algorithmStart id=fake_success type=IMAGE
+17:39:02.632 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+17:39:18.767 I algorithmStart id=fake_failing type=IMAGE
+17:39:18.768 W algorithmError id=fake_failing detail=boom
+17:39:18.768 W algorithm: fake_failing
+null
+17:39:18.768 I algorithmStart id=fake_success type=IMAGE
+17:39:18.769 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+17:39:18.870 D tracker onPrepared total=1000
+17:39:18.871 D tracker onPrepared total=1000
+17:39:18.871 D tracker onPrepared total=1000
+17:39:18.871 D tracker onMediaStorePhaseStart
+17:39:18.872 D tracker onCachePhaseStart estimatedTotal=100
+17:39:18.872 D tracker onPrepared total=1000
+17:39:18.873 D tracker complete scanned=1000
+17:39:18.873 D tracker onPrepared total=1000
+17:39:18.874 D tracker complete scanned=1000
+20:13:03.959 I algorithmSkipped id=fake_failing reason=disabled
+20:13:03.961 I algorithmStart id=fake_success type=IMAGE
+20:13:03.962 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+20:13:26.025 I algorithmStart id=fake_failing type=IMAGE
+20:13:26.026 W algorithmError id=fake_failing detail=boom
+20:13:26.026 W algorithm: fake_failing
+null
+20:13:26.027 I algorithmStart id=fake_success type=IMAGE
+20:13:26.027 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+20:13:26.122 D tracker onPrepared total=1000
+20:13:26.122 D tracker onPrepared total=1000
+20:13:26.123 D tracker onPrepared total=1000
+20:13:26.123 D tracker onMediaStorePhaseStart
+20:13:26.124 D tracker onCachePhaseStart estimatedTotal=100
+20:13:26.125 D tracker onPrepared total=1000
+20:13:26.125 D tracker complete scanned=1000
+20:13:26.126 D tracker onPrepared total=1000
+20:13:26.126 D tracker complete scanned=1000
+20:13:27.661 I algorithmSkipped id=fake_failing reason=disabled
+20:13:27.662 I algorithmStart id=fake_success type=IMAGE
+20:13:27.663 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+20:13:47.036 I algorithmStart id=fake_failing type=IMAGE
+20:13:47.037 W algorithmError id=fake_failing detail=boom
+20:13:47.037 W algorithm: fake_failing
+null
+20:13:47.037 I algorithmStart id=fake_success type=IMAGE
+20:13:47.038 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+20:13:47.133 D tracker onPrepared total=1000
+20:13:47.133 D tracker onPrepared total=1000
+20:13:47.134 D tracker onPrepared total=1000
+20:13:47.134 D tracker onMediaStorePhaseStart
+20:13:47.134 D tracker onCachePhaseStart estimatedTotal=100
+20:13:47.135 D tracker onPrepared total=1000
+20:13:47.135 D tracker complete scanned=1000
+20:13:47.136 D tracker onPrepared total=1000
+20:13:47.136 D tracker complete scanned=1000
+20:23:45.609 I algorithmSkipped id=fake_failing reason=disabled
+20:23:45.615 I algorithmStart id=fake_success type=IMAGE
+20:23:45.616 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+20:24:02.797 I algorithmStart id=fake_failing type=IMAGE
+20:24:02.797 W algorithmError id=fake_failing detail=boom
+20:24:02.798 W algorithm: fake_failing
+null
+20:24:02.798 I algorithmStart id=fake_success type=IMAGE
+20:24:02.799 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+20:24:02.909 D tracker onPrepared total=1000
+20:24:02.910 D tracker onPrepared total=1000
+20:24:02.910 D tracker onPrepared total=1000
+20:24:02.911 D tracker onMediaStorePhaseStart
+20:24:02.911 D tracker onCachePhaseStart estimatedTotal=100
+20:24:02.912 D tracker onPrepared total=1000
+20:24:02.912 D tracker complete scanned=1000
+20:24:02.913 D tracker onPrepared total=1000
+20:24:02.914 D tracker complete scanned=1000
+20:24:07.111 I algorithmSkipped id=fake_failing reason=disabled
+20:24:07.113 I algorithmStart id=fake_success type=IMAGE
+20:24:07.114 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+20:24:26.198 I algorithmStart id=fake_failing type=IMAGE
+20:24:26.199 W algorithmError id=fake_failing detail=boom
+20:24:26.199 W algorithm: fake_failing
+null
+20:24:26.200 I algorithmStart id=fake_success type=IMAGE
+20:24:26.200 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+20:24:26.327 D tracker onPrepared total=1000
+20:24:26.328 D tracker onPrepared total=1000
+20:24:26.328 D tracker onPrepared total=1000
+20:24:26.329 D tracker onMediaStorePhaseStart
+20:24:26.330 D tracker onCachePhaseStart estimatedTotal=100
+20:24:26.330 D tracker onPrepared total=1000
+20:24:26.331 D tracker complete scanned=1000
+20:24:26.331 D tracker onPrepared total=1000
+20:24:26.332 D tracker complete scanned=1000
+20:37:48.088 I algorithmSkipped id=fake_failing reason=disabled
+20:37:48.090 I algorithmStart id=fake_success type=IMAGE
+20:37:48.090 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+20:38:07.381 I algorithmStart id=fake_failing type=IMAGE
+20:38:07.381 W algorithmError id=fake_failing detail=boom
+20:38:07.382 W algorithm: fake_failing
+null
+20:38:07.382 I algorithmStart id=fake_success type=IMAGE
+20:38:07.382 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+20:38:07.478 D tracker onPrepared total=1000
+20:38:07.478 D tracker onPrepared total=1000
+20:38:07.479 D tracker onPrepared total=1000
+20:38:07.479 D tracker onMediaStorePhaseStart
+20:38:07.480 D tracker onCachePhaseStart estimatedTotal=100
+20:38:07.480 D tracker onPrepared total=1000
+20:38:07.481 D tracker complete scanned=1000
+20:38:07.482 D tracker onPrepared total=1000
+20:38:07.482 D tracker complete scanned=1000
+20:38:31.378 I algorithmSkipped id=fake_failing reason=disabled
+20:38:31.380 I algorithmStart id=fake_success type=IMAGE
+20:38:31.381 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+20:38:48.843 I algorithmStart id=fake_failing type=IMAGE
+20:38:48.843 W algorithmError id=fake_failing detail=boom
+20:38:48.844 W algorithm: fake_failing
+null
+20:38:48.844 I algorithmStart id=fake_success type=IMAGE
+20:38:48.845 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+20:38:48.962 D tracker onPrepared total=1000
+20:38:48.963 D tracker onPrepared total=1000
+20:38:48.963 D tracker onPrepared total=1000
+20:38:48.963 D tracker onMediaStorePhaseStart
+20:38:48.964 D tracker onCachePhaseStart estimatedTotal=100
+20:38:48.964 D tracker onPrepared total=1000
+20:38:48.965 D tracker complete scanned=1000
+20:38:48.966 D tracker onPrepared total=1000
+20:38:48.966 D tracker complete scanned=1000
+22:47:19.540 I algorithmSkipped id=fake_failing reason=disabled
+22:47:19.542 I algorithmStart id=fake_success type=IMAGE
+22:47:19.542 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+22:47:37.563 I algorithmStart id=fake_failing type=IMAGE
+22:47:37.564 W algorithmError id=fake_failing detail=boom
+22:47:37.564 W algorithm: fake_failing
+null
+22:47:37.565 I algorithmStart id=fake_success type=IMAGE
+22:47:37.565 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+22:47:37.658 D tracker onPrepared total=1000
+22:47:37.659 D tracker onPrepared total=1000
+22:47:37.659 D tracker onPrepared total=1000
+22:47:37.659 D tracker onMediaStorePhaseStart
+22:47:37.660 D tracker onCachePhaseStart estimatedTotal=100
+22:47:37.661 D tracker onPrepared total=1000
+22:47:37.661 D tracker complete scanned=1000
+22:47:37.662 D tracker onPrepared total=1000
+22:47:37.662 D tracker complete scanned=1000
+22:47:48.313 I algorithmSkipped id=fake_failing reason=disabled
+22:47:48.315 I algorithmStart id=fake_success type=IMAGE
+22:47:48.315 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+22:48:03.557 I algorithmStart id=fake_failing type=IMAGE
+22:48:03.558 W algorithmError id=fake_failing detail=boom
+22:48:03.558 W algorithm: fake_failing
+null
+22:48:03.559 I algorithmStart id=fake_success type=IMAGE
+22:48:03.559 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+22:48:03.657 D tracker onPrepared total=1000
+22:48:03.658 D tracker onPrepared total=1000
+22:48:03.658 D tracker onPrepared total=1000
+22:48:03.658 D tracker onMediaStorePhaseStart
+22:48:03.659 D tracker onCachePhaseStart estimatedTotal=100
+22:48:03.659 D tracker onPrepared total=1000
+22:48:03.660 D tracker complete scanned=1000
+22:48:03.660 D tracker onPrepared total=1000
+22:48:03.661 D tracker complete scanned=1000
+22:53:33.980 I algorithmSkipped id=fake_failing reason=disabled
+22:53:33.982 I algorithmStart id=fake_success type=IMAGE
+22:53:33.983 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+22:53:49.509 I algorithmStart id=fake_failing type=IMAGE
+22:53:49.509 W algorithmError id=fake_failing detail=boom
+22:53:49.510 W algorithm: fake_failing
+null
+22:53:49.510 I algorithmStart id=fake_success type=IMAGE
+22:53:49.511 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+22:53:49.609 D tracker onPrepared total=1000
+22:53:49.610 D tracker onPrepared total=1000
+22:53:49.610 D tracker onPrepared total=1000
+22:53:49.611 D tracker onMediaStorePhaseStart
+22:53:49.611 D tracker onCachePhaseStart estimatedTotal=100
+22:53:49.611 D tracker onPrepared total=1000
+22:53:49.612 D tracker complete scanned=1000
+22:53:49.612 D tracker onPrepared total=1000
+22:53:49.612 D tracker complete scanned=1000
+22:53:59.856 I algorithmSkipped id=fake_failing reason=disabled
+22:53:59.858 I algorithmStart id=fake_success type=IMAGE
+22:53:59.859 I algorithmEnd id=fake_success type=IMAGE durationMs=1 processed=0 found=1 duplicatesSkipped=0
+22:54:15.949 I algorithmStart id=fake_failing type=IMAGE
+22:54:15.950 W algorithmError id=fake_failing detail=boom
+22:54:15.950 W algorithm: fake_failing
+null
+22:54:15.950 I algorithmStart id=fake_success type=IMAGE
+22:54:15.951 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+22:54:16.048 D tracker onPrepared total=1000
+22:54:16.049 D tracker onPrepared total=1000
+22:54:16.049 D tracker onPrepared total=1000
+22:54:16.049 D tracker onMediaStorePhaseStart
+22:54:16.050 D tracker onCachePhaseStart estimatedTotal=100
+22:54:16.050 D tracker onPrepared total=1000
+22:54:16.051 D tracker complete scanned=1000
+22:54:16.051 D tracker onPrepared total=1000
+22:54:16.052 D tracker complete scanned=1000
+23:02:20.789 I algorithmSkipped id=fake_failing reason=disabled
+23:02:20.791 I algorithmStart id=fake_success type=IMAGE
+23:02:20.792 I algorithmEnd id=fake_success type=IMAGE durationMs=1 processed=0 found=1 duplicatesSkipped=0
+23:02:36.361 I algorithmStart id=fake_failing type=IMAGE
+23:02:36.361 W algorithmError id=fake_failing detail=boom
+23:02:36.362 W algorithm: fake_failing
+null
+23:02:36.362 I algorithmStart id=fake_success type=IMAGE
+23:02:36.363 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+23:02:36.454 D tracker onPrepared total=1000
+23:02:36.454 D tracker onPrepared total=1000
+23:02:36.455 D tracker onPrepared total=1000
+23:02:36.455 D tracker onMediaStorePhaseStart
+23:02:36.456 D tracker onCachePhaseStart estimatedTotal=100
+23:02:36.456 D tracker onPrepared total=1000
+23:02:36.457 D tracker complete scanned=1000
+23:02:36.457 D tracker onPrepared total=1000
+23:02:36.457 D tracker complete scanned=1000
+23:03:20.722 I algorithmSkipped id=fake_failing reason=disabled
+23:03:20.723 I algorithmStart id=fake_success type=IMAGE
+23:03:20.724 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+23:03:35.463 I algorithmStart id=fake_failing type=IMAGE
+23:03:35.463 W algorithmError id=fake_failing detail=boom
+23:03:35.464 W algorithm: fake_failing
+null
+23:03:35.464 I algorithmStart id=fake_success type=IMAGE
+23:03:35.465 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+23:03:35.565 D tracker onPrepared total=1000
+23:03:35.566 D tracker onPrepared total=1000
+23:03:35.566 D tracker onPrepared total=1000
+23:03:35.567 D tracker onMediaStorePhaseStart
+23:03:35.568 D tracker onCachePhaseStart estimatedTotal=100
+23:03:35.568 D tracker onPrepared total=1000
+23:03:35.569 D tracker complete scanned=1000
+23:03:35.569 D tracker onPrepared total=1000
+23:03:35.570 D tracker complete scanned=1000
+23:08:37.647 I algorithmSkipped id=fake_failing reason=disabled
+23:08:37.649 I algorithmStart id=fake_success type=IMAGE
+23:08:37.650 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+23:08:52.973 I algorithmStart id=fake_failing type=IMAGE
+23:08:52.973 W algorithmError id=fake_failing detail=boom
+23:08:52.974 W algorithm: fake_failing
+null
+23:08:52.974 I algorithmStart id=fake_success type=IMAGE
+23:08:52.975 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+23:08:53.077 D tracker onPrepared total=1000
+23:08:53.078 D tracker onPrepared total=1000
+23:08:53.078 D tracker onPrepared total=1000
+23:08:53.078 D tracker onMediaStorePhaseStart
+23:08:53.079 D tracker onCachePhaseStart estimatedTotal=100
+23:08:53.080 D tracker onPrepared total=1000
+23:08:53.080 D tracker complete scanned=1000
+23:08:53.080 D tracker onPrepared total=1000
+23:08:53.081 D tracker complete scanned=1000
+23:08:56.814 I algorithmSkipped id=fake_failing reason=disabled
+23:08:56.816 I algorithmStart id=fake_success type=IMAGE
+23:08:56.816 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+23:09:13.049 I algorithmStart id=fake_failing type=IMAGE
+23:09:13.049 W algorithmError id=fake_failing detail=boom
+23:09:13.050 W algorithm: fake_failing
+null
+23:09:13.050 I algorithmStart id=fake_success type=IMAGE
+23:09:13.051 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+23:09:13.155 D tracker onPrepared total=1000
+23:09:13.156 D tracker onPrepared total=1000
+23:09:13.157 D tracker onPrepared total=1000
+23:09:13.157 D tracker onMediaStorePhaseStart
+23:09:13.158 D tracker onCachePhaseStart estimatedTotal=100
+23:09:13.159 D tracker onPrepared total=1000
+23:09:13.159 D tracker complete scanned=1000
+23:09:13.160 D tracker onPrepared total=1000
+23:09:13.160 D tracker complete scanned=1000
+23:13:24.462 I algorithmSkipped id=fake_failing reason=disabled
+23:13:24.464 I algorithmStart id=fake_success type=IMAGE
+23:13:24.465 I algorithmEnd id=fake_success type=IMAGE durationMs=1 processed=0 found=1 duplicatesSkipped=0
+23:13:38.117 I algorithmStart id=fake_failing type=IMAGE
+23:13:38.118 W algorithmError id=fake_failing detail=boom
+23:13:38.118 W algorithm: fake_failing
+null
+23:13:38.119 I algorithmStart id=fake_success type=IMAGE
+23:13:38.120 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+23:13:38.240 D tracker onPrepared total=1000
+23:13:38.240 D tracker onPrepared total=1000
+23:13:38.241 D tracker onPrepared total=1000
+23:13:38.241 D tracker onMediaStorePhaseStart
+23:13:38.242 D tracker onCachePhaseStart estimatedTotal=100
+23:13:38.243 D tracker onPrepared total=1000
+23:13:38.243 D tracker complete scanned=1000
+23:13:38.244 D tracker onPrepared total=1000
+23:13:38.244 D tracker complete scanned=1000
+23:13:41.895 I algorithmSkipped id=fake_failing reason=disabled
+23:13:41.896 I algorithmStart id=fake_success type=IMAGE
+23:13:41.897 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+23:13:56.579 I algorithmStart id=fake_failing type=IMAGE
+23:13:56.580 W algorithmError id=fake_failing detail=boom
+23:13:56.580 W algorithm: fake_failing
+null
+23:13:56.581 I algorithmStart id=fake_success type=IMAGE
+23:13:56.581 I algorithmEnd id=fake_success type=IMAGE durationMs=0 processed=0 found=1 duplicatesSkipped=0
+23:13:56.694 D tracker onPrepared total=1000
+23:13:56.694 D tracker onPrepared total=1000
+23:13:56.695 D tracker onPrepared total=1000
+23:13:56.695 D tracker onMediaStorePhaseStart
+23:13:56.696 D tracker onCachePhaseStart estimatedTotal=100
+23:13:56.696 D tracker onPrepared total=1000
+23:13:56.697 D tracker complete scanned=1000
+23:13:56.697 D tracker onPrepared total=1000
+23:13:56.698 D tracker complete scanned=1000

@@ -35,6 +35,7 @@ public final class FileBrowserAdapter extends RecyclerView.Adapter<FileBrowserAd
     private final Listener listener;
     private boolean multiSelectMode;
     private final Set<String> selectedPaths = new HashSet<>();
+    private String highlightedPath;
 
     public FileBrowserAdapter(List<FileBrowserActivity.FileEntry> entries, Listener listener) {
         this.entries = entries;
@@ -72,6 +73,11 @@ public final class FileBrowserAdapter extends RecyclerView.Adapter<FileBrowserAd
         return selectedPaths.size();
     }
 
+    public void setHighlightedPath(String path) {
+        highlightedPath = path;
+        notifyDataSetChanged();
+    }
+
     @NonNull
     @Override
     public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -82,7 +88,7 @@ public final class FileBrowserAdapter extends RecyclerView.Adapter<FileBrowserAd
 
     @Override
     public void onBindViewHolder(@NonNull Holder holder, int position) {
-        holder.bind(entries.get(position), listener, multiSelectMode, selectedPaths);
+        holder.bind(entries.get(position), listener, multiSelectMode, selectedPaths, highlightedPath);
     }
 
     @Override
@@ -110,9 +116,13 @@ public final class FileBrowserAdapter extends RecyclerView.Adapter<FileBrowserAd
                 final FileBrowserActivity.FileEntry entry,
                 final Listener listener,
                 boolean multiSelectMode,
-                Set<String> selectedPaths
+                Set<String> selectedPaths,
+                String highlightedPath
         ) {
             name.setText(entry.name);
+            itemView.setBackgroundResource(entry.file.getAbsolutePath().equals(highlightedPath)
+                    ? R.drawable.bg_file_entry_download_hint
+                    : R.drawable.bg_card);
             checkbox.setOnCheckedChangeListener(null);
             if (entry.directory) {
                 icon.setImageResource(R.drawable.ic_nav_folder);

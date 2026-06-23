@@ -10,10 +10,12 @@ import com.example.cleanrecovery.ui.widget.SystemUiHelper;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.database.Cursor;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
@@ -22,17 +24,22 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.MediaStore;
 import android.provider.Settings;
 import android.text.InputType;
 import android.text.format.DateFormat;
 import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
+import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.TextView;
@@ -58,6 +65,11 @@ import java.util.Set;
 
 public final class FileBrowserActivity extends Activity {
     public static final String EXTRA_INITIAL_PATH = "com.example.cleanrecovery.extra.INITIAL_PATH";
+    private static final long DOWNLOAD_HINT_VISIBLE_MS = 5_000L;
+    private static final long RECENT_DOWNLOAD_WINDOW_MS = 5L * 60L * 1000L;
+    private static final int RECENT_DOWNLOAD_MAX_DEPTH = 4;
+    private static final int RECENT_DOWNLOAD_MAX_FILES_SCANNED = 2000;
+    private static final int RECENT_DOWNLOAD_MAX_RESULTS = 20;
 
     private enum SortMode {
         NAME,
@@ -72,10 +84,20 @@ public final class FileBrowserActivity extends Activity {
     private SortMode sortMode = SortMode.NAME;
     private boolean showHiddenFiles;
     private String filterQuery = "";
+    private File suggestedDownloadDir;
+    private boolean staticDownloadHintDismissed;
+    private boolean downloadHintCopyCollapsed;
+    private String pendingLocatePath;
 
     private RecyclerView listView;
     private View emptyPanel;
     private TextView emptyLabel;
+    private View downloadHintPanel;
+    private View downloadHintCopy;
+    private TextView downloadHintTitle;
+    private TextView downloadHintMessage;
+    private TextView downloadHintAction;
+    private View downloadHintClose;
     private View moreButton;
     private View toolbar;
     private View multiSelectBar;
@@ -87,6 +109,14 @@ public final class FileBrowserActivity extends Activity {
     // 文件管理 V2：底部操作栏（多选模式）
     private View bottomActionBar;
     private final Handler undoSnackbarHandler = new Handler(Looper.getMainLooper());
+    private final Handler downloadHintHandler = new Handler(Looper.getMainLooper());
+    private final Handler locateHighlightHandler = new Handler(Looper.getMainLooper());
+    private final Runnable hideDownloadHintRunnable = new Runnable() {
+        @Override
+        public void run() {
+            collapseDownloadHintCopy();
+        }
+    };
     private View undoSnackbarView;
 
     @Override
@@ -101,6 +131,12 @@ public final class FileBrowserActivity extends Activity {
         titleLabel = findViewById(R.id.file_browser_title);
         emptyPanel = findViewById(R.id.file_browser_empty_panel);
         emptyLabel = findViewById(R.id.file_browser_empty);
+        downloadHintPanel = findViewById(R.id.file_browser_download_hint);
+        downloadHintCopy = findViewById(R.id.file_browser_download_hint_copy);
+        downloadHintTitle = findViewById(R.id.file_browser_download_hint_title);
+        downloadHintMessage = findViewById(R.id.file_browser_download_hint_message);
+        downloadHintAction = findViewById(R.id.file_browser_download_hint_action);
+        downloadHintClose = findViewById(R.id.file_browser_download_hint_close);
         breadcrumbContainer = findViewById(R.id.file_browser_breadcrumb);
         breadcrumbScroll = findViewById(R.id.file_browser_breadcrumb_scroll);
         searchInput = findViewById(R.id.file_browser_search);
@@ -146,6 +182,9 @@ public final class FileBrowserActivity extends Activity {
         listView.setLayoutManager(new LinearLayoutManager(this));
         listView.setAdapter(adapter);
 
+        downloadHintAction.setOnClickListener(v -> showRecentDownloads());
+        downloadHintClose.setOnClickListener(v -> dismissDownloadHint());
+
         moreButton = findViewById(R.id.file_browser_more);
         findViewById(R.id.file_browser_back).setOnClickListener(v -> finish());
         moreButton.setOnClickListener(this::showToolbarMenu);
@@ -156,6 +195,13 @@ public final class FileBrowserActivity extends Activity {
 
         File initial = resolveInitialDirectory(getIntent().getStringExtra(EXTRA_INITIAL_PATH));
         openDirectory(initial);
+    }
+
+    @Override
+    protected void onDestroy() {
+        downloadHintHandler.removeCallbacks(hideDownloadHintRunnable);
+        locateHighlightHandler.removeCallbacksAndMessages(null);
+        super.onDestroy();
     }
 
     private void configureSearchView() {
@@ -318,6 +364,7 @@ public final class FileBrowserActivity extends Activity {
                 allEntries.add(FileEntry.from(child));
             }
         }
+        suggestedDownloadDir = findSuggestedDownloadDir();
         applyFilterAndSort();
     }
 
@@ -331,6 +378,8 @@ public final class FileBrowserActivity extends Activity {
         sortEntries(entries);
         adapter.notifyDataSetChanged();
         updateEmptyState();
+        updateDownloadHintPanel();
+        locatePendingFileIfNeeded();
     }
 
     private boolean matchesFilter(FileEntry entry) {
@@ -338,6 +387,423 @@ public final class FileBrowserActivity extends Activity {
             return true;
         }
         return entry.name.toLowerCase(Locale.US).contains(filterQuery);
+    }
+
+    private void updateDownloadHintPanel() {
+        if (downloadHintPanel == null) {
+            return;
+        }
+        boolean wasVisible = downloadHintPanel.getVisibility() == View.VISIBLE;
+        boolean show = !staticDownloadHintDismissed
+                && suggestedDownloadDir != null
+                && currentDir != null
+                && !isSamePath(currentDir, suggestedDownloadDir);
+        downloadHintPanel.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (!show) {
+            downloadHintHandler.removeCallbacks(hideDownloadHintRunnable);
+            return;
+        }
+        renderDownloadHintPanel();
+        if (!wasVisible && !downloadHintCopyCollapsed) {
+            downloadHintHandler.removeCallbacks(hideDownloadHintRunnable);
+            downloadHintHandler.postDelayed(hideDownloadHintRunnable, DOWNLOAD_HINT_VISIBLE_MS);
+        }
+    }
+
+    private void renderDownloadHintPanel() {
+        boolean expanded = !downloadHintCopyCollapsed;
+        if (downloadHintCopy != null) {
+            downloadHintCopy.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        }
+        downloadHintClose.setVisibility(expanded ? View.VISIBLE : View.GONE);
+        if (expanded) {
+            downloadHintTitle.setText(R.string.file_browser_download_hint_title);
+            downloadHintMessage.setText(getString(
+                    R.string.file_browser_download_hint_message,
+                    displayDownloadPath(suggestedDownloadDir)
+            ));
+        }
+        downloadHintAction.setText(R.string.file_browser_recent_downloads_action);
+    }
+
+    private void collapseDownloadHintCopy() {
+        downloadHintCopyCollapsed = true;
+        renderDownloadHintPanel();
+    }
+
+    private void showRecentDownloads() {
+        Toast.makeText(this, R.string.file_browser_recent_downloads_scanning, Toast.LENGTH_SHORT).show();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                final List<RecentDownloadCandidate> results = findRecentDownloadCandidates();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        showRecentDownloadsDialog(results);
+                    }
+                });
+            }
+        }).start();
+    }
+
+    private void showRecentDownloadsDialog(final List<RecentDownloadCandidate> results) {
+        if (results.isEmpty()) {
+            new AlertDialog.Builder(this)
+                    .setTitle(R.string.file_browser_recent_downloads_title)
+                    .setMessage(R.string.file_browser_recent_downloads_empty)
+                    .setNegativeButton(android.R.string.ok, null)
+                    .show();
+            return;
+        }
+
+        RecyclerView recyclerView = new RecyclerView(this);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        recyclerView.setClipToPadding(false);
+        recyclerView.setPadding(dp(8), dp(8), dp(8), 0);
+
+        final AlertDialog[] dialogRef = new AlertDialog[1];
+        recyclerView.setAdapter(new RecentDownloadsAdapter(results, new RecentDownloadsAdapter.Listener() {
+            @Override
+            public void onRecentDownloadClicked(RecentDownloadCandidate candidate) {
+                if (dialogRef[0] != null) {
+                    dialogRef[0].dismiss();
+                }
+                openDirectoryAndLocate(candidate.file);
+            }
+        }));
+
+        dialogRef[0] = new AlertDialog.Builder(this)
+                .setTitle(R.string.file_browser_recent_downloads_title)
+                .setView(recyclerView)
+                .setNegativeButton(android.R.string.cancel, null)
+                .create();
+        dialogRef[0].show();
+    }
+
+    private List<RecentDownloadCandidate> findRecentDownloadCandidates() {
+        long cutoff = System.currentTimeMillis() - RECENT_DOWNLOAD_WINDOW_MS;
+        ArrayList<RecentDownloadCandidate> results = new ArrayList<>();
+        HashSet<String> visitedDirs = new HashSet<>();
+        HashSet<String> emittedFiles = new HashSet<>();
+        int[] scannedFiles = {0};
+
+        collectMediaStoreDownloadCandidates(cutoff, emittedFiles, results);
+        collectDownloadManagerCandidates(cutoff, emittedFiles, results);
+        for (File root : recentDownloadSearchRoots()) {
+            if (scannedFiles[0] >= RECENT_DOWNLOAD_MAX_FILES_SCANNED) {
+                break;
+            }
+            scanRecentDownloadFiles(root, 0, cutoff, visitedDirs, emittedFiles, results, scannedFiles);
+        }
+
+        results.sort(new Comparator<RecentDownloadCandidate>() {
+            @Override
+            public int compare(RecentDownloadCandidate left, RecentDownloadCandidate right) {
+                return Long.compare(right.lastModified, left.lastModified);
+            }
+        });
+        if (results.size() > RECENT_DOWNLOAD_MAX_RESULTS) {
+            return new ArrayList<>(results.subList(0, RECENT_DOWNLOAD_MAX_RESULTS));
+        }
+        return results;
+    }
+
+    private void collectMediaStoreDownloadCandidates(
+            long cutoff,
+            Set<String> emittedFiles,
+            List<RecentDownloadCandidate> results
+    ) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return;
+        }
+        String[] projection = new String[]{
+                MediaStore.MediaColumns.DISPLAY_NAME,
+                MediaStore.MediaColumns.DATA,
+                MediaStore.MediaColumns.DATE_MODIFIED,
+                MediaStore.MediaColumns.MIME_TYPE
+        };
+        String selection = MediaStore.MediaColumns.DATE_MODIFIED + " >= ?";
+        String[] selectionArgs = new String[]{String.valueOf(cutoff / 1000L)};
+        String sortOrder = MediaStore.MediaColumns.DATE_MODIFIED + " DESC";
+        Cursor cursor = null;
+        try {
+            cursor = getContentResolver().query(
+                    MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL),
+                    projection,
+                    selection,
+                    selectionArgs,
+                    sortOrder
+            );
+            if (cursor == null) {
+                return;
+            }
+            int pathColumn = cursor.getColumnIndex(MediaStore.MediaColumns.DATA);
+            int modifiedColumn = cursor.getColumnIndex(MediaStore.MediaColumns.DATE_MODIFIED);
+            int mimeColumn = cursor.getColumnIndex(MediaStore.MediaColumns.MIME_TYPE);
+            while (cursor.moveToNext()) {
+                if (results.size() >= RECENT_DOWNLOAD_MAX_RESULTS) {
+                    return;
+                }
+                String path = pathColumn >= 0 ? cursor.getString(pathColumn) : null;
+                long modified = modifiedColumn >= 0 ? cursor.getLong(modifiedColumn) * 1000L : 0L;
+                String mime = mimeColumn >= 0 ? cursor.getString(mimeColumn) : null;
+                if (path != null && !isMediaMime(mime)) {
+                    addRecentCandidate(new File(path), cutoff, emittedFiles, results, modified);
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // Some vendor MediaStore implementations hide DATA. The filesystem pass remains the fallback.
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+    }
+
+    private void collectDownloadManagerCandidates(
+            long cutoff,
+            Set<String> emittedFiles,
+            List<RecentDownloadCandidate> results
+    ) {
+        DownloadManager manager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+        if (manager == null) {
+            return;
+        }
+        DownloadManager.Query query = new DownloadManager.Query();
+        query.setFilterByStatus(DownloadManager.STATUS_SUCCESSFUL);
+        Cursor cursor = null;
+        try {
+            cursor = manager.query(query);
+            if (cursor == null) {
+                return;
+            }
+            int uriColumn = cursor.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI);
+            int modifiedColumn = cursor.getColumnIndex(DownloadManager.COLUMN_LAST_MODIFIED_TIMESTAMP);
+            while (cursor.moveToNext()) {
+                if (results.size() >= RECENT_DOWNLOAD_MAX_RESULTS) {
+                    return;
+                }
+                long modified = modifiedColumn >= 0 ? cursor.getLong(modifiedColumn) : 0L;
+                if (modified < cutoff) {
+                    continue;
+                }
+                String localUri = uriColumn >= 0 ? cursor.getString(uriColumn) : null;
+                File file = fileFromDownloadManagerUri(localUri);
+                if (file != null) {
+                    addRecentCandidate(file, cutoff, emittedFiles, results, modified);
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // DownloadManager visibility is intentionally narrow on modern Android.
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+    }
+
+    private List<File> recentDownloadSearchRoots() {
+        ArrayList<File> roots = new ArrayList<>();
+        HashSet<String> seen = new HashSet<>();
+        File external = Environment.getExternalStorageDirectory();
+        addUniqueDirectory(roots, seen, Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS));
+        if (external != null) {
+            addUniqueDirectory(roots, seen, new File(external, "Download"));
+            addUniqueDirectory(roots, seen, new File(external, "Downloads"));
+            addUniqueDirectory(roots, seen, new File(external, "Documents"));
+            addUniqueDirectory(roots, seen, new File(new File(external, "DataRecovery"), "Downloads"));
+        }
+        return roots;
+    }
+
+    private void scanRecentDownloadFiles(
+            File directory,
+            int depth,
+            long cutoff,
+            Set<String> visitedDirs,
+            Set<String> emittedFiles,
+            List<RecentDownloadCandidate> results,
+            int[] scannedFiles
+    ) {
+        if (directory == null
+                || depth > RECENT_DOWNLOAD_MAX_DEPTH
+                || scannedFiles[0] >= RECENT_DOWNLOAD_MAX_FILES_SCANNED
+                || !directory.isDirectory()
+                || !isAccessible(directory)) {
+            return;
+        }
+        String directoryPath = canonicalPath(directory);
+        if (!visitedDirs.add(directoryPath)) {
+            return;
+        }
+
+        File[] children;
+        try {
+            children = directory.listFiles();
+        } catch (SecurityException ignored) {
+            return;
+        }
+        if (children == null) {
+            return;
+        }
+
+        for (File child : children) {
+            if (scannedFiles[0] >= RECENT_DOWNLOAD_MAX_FILES_SCANNED) {
+                return;
+            }
+            if (child.isDirectory()) {
+                scanRecentDownloadFiles(child, depth + 1, cutoff, visitedDirs, emittedFiles, results, scannedFiles);
+            } else if (child.isFile()) {
+                scannedFiles[0]++;
+                addRecentCandidate(child, cutoff, emittedFiles, results, child.lastModified());
+            }
+        }
+    }
+
+    private void addRecentCandidate(
+            File file,
+            long cutoff,
+            Set<String> emittedFiles,
+            List<RecentDownloadCandidate> results,
+            long modified
+    ) {
+        if (!shouldIncludeRecentDownload(file, cutoff)) {
+            return;
+        }
+        String path = canonicalPath(file);
+        if (emittedFiles.add(path)) {
+            results.add(new RecentDownloadCandidate(file, modified > 0L ? modified : file.lastModified()));
+        }
+    }
+
+    private static File fileFromDownloadManagerUri(String localUri) {
+        if (localUri == null || localUri.isEmpty()) {
+            return null;
+        }
+        Uri uri = Uri.parse(localUri);
+        if ("file".equalsIgnoreCase(uri.getScheme())) {
+            String path = uri.getPath();
+            return path == null ? null : new File(path);
+        }
+        return null;
+    }
+
+    private boolean shouldIncludeRecentDownload(File file, long cutoff) {
+        if (file == null || !file.isFile() || !isAccessible(file) || file.lastModified() < cutoff) {
+            return false;
+        }
+        FileBrowserMime.Kind kind = FileBrowserMime.kindFor(file, file.getName(), false);
+        return kind != FileBrowserMime.Kind.IMAGE
+                && kind != FileBrowserMime.Kind.VIDEO
+                && kind != FileBrowserMime.Kind.AUDIO;
+    }
+
+    private static boolean isMediaMime(String mime) {
+        if (mime == null) {
+            return false;
+        }
+        String lower = mime.toLowerCase(Locale.US);
+        return lower.startsWith("image/") || lower.startsWith("video/") || lower.startsWith("audio/");
+    }
+
+    private static void addUniqueDirectory(List<File> roots, Set<String> seen, File directory) {
+        if (directory == null || !directory.isDirectory() || !isAccessible(directory)) {
+            return;
+        }
+        String path = canonicalPath(directory);
+        if (seen.add(path)) {
+            roots.add(directory);
+        }
+    }
+
+    private void openSuggestedDownloadLocation() {
+        if (suggestedDownloadDir != null && suggestedDownloadDir.isDirectory() && isAccessible(suggestedDownloadDir)) {
+            staticDownloadHintDismissed = true;
+            openDirectory(suggestedDownloadDir);
+            return;
+        }
+        Toast.makeText(this, R.string.file_browser_download_hint_missing, Toast.LENGTH_SHORT).show();
+    }
+
+    private void dismissDownloadHint() {
+        staticDownloadHintDismissed = true;
+        downloadHintHandler.removeCallbacks(hideDownloadHintRunnable);
+        updateDownloadHintPanel();
+    }
+
+    private File findSuggestedDownloadDir() {
+        File external = Environment.getExternalStorageDirectory();
+        File downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+        if (downloads != null && downloads.isDirectory() && isAccessible(downloads)) {
+            return downloads;
+        }
+        if (external == null) {
+            return null;
+        }
+        File legacyDownloads = new File(external, "Downloads");
+        return legacyDownloads.isDirectory() && isAccessible(legacyDownloads) ? legacyDownloads : null;
+    }
+
+    private void openDirectoryAndLocate(File file) {
+        File parent = file == null ? null : file.getParentFile();
+        if (parent == null || !parent.isDirectory() || !isAccessible(parent)) {
+            Toast.makeText(this, R.string.file_browser_download_hint_missing, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        pendingLocatePath = canonicalPath(file);
+        openDirectory(parent);
+    }
+
+    private String displayDownloadPath(File directory) {
+        File external = Environment.getExternalStorageDirectory();
+        if (external != null && isPathAtOrUnder(directory, external)) {
+            String base = external.getAbsolutePath();
+            String path = directory.getAbsolutePath();
+            if (path.equals(base)) {
+                return getString(R.string.file_browser_internal_storage);
+            }
+            if (path.startsWith(base + File.separator)) {
+                return getString(R.string.file_browser_internal_storage)
+                        + File.separator
+                        + path.substring(base.length() + 1);
+            }
+        }
+        return directory.getAbsolutePath();
+    }
+
+    private void locatePendingFileIfNeeded() {
+        if (pendingLocatePath == null || listView == null || adapter == null) {
+            return;
+        }
+        final String targetPath = pendingLocatePath;
+        int targetPosition = -1;
+        for (int i = 0; i < entries.size(); i++) {
+            if (targetPath.equals(canonicalPath(entries.get(i).file))) {
+                targetPosition = i;
+                break;
+            }
+        }
+        if (targetPosition < 0) {
+            pendingLocatePath = null;
+            return;
+        }
+        final int position = targetPosition;
+        listView.post(new Runnable() {
+            @Override
+            public void run() {
+                listView.scrollToPosition(position);
+                adapter.setHighlightedPath(entries.get(position).file.getAbsolutePath());
+                locateHighlightHandler.removeCallbacksAndMessages(null);
+                locateHighlightHandler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        adapter.setHighlightedPath(null);
+                    }
+                }, 2500L);
+            }
+        });
+        pendingLocatePath = null;
     }
 
     private void sortEntries(List<FileEntry> target) {
@@ -497,6 +963,14 @@ public final class FileBrowserActivity extends Activity {
         return childPath.equals(rootPath) || childPath.startsWith(rootPath + File.separator);
     }
 
+    private static String canonicalPath(File file) {
+        try {
+            return file.getCanonicalPath();
+        } catch (IOException ignored) {
+            return file.getAbsolutePath();
+        }
+    }
+
     private void showToolbarMenu(View anchor) {
         PopupMenu menu = new PopupMenu(this, anchor, Gravity.END);
         menu.getMenuInflater().inflate(R.menu.menu_file_browser, menu.getMenu());
@@ -531,6 +1005,11 @@ public final class FileBrowserActivity extends Activity {
                 }
                 if (id == R.id.menu_recycle_bin) {
                     openRecycleBin();
+                    return true;
+                }
+                if (id == R.id.menu_download_locations) {
+                    staticDownloadHintDismissed = true;
+                    showRecentDownloads();
                     return true;
                 }
                 if (id == R.id.menu_sort_name) {
@@ -1427,6 +1906,119 @@ public final class FileBrowserActivity extends Activity {
         BreadcrumbSegment(String label, File directory) {
             this.label = label;
             this.directory = directory;
+        }
+    }
+
+    private final class RecentDownloadsAdapter
+            extends RecyclerView.Adapter<RecentDownloadsAdapter.Holder> {
+        interface Listener {
+            void onRecentDownloadClicked(RecentDownloadCandidate candidate);
+        }
+
+        private final List<RecentDownloadCandidate> downloads;
+        private final Listener listener;
+
+        RecentDownloadsAdapter(List<RecentDownloadCandidate> downloads, Listener listener) {
+            this.downloads = downloads;
+            this.listener = listener;
+        }
+
+        @Override
+        public Holder onCreateViewHolder(ViewGroup parent, int viewType) {
+            View view = LayoutInflater.from(parent.getContext())
+                    .inflate(R.layout.item_file_browser_entry, parent, false);
+            return new Holder(view);
+        }
+
+        @Override
+        public void onBindViewHolder(Holder holder, int position) {
+            holder.bind(downloads.get(position), listener);
+        }
+
+        @Override
+        public int getItemCount() {
+            return downloads.size();
+        }
+
+        final class Holder extends RecyclerView.ViewHolder {
+            private final View checkbox;
+            private final ImageView icon;
+            private final TextView name;
+            private final TextView meta;
+            private final ImageButton info;
+
+            Holder(View itemView) {
+                super(itemView);
+                checkbox = itemView.findViewById(R.id.file_entry_checkbox);
+                icon = itemView.findViewById(R.id.file_entry_icon);
+                name = itemView.findViewById(R.id.file_entry_name);
+                meta = itemView.findViewById(R.id.file_entry_meta);
+                info = itemView.findViewById(R.id.file_entry_info);
+            }
+
+            void bind(final RecentDownloadCandidate candidate, final Listener listener) {
+                checkbox.setVisibility(View.GONE);
+                info.setVisibility(View.GONE);
+                itemView.setBackgroundResource(R.drawable.bg_card);
+                name.setText(candidate.file.getName());
+                name.setMaxLines(1);
+                icon.setImageResource(iconForRecentDownload(candidate.file));
+                icon.clearColorFilter();
+                meta.setText(getString(
+                        R.string.file_browser_recent_downloads_item_meta,
+                        DateFormat.getTimeFormat(FileBrowserActivity.this)
+                                .format(new Date(candidate.lastModified)),
+                        displayDownloadPath(candidate.file)
+                ));
+                meta.setMaxLines(2);
+                itemView.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View view) {
+                        listener.onRecentDownloadClicked(candidate);
+                    }
+                });
+            }
+        }
+    }
+
+    private static int iconForRecentDownload(File file) {
+        FileBrowserMime.Kind kind = FileBrowserMime.kindFor(file, file.getName(), false);
+        switch (kind) {
+            case TEXT:
+                return R.drawable.ic_type_text;
+            case PDF:
+                return R.drawable.ic_type_pdf;
+            case ZIP:
+                return R.drawable.ic_type_zip;
+            case APK:
+                return R.drawable.ic_type_apk;
+            case DOC:
+                return R.drawable.ic_type_doc;
+            case XLS:
+                return R.drawable.ic_type_xls;
+            case PPT:
+                return R.drawable.ic_type_ppt;
+            case VIDEO:
+                return R.drawable.ic_type_video;
+            case IMAGE:
+                return R.drawable.ic_type_image;
+            case AUDIO:
+                return R.drawable.ic_type_audio;
+            case DIRECTORY:
+                return R.drawable.ic_nav_folder;
+            case UNKNOWN:
+            default:
+                return R.drawable.ic_type_unknown;
+        }
+    }
+
+    private static final class RecentDownloadCandidate {
+        final File file;
+        final long lastModified;
+
+        RecentDownloadCandidate(File file, long lastModified) {
+            this.file = file;
+            this.lastModified = lastModified;
         }
     }
 

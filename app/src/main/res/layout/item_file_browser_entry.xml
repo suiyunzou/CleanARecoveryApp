@@ -49,6 +49,7 @@
             android:paddingTop="2dp"
             android:textColor="@color/text_muted"
             android:textSize="@dimen/text_caption" />
+
     </LinearLayout>
 
     <ImageButton

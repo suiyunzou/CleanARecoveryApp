@@ -129,6 +129,80 @@
             android:orientation="horizontal" />
     </HorizontalScrollView>
 
+    <LinearLayout
+        android:id="@+id/file_browser_download_hint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/space_md"
+        android:layout_marginEnd="@dimen/space_md"
+        android:layout_marginBottom="@dimen/space_sm"
+        android:background="@drawable/bg_download_hint_panel"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/space_md"
+        android:paddingTop="@dimen/space_sm"
+        android:paddingEnd="@dimen/space_sm"
+        android:paddingBottom="@dimen/space_sm"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:id="@+id/file_browser_download_hint_copy"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/file_browser_download_hint_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:textSize="@dimen/text_body"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/file_browser_download_hint_message"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:maxLines="2"
+                android:textColor="@color/text_secondary"
+                android:textSize="@dimen/text_caption" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/file_browser_download_hint_action"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/space_sm"
+            android:background="@drawable/bg_button_secondary"
+            android:clickable="true"
+            android:focusable="true"
+            android:minHeight="36dp"
+            android:paddingStart="@dimen/space_sm"
+            android:paddingTop="@dimen/space_xs"
+            android:paddingEnd="@dimen/space_sm"
+            android:paddingBottom="@dimen/space_xs"
+            android:textColor="@color/brand_primary_dark"
+            android:textSize="@dimen/text_caption"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/file_browser_download_hint_close"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="@dimen/space_xs"
+            android:background="?android:attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="X"
+            android:textColor="@color/text_muted"
+            android:textSize="@dimen/text_caption"
+            android:textStyle="bold" />
+
+    </LinearLayout>
+
     <androidx.appcompat.widget.SearchView
         android:id="@+id/file_browser_search"
         android:layout_width="match_parent"

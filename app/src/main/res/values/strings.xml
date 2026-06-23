@@ -149,6 +149,16 @@
     <string name="file_browser_select">Select</string>
     <string name="file_browser_select_items">Select items</string>
     <string name="file_browser_view_recycle_bin">View recycle bin</string>
+    <string name="file_browser_find_downloads">Find downloads</string>
+    <string name="file_browser_download_hint_title">Downloaded files may be here</string>
+    <string name="file_browser_download_hint_message">Tap Recent to locate files changed in the last 5 minutes. Common downloads are usually under %1$s.</string>
+    <string name="file_browser_download_hint_action">Open</string>
+    <string name="file_browser_recent_downloads_action">Recent</string>
+    <string name="file_browser_recent_downloads_title">Recently downloaded files</string>
+    <string name="file_browser_recent_downloads_scanning">Looking for recent files…</string>
+    <string name="file_browser_recent_downloads_empty">No non-media downloads changed in the last 5 minutes. Confirm the download finished, then try again.</string>
+    <string name="file_browser_recent_downloads_item_meta">%1$s · %2$s</string>
+    <string name="file_browser_download_hint_missing">No readable download folder found</string>
     <string name="file_browser_internal_storage">Internal storage</string>
     <string name="file_browser_cancel_select">Cancel</string>
     <string name="file_browser_selected_count">%1$d selected</string>

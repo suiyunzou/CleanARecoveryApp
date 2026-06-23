@@ -12,6 +12,14 @@ _android_sdk/
 *.iml
 .vscode/
 
+# AI Tools
+.trae/
+.cursor/
+.windsurf/
+.agents/
+.claude/
+agent/
+
 # Build outputs
 dist/
 *.apk
