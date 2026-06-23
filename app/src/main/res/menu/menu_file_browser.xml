@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <group android:id="@+id/menu_action_group">
+        <item
+            android:id="@+id/menu_search"
+            android:title="@string/file_browser_search_files" />
+        <item
+            android:id="@+id/menu_new_folder"
+            android:title="@string/file_browser_new_folder" />
+        <item
+            android:id="@+id/menu_select_items"
+            android:title="@string/file_browser_select_items" />
+        <item
+            android:id="@+id/menu_recycle_bin"
+            android:title="@string/file_browser_view_recycle_bin" />
+        <item
+            android:id="@+id/menu_download_locations"
+            android:title="@string/file_browser_find_downloads" />
+    </group>
+
+    <group
+        android:id="@+id/menu_sort_group"
+        android:checkableBehavior="single">
+        <item
+            android:id="@+id/menu_sort_name"
+            android:checkable="true"
+            android:title="@string/file_browser_sort_name" />
+        <item
+            android:id="@+id/menu_sort_size"
+            android:checkable="true"
+            android:title="@string/file_browser_sort_size" />
+        <item
+            android:id="@+id/menu_sort_date"
+            android:checkable="true"
+            android:title="@string/file_browser_sort_date" />
+    </group>
+
+    <item
+        android:id="@+id/menu_show_hidden"
+        android:checkable="true"
+        android:title="@string/file_browser_show_hidden" />
+</menu>

@@ -18,10 +18,13 @@ public final class MediaStoreExperimentScanner {
     }
 
     private final Context context;
-    private final MediaStoreReadabilityProbe probe = new MediaStoreReadabilityProbe();
+    private final MediaStoreReadabilityProbe probe;
+    private final boolean skipProbe;
 
     public MediaStoreExperimentScanner(Context context) {
         this.context = context.getApplicationContext();
+        this.skipProbe = true;
+        this.probe = null;
     }
 
     public List<RecoveryCandidate> scan(Callback callback) {
@@ -30,17 +33,29 @@ public final class MediaStoreExperimentScanner {
             return results;
         }
         for (String volume : MediaStore.getExternalVolumeNames(context)) {
-            if (callback != null && callback.isCancelled()) {
-                break;
-            }
+            if (callback != null && callback.isCancelled()) break;
             results.addAll(scanVolume(volume, MediaStoreQuerySpec.visibleImages(volume), callback));
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 results.addAll(scanVolume(volume, MediaStoreQuerySpec.trashedImages(volume), callback));
             }
             results.addAll(scanVolume(volume, MediaStoreQuerySpec.pendingImages(volume), callback));
+
+            results.addAll(scanVolume(volume, MediaStoreQuerySpec.visibleVideos(volume), callback));
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                results.addAll(scanVolume(volume, MediaStoreQuerySpec.trashedVideos(volume), callback));
+            }
+            results.addAll(scanVolume(volume, MediaStoreQuerySpec.pendingVideos(volume), callback));
+
+            results.addAll(scanVolume(volume, MediaStoreQuerySpec.visibleAudio(volume), callback));
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                results.addAll(scanVolume(volume, MediaStoreQuerySpec.trashedAudio(volume), callback));
+            }
+            results.addAll(scanVolume(volume, MediaStoreQuerySpec.pendingAudio(volume), callback));
         }
         return results;
     }
+
+    private static final int PROGRESS_INTERVAL = 25;
 
     private List<RecoveryCandidate> scanVolume(
             String volumeName,
@@ -55,27 +70,31 @@ public final class MediaStoreExperimentScanner {
                 spec.selectionArgs,
                 spec.sortOrder
         )) {
-            if (cursor == null) {
-                return results;
-            }
+            if (cursor == null) return results;
+            int row = 0;
             while (cursor.moveToNext()) {
-                if (callback != null && callback.isCancelled()) {
-                    break;
-                }
+                if (callback != null && callback.isCancelled()) break;
                 long id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID));
-                String mimeType = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE));
                 android.net.Uri contentUri = android.content.ContentUris.withAppendedId(spec.collectionUri, id);
-                MediaStoreReadabilityProbe.ProbeResult probeResult = probe.probe(context, contentUri, mimeType);
+                String mimeType = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE));
+                MediaStoreReadabilityProbe.ProbeResult probeResult;
+                if (skipProbe) {
+                    probeResult = new MediaStoreReadabilityProbe.ProbeResult(
+                            true, "SKIPPED", 0, 0, "",
+                            cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE)),
+                            0L, "");
+                } else {
+                    probeResult = probe.probe(context, contentUri, mimeType);
+                }
                 RecoveryCandidate candidate = MediaStoreCandidateMapper.fromCursor(
-                        cursor,
-                        spec.collectionUri,
-                        spec.queryMode,
-                        volumeName,
-                        probeResult
-                );
+                        cursor, spec.collectionUri, spec.queryMode, volumeName, probeResult);
                 results.add(candidate);
                 if (callback != null) {
                     callback.onCandidate(candidate);
+                    row++;
+                    if (row % PROGRESS_INTERVAL == 0) {
+                        callback.onProgress(spec.queryMode + " " + row);
+                    }
                 }
             }
         }

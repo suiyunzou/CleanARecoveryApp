@@ -62,6 +62,6 @@
             android:minHeight="@dimen/button_min_height"
             android:text="@string/button_grant_access"
             android:textAllCaps="false"
-            android:textColor="@android:color/white" />
+            android:textColor="@color/text_on_primary" />
     </LinearLayout>
 </ScrollView>

@@ -1,20 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="brand_primary">#00897B</color>
-    <color name="brand_primary_dark">#00695C</color>
-    <color name="brand_secondary">#26A69A</color>
-    <color name="background_app">#F6F8FA</color>
+    <!-- 清寻恢复 · fresh teal-green palette -->
+    <color name="brand_primary">#14B8A6</color>
+    <color name="brand_primary_dark">#0EA5A0</color>
+    <color name="brand_secondary">#2DD4BF</color>
+    <color name="brand_accent">#3B82F6</color>
+    <color name="brand_accent_soft">#E0F2FE</color>
+    <color name="accent_purple">#8B5CF6</color>
+    <color name="accent_amber">#F59E0B</color>
+    <color name="accent_orange">#F97316</color>
+    <color name="accent_red">#EF4444</color>
+    <color name="accent_image">#14B8A6</color>
+    <color name="accent_video">#F97316</color>
+    <color name="accent_audio">#3B82F6</color>
+    <color name="accent_document">#8B5CF6</color>
+    <color name="background_app">#F8FAFC</color>
     <color name="surface_card">#FFFFFF</color>
-    <color name="text_primary">#14212B</color>
-    <color name="text_secondary">#52626D</color>
-    <color name="text_muted">#5B6974</color>
-    <color name="border_subtle">#E5EAEE</color>
-    <color name="status_success">#007669</color>
-    <color name="status_warning">#AE5900</color>
-    <color name="badge_deleted_bg">#FFF3E0</color>
-    <color name="badge_deleted_text">#E65100</color>
-    <color name="badge_existing_bg">#ECEFF1</color>
-    <color name="badge_existing_text">#546E7A</color>
-    <color name="permission_banner_bg">#E0F2F1</color>
-    <color name="overlay_scrim">#99000000</color>
+    <color name="text_primary">#111827</color>
+    <color name="text_secondary">#374151</color>
+    <color name="text_muted">#6B7280</color>
+    <color name="text_on_primary">#FFFFFF</color>
+    <color name="border_subtle">#E5E7EB</color>
+    <color name="neutral_light">#D1D5DB</color>
+    <color name="status_success">#0EA5A0</color>
+    <color name="status_warning">#F59E0B</color>
+    <color name="status_running">#3B82F6</color>
+    <color name="status_skipped">#6B7280</color>
+    <color name="badge_deleted_bg">#FEF3C7</color>
+    <color name="badge_deleted_text">#92400E</color>
+    <color name="badge_existing_bg">#CCFBF1</color>
+    <color name="badge_existing_text">#0F766E</color>
+    <color name="permission_banner_bg">#CCFBF1</color>
+    <color name="overlay_scrim">#80111827</color>
+    <color name="preview_backdrop">#111827</color>
+    <color name="algorithm_log_bg">#FFFFFF</color>
 </resources>

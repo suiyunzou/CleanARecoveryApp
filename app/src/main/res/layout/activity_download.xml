@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_app"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical">
+
+    <!-- Toolbar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/toolbar_height"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="@dimen/space_md">
+
+        <ImageButton
+            android:id="@+id/download_back_button"
+            android:layout_width="40dp" android:layout_height="40dp"
+            android:background="@drawable/bg_icon_button"
+            android:contentDescription="@string/button_back"
+            android:src="@drawable/ic_back" />
+
+        <TextView
+            android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/space_md"
+            android:layout_weight="1"
+            android:text="@string/music_download_title"
+            android:textColor="@color/text_primary"
+            android:textSize="@dimen/text_title" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingHorizontal="@dimen/space_lg"
+            android:paddingBottom="@dimen/space_xl">
+
+            <!-- Current song card -->
+            <LinearLayout
+                android:id="@+id/download_song_card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:padding="@dimen/space_lg">
+
+                <TextView
+                    android:id="@+id/download_song_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/text_section"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/download_song_artist"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="@dimen/text_caption" />
+
+                <TextView
+                    android:id="@+id/download_song_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_sm"
+                    android:textColor="@color/status_success"
+                    android:textSize="@dimen/text_caption"
+                    android:visibility="gone" />
+
+                <!-- Download path display -->
+                <TextView
+                    android:id="@+id/download_path_text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_sm"
+                    android:ellipsize="middle"
+                    android:maxLines="2"
+                    android:textColor="@color/text_muted"
+                    android:textSize="@dimen/text_caption"
+                    android:visibility="gone" />
+
+                <!-- Post-download action buttons -->
+                <LinearLayout
+                    android:id="@+id/download_action_buttons"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_md"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <Button
+                        android:id="@+id/download_open_file_button"
+                        android:layout_width="0dp"
+                        android:layout_height="@dimen/button_min_height"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_button_secondary"
+                        android:text="@string/music_download_open_file"
+                        android:textAllCaps="false"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/text_caption" />
+
+                    <Button
+                        android:id="@+id/download_view_folder_button"
+                        android:layout_width="0dp"
+                        android:layout_height="@dimen/button_min_height"
+                        android:layout_marginStart="@dimen/space_md"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_button_secondary"
+                        android:text="@string/music_download_view_folder"
+                        android:textAllCaps="false"
+                        android:textColor="@color/text_primary"
+                        android:textSize="@dimen/text_caption" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Quality selector -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_lg"
+                android:text="@string/music_download_quality"
+                android:textColor="@color/text_primary"
+                android:textSize="@dimen/text_section"
+                android:textStyle="bold" />
+
+            <RadioGroup
+                android:id="@+id/download_quality_group"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_sm"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:padding="@dimen/space_md">
+
+                <RadioButton
+                    android:id="@+id/download_quality_standard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="@string/music_download_quality_standard" />
+
+                <RadioButton
+                    android:id="@+id/download_quality_high"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/music_download_quality_high" />
+
+                <RadioButton
+                    android:id="@+id/download_quality_lossless"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/music_download_quality_lossless" />
+            </RadioGroup>
+
+            <!-- Download button + progress -->
+            <ProgressBar
+                android:id="@+id/download_progress_bar"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_lg"
+                android:max="100"
+                android:progress="0"
+                android:progressTint="@color/brand_primary"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/download_progress_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:textColor="@color/text_secondary"
+                android:textSize="@dimen/text_caption"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_md"
+                android:gravity="center"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/download_start_button"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/button_min_height"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_button_primary"
+                    android:backgroundTint="@color/brand_primary"
+                    android:text="@string/music_download_start"
+                    android:textAllCaps="false"
+                    android:textColor="@color/surface_card"
+                    android:textSize="@dimen/text_body" />
+
+                <Button
+                    android:id="@+id/download_cancel_button"
+                    android:layout_width="0dp"
+                    android:layout_height="@dimen/button_min_height"
+                    android:layout_marginStart="@dimen/space_md"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_button_secondary"
+                    android:text="@string/music_download_cancel"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/text_body"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <!-- Storage info -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_xl"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:padding="@dimen/space_lg">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/music_download_storage"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/text_body"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/download_storage_used"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_sm"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="@dimen/text_caption" />
+
+                <TextView
+                    android:id="@+id/download_storage_free"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="@dimen/text_caption" />
+
+                <Button
+                    android:id="@+id/download_clear_button"
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:layout_marginTop="@dimen/space_md"
+                    android:background="@drawable/bg_tab_unselected"
+                    android:paddingHorizontal="@dimen/space_lg"
+                    android:text="@string/music_download_clear_all"
+                    android:textAllCaps="false"
+                    android:textColor="@color/accent_orange"
+                    android:textSize="@dimen/text_caption" />
+            </LinearLayout>
+
+            <!-- Downloaded songs list -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_xl"
+                android:text="@string/music_download_downloaded"
+                android:textColor="@color/text_primary"
+                android:textSize="@dimen/text_section"
+                android:textStyle="bold" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/downloaded_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_sm"
+                android:nestedScrollingEnabled="false" />
+
+            <TextView
+                android:id="@+id/downloaded_empty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_xl"
+                android:gravity="center"
+                android:text="@string/music_download_empty"
+                android:textColor="@color/music_text_empty"
+                android:textSize="@dimen/text_body"
+                android:visibility="gone" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

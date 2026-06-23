@@ -1,24 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/playback_controls"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@color/overlay_scrim"
-    android:orientation="vertical"
-    android:padding="@dimen/space_sm">
+    android:background="@drawable/bg_preview_control_bar"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="@dimen/space_md"
+    android:paddingTop="@dimen/space_sm"
+    android:paddingEnd="@dimen/space_md"
+    android:paddingBottom="@dimen/space_sm">
 
-    <TextView
-        android:id="@+id/playback_state"
+    <SeekBar
+        android:id="@+id/playback_seek"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/preview_loading"
-        android:textColor="@android:color/white"
-        android:textSize="@dimen/text_caption" />
-
-    <Button
-        android:id="@+id/playback_button"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@drawable/bg_button_secondary"
-        android:text="@string/preview_play"
-        android:textAllCaps="false" />
+        android:layout_height="36dp"
+        android:max="1000"
+        android:progress="0" />
 </LinearLayout>

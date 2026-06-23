@@ -78,7 +78,15 @@ public final class CacheProfileScanner {
     private static CandidateLabel thumbnailLabelFor(CacheProfile profile) {
         if ("generic_thumbnails".equals(profile.profileId)
                 || "samsung_gallery_cache".equals(profile.profileId)
-                || "oppo_gallery_cache".equals(profile.profileId)) {
+                || "oppo_gallery_cache".equals(profile.profileId)
+                || "huawei_gallery_cache".equals(profile.profileId)
+                || "vivo_gallery_cache".equals(profile.profileId)
+                || "realme_gallery_cache".equals(profile.profileId)
+                || "oneplus_gallery_cache".equals(profile.profileId)
+                || "miui_gallery_cloud_cache".equals(profile.profileId)
+                || "dcim_hidden_cache".equals(profile.profileId)
+                || "samsung_myfiles_temp".equals(profile.profileId)
+                || "oppo_coloros_photos_cache".equals(profile.profileId)) {
             return CandidateLabel.THUMBNAIL;
         }
         return CandidateLabel.CACHE_COPY;
@@ -110,10 +118,18 @@ public final class CacheProfileScanner {
         if ("xiaomi_photo_blob".equals(profile.profileId) || "verified_imgcache".equals(profile.profileId)) {
             return CandidateSourceKind.OEM_GALLERY_CACHE;
         }
-        if ("generic_thumbnails".equals(profile.profileId)) {
+        if ("generic_thumbnails".equals(profile.profileId) || "dcim_hidden_cache".equals(profile.profileId)) {
             return CandidateSourceKind.GENERIC_THUMBNAIL;
         }
-        if ("samsung_gallery_cache".equals(profile.profileId) || "oppo_gallery_cache".equals(profile.profileId)) {
+        if ("samsung_gallery_cache".equals(profile.profileId)
+                || "oppo_gallery_cache".equals(profile.profileId)
+                || "huawei_gallery_cache".equals(profile.profileId)
+                || "vivo_gallery_cache".equals(profile.profileId)
+                || "realme_gallery_cache".equals(profile.profileId)
+                || "oneplus_gallery_cache".equals(profile.profileId)
+                || "miui_gallery_cloud_cache".equals(profile.profileId)
+                || "samsung_myfiles_temp".equals(profile.profileId)
+                || "oppo_coloros_photos_cache".equals(profile.profileId)) {
             return CandidateSourceKind.OEM_GALLERY_CACHE;
         }
         return CandidateSourceKind.KNOWN_CACHE_BLOB;

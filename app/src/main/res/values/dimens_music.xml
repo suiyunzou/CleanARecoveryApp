@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="music_cover_sm">48dp</dimen>
+    <dimen name="music_cover_md">56dp</dimen>
+    <dimen name="music_cover_lg">200dp</dimen>
+    <dimen name="music_mini_player_height">64dp</dimen>
+</resources>

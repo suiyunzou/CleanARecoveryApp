@@ -111,6 +111,78 @@ public final class CacheProfileRegistry {
                         "FILE",
                         "file_reader",
                         "plan-008A-android-media"
+                ),
+                new CacheProfile(
+                        "huawei_gallery_cache",
+                        "Huawei/Honor",
+                        "10-14",
+                        new String[]{"/com.huawei.photos/cache/", "/huawei/gallery/cache/", "/magazineunlock/"},
+                        "FILE",
+                        "file_reader",
+                        "plan-013-huawei-gallery-cache"
+                ),
+                new CacheProfile(
+                        "vivo_gallery_cache",
+                        "Vivo/Funtouch",
+                        "10-14",
+                        new String[]{"/vivo/gallery/cache/", "/com.vivo.gallery/cache/"},
+                        "FILE",
+                        "file_reader",
+                        "plan-013-vivo-gallery-cache"
+                ),
+                new CacheProfile(
+                        "realme_gallery_cache",
+                        "Realme/ColorOS",
+                        "10-14",
+                        new String[]{"/com.realme.gallery/cache/", "/realme/gallery/cache/"},
+                        "FILE",
+                        "file_reader",
+                        "plan-013-realme-gallery-cache"
+                ),
+                new CacheProfile(
+                        "oneplus_gallery_cache",
+                        "OnePlus/OxygenOS",
+                        "10-14",
+                        new String[]{"/oneplus/gallery/cache/", "/com.oneplus.gallery/cache/"},
+                        "FILE",
+                        "file_reader",
+                        "plan-013-oneplus-gallery-cache"
+                ),
+                new CacheProfile(
+                        "miui_gallery_cloud_cache",
+                        "Xiaomi/MIUI",
+                        "11-14",
+                        new String[]{"/miui/gallery/cloud/.cache/", "/miui/gallery/.cache/"},
+                        "FILE",
+                        "file_reader",
+                        "plan-013-miui-gallery-cloud"
+                ),
+                new CacheProfile(
+                        "dcim_hidden_cache",
+                        "generic",
+                        "10-14",
+                        new String[]{"/dcim/.cache/", "/pictures/.cache/", "/pictures/screenshots/.cache/"},
+                        "FILE",
+                        "file_reader",
+                        "plan-013-dcim-hidden-cache"
+                ),
+                new CacheProfile(
+                        "samsung_myfiles_temp",
+                        "Samsung",
+                        "10-14",
+                        new String[]{"/com.samsung.android.app.myfiles/.tmp/"},
+                        "FILE",
+                        "file_reader",
+                        "plan-013-samsung-myfiles"
+                ),
+                new CacheProfile(
+                        "oppo_coloros_photos_cache",
+                        "Oppo/ColorOS",
+                        "12-14",
+                        new String[]{"/coloros/gallery/cache/", "/com.coloros.gallery3d/cache/"},
+                        "FILE",
+                        "file_reader",
+                        "plan-013-oppo-photos-cache"
                 )
         ));
         return Collections.unmodifiableList(profiles);

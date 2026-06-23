@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/music_mini_player_height"
+    android:background="@color/music_mini_player_bg"
+    android:clickable="true"
+    android:elevation="4dp"
+    android:focusable="true"
+    android:gravity="center"
+    android:orientation="horizontal"
+    android:paddingHorizontal="@dimen/space_md">
+
+    <ImageButton
+        android:id="@+id/mini_player_prev"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@android:color/transparent"
+        android:contentDescription="@string/preview_prev"
+        android:src="@drawable/ic_skip_previous"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/mini_player_center"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <FrameLayout
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_mini_player_icon_circle"
+            android:clipToOutline="true">
+
+            <ImageView
+                android:id="@+id/mini_player_cover"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@string/music_album_cover"
+                android:scaleType="centerCrop"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/mini_player_icon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="♪"
+                android:textColor="@color/brand_primary"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/mini_player_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/space_sm"
+            android:ellipsize="end"
+            android:gravity="center_vertical"
+            android:maxWidth="240dp"
+            android:maxLines="1"
+            android:textColor="@color/text_primary"
+            android:textSize="@dimen/text_body" />
+    </LinearLayout>
+
+    <ImageButton
+        android:id="@+id/mini_player_next"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="@android:color/transparent"
+        android:contentDescription="@string/preview_next"
+        android:src="@drawable/ic_skip_next"
+        android:visibility="gone" />
+</LinearLayout>

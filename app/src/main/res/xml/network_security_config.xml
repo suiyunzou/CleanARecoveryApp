@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 酷狗 API 和 CDN 域名允许明文 HTTP（部分接口和 CDN 仅支持 HTTP） -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">kugou.com</domain>
+    </domain-config>
+    <!-- Auth and entitlement APIs use HTTPS; pinning-friendly config goes here. -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">gateway.kugou.com</domain>
+        <domain includeSubdomains="true">wwwapi.kugou.com</domain>
+    </domain-config>
+</network-security-config>

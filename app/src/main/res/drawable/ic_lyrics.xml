@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 歌词图标：带横线的文档（表示文本歌词） -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/text_secondary"
+        android:pathData="M14,2 L6,2 C4.9,2 4,2.9 4,4 L4,20 C4,21.1 4.9,22 6,22 L18,22 C19.1,22 20,21.1 20,20 L20,8 L14,2 Z M14,8 L14,4 L18,8 L14,8 Z" />
+    <path
+        android:fillColor="@color/surface_card"
+        android:pathData="M7,12 L17,12 L17,13.5 L7,13.5 Z M7,15 L17,15 L17,16.5 L7,16.5 Z M7,9 L11,9 L11,10.5 L7,10.5 Z" />
+</vector>

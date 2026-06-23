@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_app"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical">
+
+    <!-- Toolbar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:minHeight="@dimen/toolbar_height"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/space_sm"
+        android:paddingEnd="@dimen/space_sm">
+
+        <ImageButton
+            android:id="@+id/universal_back_button"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_icon_button"
+            android:contentDescription="@string/button_back"
+            android:padding="12dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_back" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:paddingStart="@dimen/space_sm"
+            android:text="@string/universal_download_title"
+            android:textColor="@color/text_primary"
+            android:textSize="@dimen/text_section"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="@dimen/space_xl">
+
+            <!-- URL input card -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_card"
+                android:elevation="@dimen/elevation_card"
+                android:orientation="vertical"
+                android:padding="@dimen/space_lg">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/universal_download_url_label"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/text_section"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_xs"
+                    android:text="@string/universal_download_url_hint"
+                    android:textColor="@color/text_muted"
+                    android:textSize="@dimen/text_caption" />
+
+                <EditText
+                    android:id="@+id/universal_url_input"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_md"
+                    android:background="@drawable/bg_input_field"
+                    android:hint="https://..."
+                    android:inputType="textUri"
+                    android:maxLines="3"
+                    android:minHeight="48dp"
+                    android:padding="@dimen/space_md"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_muted"
+                    android:textSize="@dimen/text_body" />
+
+                <Button
+                    android:id="@+id/universal_download_button"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="@dimen/space_lg"
+                    android:background="@drawable/bg_button_primary"
+                    android:backgroundTint="@color/brand_accent"
+                    android:text="@string/universal_download_action"
+                    android:textAllCaps="false"
+                    android:textColor="@color/surface_card"
+                    android:textSize="@dimen/text_body"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Quality selection card (hidden until URL is submitted) -->
+            <LinearLayout
+                android:id="@+id/universal_quality_card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_md"
+                android:background="@drawable/bg_card"
+                android:elevation="@dimen/elevation_card"
+                android:orientation="vertical"
+                android:padding="@dimen/space_lg"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/universal_download_quality_title"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/text_section"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/universal_quality_video_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_md"
+                    android:text="@string/universal_download_video_quality"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="@dimen/text_caption"
+                    android:textStyle="bold" />
+
+                <RadioGroup
+                    android:id="@+id/universal_quality_video_group"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_xs" />
+
+                <TextView
+                    android:id="@+id/universal_quality_audio_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_md"
+                    android:text="@string/universal_download_audio_quality"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="@dimen/text_caption"
+                    android:textStyle="bold" />
+
+                <RadioGroup
+                    android:id="@+id/universal_quality_audio_group"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_xs" />
+
+                <Button
+                    android:id="@+id/universal_start_download_button"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="@dimen/space_lg"
+                    android:background="@drawable/bg_button_primary"
+                    android:backgroundTint="@color/brand_primary"
+                    android:text="@string/universal_download_start"
+                    android:textAllCaps="false"
+                    android:textColor="@color/surface_card"
+                    android:textSize="@dimen/text_body"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- Status / progress card (hidden until download starts) -->
+            <LinearLayout
+                android:id="@+id/universal_status_card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_md"
+                android:background="@drawable/bg_card"
+                android:elevation="@dimen/elevation_card"
+                android:orientation="vertical"
+                android:padding="@dimen/space_lg"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/universal_status_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/universal_download_status"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/text_section"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/universal_status_message"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_sm"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="@dimen/text_body" />
+
+                <ProgressBar
+                    android:id="@+id/universal_progress_bar"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_md"
+                    android:indeterminate="false"
+                    android:max="100"
+                    android:progress="0" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_xs"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/universal_progress_text"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textColor="@color/text_muted"
+                        android:textSize="@dimen/text_caption" />
+
+                    <TextView
+                        android:id="@+id/universal_speed_text"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/text_muted"
+                        android:textSize="@dimen/text_caption"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/universal_action_buttons"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_md"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <Button
+                        android:id="@+id/universal_pause_button"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_button_secondary"
+                        android:text="@string/universal_download_pause"
+                        android:textAllCaps="false"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="@dimen/text_body" />
+
+                    <View
+                        android:layout_width="@dimen/space_sm"
+                        android:layout_height="0dp" />
+
+                    <Button
+                        android:id="@+id/universal_cancel_button"
+                        android:layout_width="0dp"
+                        android:layout_height="48dp"
+                        android:layout_weight="1"
+                        android:background="@drawable/bg_button_secondary"
+                        android:text="@string/universal_download_cancel"
+                        android:textAllCaps="false"
+                        android:textColor="@color/accent_red"
+                        android:textSize="@dimen/text_body" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Supported sites hint -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/space_xl"
+                android:layout_marginBottom="@dimen/space_xl"
+                android:gravity="center"
+                android:text="@string/universal_download_supported_sites"
+                android:textColor="@color/text_muted"
+                android:textSize="@dimen/text_micro" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>
