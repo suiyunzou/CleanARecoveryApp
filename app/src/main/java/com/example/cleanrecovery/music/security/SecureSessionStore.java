@@ -228,6 +228,18 @@ public final class SecureSessionStore {
                     && refreshExpiresAt > System.currentTimeMillis();
         }
 
+        /**
+         * 酷狗短信登录只下发长期有效的 {@code token}，不返回 refreshtoken，
+         * 因此 {@link #isRefreshable()} 恒为 false。此方法用于判断"会话是否仍可用"：
+         * 只要 accessToken 非空且未超过会话整体有效期（refreshExpiresAt，默认 30 天），
+         * 即视为已登录，避免重启后被误清。
+         */
+        public boolean isUsable() {
+            return accessToken != null
+                    && !accessToken.isEmpty()
+                    && refreshExpiresAt > System.currentTimeMillis();
+        }
+
         public boolean isAccessExpired() {
             return accessExpiresAt <= System.currentTimeMillis();
         }

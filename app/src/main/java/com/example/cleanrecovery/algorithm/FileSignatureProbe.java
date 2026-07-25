@@ -33,7 +33,14 @@ public final class FileSignatureProbe {
             return null;
         }
         byte[] prefix = readPrefix(file, ScanLimits.SIGNATURE_PREFIX_BYTES);
-        return probe(prefix);
+        ProbeResult result = probe(prefix);
+        if (result != null && MIME_ZIP.equals(result.mimeDetected)) {
+            // OOXML part names (word/, xl/, ppt/) sit past the 32-byte prefix,
+            // so re-read a small window to tell docx/xlsx/pptx from a plain zip.
+            byte[] window = readPrefix(file, ZIP_REFINE_BYTES);
+            return new ProbeResult(RecoveryType.DOCUMENT, zipMime(window));
+        }
+        return result;
     }
 
     public static ProbeResult probe(byte[] prefix) {
@@ -62,7 +69,10 @@ public final class FileSignatureProbe {
             return new ProbeResult(RecoveryType.DOCUMENT, "application/pdf");
         }
         if (matchesZip(prefix)) {
-            return new ProbeResult(RecoveryType.DOCUMENT, "application/zip");
+            // zipMime inspects whatever bytes we were handed; with only the
+            // 32-byte prefix it stays generic, but a larger buffer (carving,
+            // probe(File) refinement) can resolve docx/xlsx/pptx.
+            return new ProbeResult(RecoveryType.DOCUMENT, zipMime(prefix));
         }
         if (matchesFtyp(prefix)) {
             return new ProbeResult(RecoveryType.VIDEO, "video/mp4");
@@ -81,12 +91,6 @@ public final class FileSignatureProbe {
         }
         if (matchesAmr(prefix)) {
             return new ProbeResult(RecoveryType.AUDIO, "audio/amr");
-        }
-        if (matchesDocx(prefix)) {
-            return new ProbeResult(RecoveryType.DOCUMENT, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-        }
-        if (matchesXlsx(prefix)) {
-            return new ProbeResult(RecoveryType.DOCUMENT, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         }
         return null;
     }
@@ -193,15 +197,50 @@ public final class FileSignatureProbe {
                 && bytes[4] == 'R' && bytes[5] == '\n';
     }
 
-    static boolean matchesDocx(byte[] bytes) {
-        return bytes.length >= 4
-                && bytes[0] == 'P' && bytes[1] == 'K'
-                && bytes[2] == 0x03 && bytes[3] == 0x04;
+    static final String MIME_ZIP = "application/zip";
+    static final String MIME_DOCX =
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    static final String MIME_XLSX =
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    static final String MIME_PPTX =
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+
+    private static final int ZIP_REFINE_BYTES = 512;
+
+    /**
+     * Resolve a ZIP-signatured buffer to a specific OOXML mime when the
+     * discriminating part name is visible, otherwise generic application/zip.
+     */
+    static String zipMime(byte[] bytes) {
+        if (containsAscii(bytes, "word/")) {
+            return MIME_DOCX;
+        }
+        if (containsAscii(bytes, "xl/")) {
+            return MIME_XLSX;
+        }
+        if (containsAscii(bytes, "ppt/")) {
+            return MIME_PPTX;
+        }
+        return MIME_ZIP;
     }
 
-    static boolean matchesXlsx(byte[] bytes) {
-        return bytes.length >= 4
-                && bytes[0] == 'P' && bytes[1] == 'K'
-                && bytes[2] == 0x03 && bytes[3] == 0x04;
+    static boolean containsAscii(byte[] haystack, String needle) {
+        if (haystack == null || needle == null) {
+            return false;
+        }
+        byte[] target = needle.getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        if (target.length == 0 || haystack.length < target.length) {
+            return false;
+        }
+        outer:
+        for (int i = 0; i + target.length <= haystack.length; i++) {
+            for (int j = 0; j < target.length; j++) {
+                if (haystack[i + j] != target[j]) {
+                    continue outer;
+                }
+            }
+            return true;
+        }
+        return false;
     }
 }

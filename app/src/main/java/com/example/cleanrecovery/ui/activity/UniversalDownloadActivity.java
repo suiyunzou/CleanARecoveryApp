@@ -132,8 +132,10 @@ public final class UniversalDownloadActivity extends Activity {
 
         // 创建下载通知通道（Android 8.0+ 需要）
         createDownloadNotificationChannel();
-        // 请求通知权限（Android 13+ 需要）
-        requestNotificationPermission();
+        // P0 A5：请求运行时权限（通知 + 媒体读取 + 全文件访问）
+        requestRuntimePermissions();
+        // P0 A5：检查并引导用户授予"所有文件访问"权限（Android 11+，写共享存储必需）
+        requestAllFilesAccessIfNeeded();
 
         // 注册 HLS 与 JS 渲染钩子（让 GenericExtractor 能处理 m3u8 与 SPA 页面）
         registerExtractorHooks();
@@ -580,13 +582,86 @@ public final class UniversalDownloadActivity extends Activity {
         nm.createNotificationChannel(channel);
     }
 
-    /** 请求通知权限（Android 13+ 需要运行时申请）。 */
-    private void requestNotificationPermission() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return;
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+    /**
+     * P0 A5：请求运行时权限（通知 + 媒体读取）。
+     *
+     * <p>批量请求以下权限（仅在对应 API 级别需要时）：</p>
+     * <ul>
+     *   <li>{@link Manifest.permission#POST_NOTIFICATIONS} —— Android 13+（API 33+），
+     *       下载完成通知必需</li>
+     *   <li>{@link Manifest.permission#READ_MEDIA_VIDEO} —— Android 13+（API 33+），
+     *       扫描已下载视频/相册刷新必需</li>
+     *   <li>{@link Manifest.permission#WRITE_EXTERNAL_STORAGE} —— Android 10 及以下，
+     *       写 {@code DataRecovery/Downloads} 共享目录必需</li>
+     * </ul>
+     * <p>使用单一 requestCode 批量请求，减少弹窗次数。</p>
+     */
+    private void requestRuntimePermissions() {
+        java.util.List<String> needed = new java.util.ArrayList<>();
+        // Android 13+：通知权限
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
+            needed.add(Manifest.permission.POST_NOTIFICATIONS);
+        }
+        // Android 13+：媒体读取权限（用于 MediaScanner 刷新相册）
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VIDEO)
+                != PackageManager.PERMISSION_GRANTED) {
+            needed.add(Manifest.permission.READ_MEDIA_VIDEO);
+        }
+        // Android 10 及以下：写外部存储（manifest 已声明 maxSdkVersion=29，需运行时申请）
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED) {
+            needed.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        }
+        if (!needed.isEmpty()) {
             ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1001);
+                    needed.toArray(new String[0]), 1001);
+        }
+    }
+
+    /**
+     * P0 A5：检查并引导用户授予"所有文件访问"权限（MANAGE_EXTERNAL_STORAGE）。
+     *
+     * <p>Android 11+（API 30+）无法通过 {@code requestPermissions} 申请此权限，
+     * 必须跳转系统设置页让用户手动授予。本应用作为"数据恢复"工具，写共享存储
+     * （{@code /storage/emulated/0/DataRecovery/Downloads}）是核心功能，故需此权限。</p>
+     *
+     * <p><b>保守策略</b>：仅在未授予时弹 Toast 引导，不强制跳转（避免打断用户首次使用流程）。
+     * 用户点击下载按钮时若仍未授予，再次提示。真正写文件失败时由下载逻辑兜底处理。</p>
+     */
+    private void requestAllFilesAccessIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return; // Android 11 以下不需要
+        if (android.os.Environment.isExternalStorageManager()) return; // 已授予
+        // 未授予：首次进入仅 Toast 提示，不强制跳转（保守，避免打断 UX）
+        Toast.makeText(this,
+                "需要\"所有文件访问\"权限才能保存到 DataRecovery/Downloads，"
+                        + "请在设置中授予",
+                Toast.LENGTH_LONG).show();
+    }
+
+    /**
+     * 跳转到系统"所有文件访问"设置页（由用户在 UI 上主动触发）。
+     */
+    private void launchAllFilesAccessSettings() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                Intent intent = new Intent(
+                        android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+                intent.setData(Uri.parse("package:" + getPackageName()));
+                startActivity(intent);
+            } catch (Exception e) {
+                // 部分设备不支持直接跳转，回退到通用所有文件访问设置
+                Intent fallback = new Intent(
+                        android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+                try {
+                    startActivity(fallback);
+                } catch (Exception ex) {
+                    Log.w(TAG, "无法跳转所有文件访问设置: " + ex.getMessage());
+                }
+            }
         }
     }
 

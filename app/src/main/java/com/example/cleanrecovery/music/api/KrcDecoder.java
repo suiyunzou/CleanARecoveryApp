@@ -1,10 +1,11 @@
 package com.example.cleanrecovery.music.api;
 
+import com.example.cleanrecovery.util.Base64Compat;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.zip.InflaterInputStream;
 
 /**
@@ -67,7 +68,7 @@ public final class KrcDecoder {
             return "";
         }
         try {
-            byte[] bytes = Base64.getDecoder().decode(base64Content);
+            byte[] bytes = Base64Compat.decode(base64Content);
             return decode(bytes);
         } catch (IllegalArgumentException e) {
             // Base64 解码失败

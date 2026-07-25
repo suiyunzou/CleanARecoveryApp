@@ -87,6 +87,28 @@ public final class MusicPlayerActivity extends Activity implements MusicPlayer.C
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        // 返回后再次进入时，没有进度回调（尤其暂停态），需主动按当前播放位置同步一次，
+        // 否则进度条/时间/歌词会停留在上次离开时的旧值。
+        updateUI();
+        syncProgressFromPlayer();
+    }
+
+    /** 用播放器的实时位置刷新进度条、时间文本与歌词位置。 */
+    private void syncProgressFromPlayer() {
+        int cur = app.player.getCurrentPosition();
+        int total = app.player.getDuration();
+        if (!seekTracking) {
+            seekBar.setProgress(total > 0 ? cur * 1000 / total : 0);
+        }
+        currentTimeText.setText(formatMs(cur));
+        if (total > 0) totalTimeText.setText(formatMs(total));
+        lyricsView.updatePosition(cur);
+        updateLyricSummary(cur);
+    }
+
+    @Override
     protected void onDestroy() {
         app.player.removeCallback(this);
         if (sleepTimer != null) ui.removeCallbacks(sleepTimer);

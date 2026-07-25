@@ -56,6 +56,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
@@ -210,7 +211,7 @@ public final class FileBrowserActivity extends Activity {
         searchInput.setQueryHint(getString(R.string.file_browser_search_hint));
         searchInput.setMaxWidth(Integer.MAX_VALUE);
 
-        SearchView.SearchAutoComplete searchText =
+        EditText searchText =
                 searchInput.findViewById(androidx.appcompat.R.id.search_src_text);
         if (searchText != null) {
             searchText.setTextColor(getColorCompat(R.color.text_primary));
@@ -247,7 +248,7 @@ public final class FileBrowserActivity extends Activity {
             @Override
             public void run() {
                 searchInput.requestFocus();
-                SearchView.SearchAutoComplete searchText =
+                EditText searchText =
                         searchInput.findViewById(androidx.appcompat.R.id.search_src_text);
                 View focusTarget = searchInput;
                 if (searchText != null) {
@@ -497,7 +498,7 @@ public final class FileBrowserActivity extends Activity {
             scanRecentDownloadFiles(root, 0, cutoff, visitedDirs, emittedFiles, results, scannedFiles);
         }
 
-        results.sort(new Comparator<RecentDownloadCandidate>() {
+        Collections.sort(results, new Comparator<RecentDownloadCandidate>() {
             @Override
             public int compare(RecentDownloadCandidate left, RecentDownloadCandidate right) {
                 return Long.compare(right.lastModified, left.lastModified);
@@ -807,7 +808,7 @@ public final class FileBrowserActivity extends Activity {
     }
 
     private void sortEntries(List<FileEntry> target) {
-        target.sort(new Comparator<FileEntry>() {
+        Collections.sort(target, new Comparator<FileEntry>() {
             @Override
             public int compare(FileEntry left, FileEntry right) {
                 if (left.directory != right.directory) {

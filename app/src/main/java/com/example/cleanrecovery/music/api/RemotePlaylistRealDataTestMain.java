@@ -5,9 +5,11 @@ import com.example.cleanrecovery.music.data.SongInfo;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.util.List;
 
 /** Optional JVM smoke test for logged-in Kugou cloud playlists. */
@@ -21,7 +23,7 @@ public final class RemotePlaylistRealDataTestMain {
         }
 
         try {
-            String json = new String(Files.readAllBytes(tokenFile.toPath()), StandardCharsets.UTF_8);
+            String json = readUtf8(tokenFile);
             JsonObject tokenJson = JsonParser.parseString(json).getAsJsonObject();
             String token = str(tokenJson, "token");
             String userid = str(tokenJson, "userid");
@@ -79,6 +81,19 @@ public final class RemotePlaylistRealDataTestMain {
             e.printStackTrace(System.out);
             System.exit(1);
         }
+    }
+
+    private static String readUtf8(File file) throws Exception {
+        StringBuilder text = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                new FileInputStream(file), StandardCharsets.UTF_8))) {
+            char[] buffer = new char[4096];
+            int read;
+            while ((read = reader.read(buffer)) != -1) {
+                text.append(buffer, 0, read);
+            }
+        }
+        return text.toString();
     }
 
     private static String str(JsonObject o, String key) {

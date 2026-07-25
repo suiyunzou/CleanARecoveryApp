@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 代理模块新增字符串（与 strings_browser.xml 中已有 proxy_* 合并；此处仅放新增项，避免重名冲突） -->
+    <string name="proxy_status_on">代理运行中</string>
+    <string name="proxy_status_format">状态：%1$s · %2$s\n本地 SOCKS5/HTTP：127.0.0.1:%3$d</string>
+    <string name="proxy_no_node_selected">请先选择一个节点</string>
+    <string name="proxy_node_invalid">节点不可用（字段缺失）</string>
+    <string name="proxy_node_format">%1$s\n%2$s@%3$s:%4$d</string>
+    <string name="proxy_node_detail">%1$s%2$s</string>
+    <string name="proxy_select_node">选择节点</string>
+    <string name="proxy_only_ss">Mihomo：支持 SS / VMess / VLESS / Trojan / Hysteria2 / TUIC</string>
+    <string name="proxy_load_sample">载入样例订阅</string>
+    <string name="proxy_switch_subscription">切换订阅</string>
+    <string name="proxy_add_subscription">添加订阅</string>
+    <string name="proxy_delete_subscription">删除当前订阅</string>
+    <string name="proxy_add_subscription_title">导入订阅</string>
+    <string name="proxy_subscription_name">订阅名称</string>
+    <string name="proxy_subscription_urls">订阅地址（每行一个，可批量导入）</string>
+    <string name="proxy_delete_subscription_confirm">删除“%1$s”及其节点缓存？</string>
+    <string name="proxy_keep_one_subscription">至少保留一个订阅</string>
+    <string name="proxy_imported_count">已导入 %1$d 个订阅</string>
+    <string name="proxy_fetch_profile_changed">订阅已切换，本次拉取结果未保存</string>
+</resources>

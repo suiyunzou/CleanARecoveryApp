@@ -26,6 +26,15 @@ android {
             returnDefaultValues = true
         }
     }
+
+    // Mihomo 以内置 Android 可执行内核运行。必须解压 jniLibs，ProcessBuilder
+    // 才能从 applicationInfo.nativeLibraryDir 启动对应 ABI 的 libmihomo.so。
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging true
+            keepDebugSymbols += ["**/libmihomo.so"]
+        }
+    }
 }
 
 dependencies {
@@ -34,6 +43,10 @@ dependencies {
     implementation "androidx.recyclerview:recyclerview:1.3.2"
     implementation "com.google.android.material:material:1.11.0"
     implementation "com.google.code.gson:gson:2.10.1"
+    // androidx.webkit: 提供 ProxyController.setProxyOverride，用于把 WebView 流量路由到本地 SS 代理。
+    // 仅此一处新增依赖，不升级既有 androidx/material/gson 版本。
+    implementation "androidx.webkit:webkit:1.10.0"
+    implementation "com.journeyapps:zxing-android-embedded:4.3.0"
     testImplementation "junit:junit:4.13.2"
     testImplementation "org.json:json:20240303"
     androidTestImplementation "androidx.test.ext:junit:1.1.5"

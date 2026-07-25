@@ -1,6 +1,9 @@
 package com.example.cleanrecovery.background;
 
 import android.graphics.Bitmap;
+import android.net.http.SslError;
+import android.os.Build;
+import android.webkit.SslErrorHandler;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
@@ -8,6 +11,7 @@ import android.webkit.WebViewClient;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +35,16 @@ public final class CompositeWebViewClient extends WebViewClient {
     }
 
     @Override
+    @SuppressWarnings("deprecation")
+    public boolean shouldOverrideUrlLoading(WebView view, String url) {
+        for (WebViewClient c : clients) {
+            if (c.shouldOverrideUrlLoading(view, url)) return true;
+        }
+        return false;
+    }
+
+    @Override
+    @RequiresApi(Build.VERSION_CODES.N)
     public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
         for (WebViewClient c : clients) {
             if (c.shouldOverrideUrlLoading(view, request)) return true;
@@ -63,10 +77,27 @@ public final class CompositeWebViewClient extends WebViewClient {
     }
 
     @Override
+    public void onPageCommitVisible(WebView view, String url) {
+        for (WebViewClient c : clients) {
+            c.onPageCommitVisible(view, url);
+        }
+    }
+
+    @Override
     public void onReceivedError(WebView view, WebResourceRequest request,
                                  android.webkit.WebResourceError error) {
         for (WebViewClient c : clients) {
             c.onReceivedError(view, request, error);
         }
+    }
+
+    @Override
+    public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+        // 仅交给最后一个客户端决策，避免多次 proceed/cancel
+        if (clients.isEmpty()) {
+            if (handler != null) handler.cancel();
+            return;
+        }
+        clients.get(clients.size() - 1).onReceivedSslError(view, handler, error);
     }
 }

@@ -14,12 +14,18 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- P0 A1: 后台下载服务使用 dataSync 类型前台服务，避免下载中被系统杀死 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
+        android:extractNativeLibs="true"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -76,8 +82,60 @@
         <activity android:name="com.example.cleanrecovery.music.ui.DownloadActivity" android:exported="false" />
         <activity android:name="com.example.cleanrecovery.music.ui.MusicLoginActivity" android:exported="false" />
         <activity android:name="com.example.cleanrecovery.ui.activity.UniversalDownloadActivity" android:exported="true" />
-        <activity android:name="com.example.cleanrecovery.ui.activity.BrowserActivity" android:exported="true" android:configChanges="orientation|screenSize|keyboardHidden" />
-        <service android:name="com.example.cleanrecovery.background.BackgroundDownloadService" android:exported="false" />
+        <activity
+            android:name="com.example.cleanrecovery.ui.activity.BrowserActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="true"
+            android:launchMode="singleTask">
+            <!-- VIA 对齐：允许在线观影浏览器作为默认浏览器/外部链接接收端。 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <data android:scheme="about" />
+                <data android:scheme="data" />
+                <data android:scheme="view-source" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.WEB_SEARCH" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
+        <!-- SS 本地代理模块（Part B） -->
+        <activity android:name="com.example.cleanrecovery.proxy.ProxyActivity" android:exported="false" android:configChanges="orientation|screenSize|keyboardHidden" />
+        <service
+            android:name="com.example.cleanrecovery.proxy.ProxyService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Local browser proxy engine" />
+        </service>
+        <activity android:name="com.example.cleanrecovery.ui.activity.BookmarksActivity" android:exported="false" />
+        <activity android:name="com.example.cleanrecovery.ui.activity.HistoryActivity" android:exported="false" />
+        <activity android:name="com.example.cleanrecovery.ui.activity.BrowserDownloadsActivity" android:exported="false" />
+        <activity android:name="com.example.cleanrecovery.ui.activity.BrowserOfflinePagesActivity" android:exported="false" />
+        <activity android:name="com.example.cleanrecovery.ui.activity.BrowserSettingsActivity" android:exported="false" />
+        <activity android:name="com.example.cleanrecovery.ui.activity.TabsActivity" android:exported="false" />
+        <service
+            android:name="com.example.cleanrecovery.background.BackgroundDownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
         <service android:name="com.example.cleanrecovery.music.player.MusicService" android:exported="false" android:foregroundServiceType="mediaPlayback" />
     </application>
 

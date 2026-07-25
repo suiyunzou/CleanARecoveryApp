@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SS 本地代理 UI：订阅输入 + 拉取 + 节点列表 + 启停 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background_app"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical">
+
+    <!-- 标题栏 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/toolbar_height"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="@dimen/space_md">
+
+        <ImageButton
+            android:id="@+id/proxy_back"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/bg_icon_button"
+            android:contentDescription="@string/browser_nav_back"
+            android:padding="10dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_back" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/space_md"
+            android:layout_weight="1"
+            android:text="@string/proxy_title"
+            android:textColor="@color/text_primary"
+            android:textSize="@dimen/text_section"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:id="@+id/proxy_status_icon"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:contentDescription="@string/proxy_status_off"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_proxy_off" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginHorizontal="@dimen/space_lg"
+        android:layout_marginTop="@dimen/space_sm"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <Spinner
+            android:id="@+id/proxy_subscription_spinner"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_input_field"
+            android:contentDescription="@string/proxy_switch_subscription"
+            android:paddingHorizontal="@dimen/space_md" />
+
+        <ImageButton
+            android:id="@+id/proxy_subscription_add"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="@dimen/space_sm"
+            android:background="@drawable/bg_icon_button"
+            android:contentDescription="@string/proxy_add_subscription"
+            android:padding="10dp"
+            android:src="@drawable/ic_add" />
+
+        <ImageButton
+            android:id="@+id/proxy_subscription_delete"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="@dimen/space_xs"
+            android:background="@drawable/bg_icon_button"
+            android:contentDescription="@string/proxy_delete_subscription"
+            android:padding="10dp"
+            android:src="@drawable/ic_delete" />
+    </LinearLayout>
+
+    <!-- 订阅输入 -->
+    <EditText
+        android:id="@+id/proxy_sub_input"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="@dimen/space_lg"
+        android:layout_marginTop="@dimen/space_xs"
+        android:background="@drawable/bg_input_field"
+        android:gravity="top|start"
+        android:hint="@string/proxy_subscription_hint"
+        android:inputType="textMultiLine|textUri"
+        android:maxLines="3"
+        android:minHeight="48dp"
+        android:padding="@dimen/space_md"
+        android:textColor="@color/text_primary"
+        android:textColorHint="@color/text_muted"
+        android:textSize="@dimen/text_body" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="@dimen/space_lg"
+        android:layout_marginTop="@dimen/space_xs"
+        android:text="@string/proxy_only_ss"
+        android:textColor="@color/text_muted"
+        android:textSize="@dimen/text_caption" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="@dimen/space_lg"
+        android:layout_marginTop="@dimen/space_sm"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/proxy_fetch_btn"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_button_primary"
+            android:backgroundTint="@color/brand_accent"
+            android:text="@string/proxy_fetch"
+            android:textAllCaps="false"
+            android:textColor="@color/surface_card"
+            android:textSize="@dimen/text_body" />
+
+        <Button
+            android:id="@+id/proxy_sample_btn"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:layout_marginStart="@dimen/space_sm"
+            android:background="@drawable/bg_button_primary"
+            android:backgroundTint="@color/border_subtle"
+            android:text="@string/proxy_load_sample"
+            android:textAllCaps="false"
+            android:textColor="@color/text_primary"
+            android:textSize="@dimen/text_body" />
+    </LinearLayout>
+
+    <!-- 状态显示 -->
+    <TextView
+        android:id="@+id/proxy_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="@dimen/space_lg"
+        android:layout_marginTop="@dimen/space_md"
+        android:background="@color/surface_card"
+        android:padding="@dimen/space_md"
+        android:text="@string/proxy_status_off"
+        android:textColor="@color/text_secondary"
+        android:textSize="@dimen/text_body" />
+
+    <!-- 节点列表 -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/proxy_node_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="@dimen/space_sm"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingHorizontal="@dimen/space_lg"
+        android:paddingBottom="@dimen/space_lg" />
+
+    <!-- 启停按钮 -->
+    <Button
+        android:id="@+id/proxy_toggle_btn"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/button_min_height"
+        android:layout_marginHorizontal="@dimen/space_lg"
+        android:layout_marginBottom="@dimen/space_lg"
+        android:background="@drawable/bg_button_primary"
+        android:backgroundTint="@color/brand_primary"
+        android:text="@string/proxy_start"
+        android:textAllCaps="false"
+        android:textColor="@color/surface_card"
+        android:textSize="@dimen/text_body" />
+</LinearLayout>

@@ -285,7 +285,7 @@
                 android:layout_height="24dp"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_move"
-                android:tint="@color/text_primary" />
+                app:tint="@color/text_primary" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -313,7 +313,7 @@
                 android:layout_height="24dp"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_copy"
-                android:tint="@color/text_primary" />
+                app:tint="@color/text_primary" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -341,7 +341,7 @@
                 android:layout_height="24dp"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_share"
-                android:tint="@color/text_primary" />
+                app:tint="@color/text_primary" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -369,7 +369,7 @@
                 android:layout_height="24dp"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_delete"
-                android:tint="@color/accent_red" />
+                app:tint="@color/accent_red" />
 
             <TextView
                 android:layout_width="wrap_content"

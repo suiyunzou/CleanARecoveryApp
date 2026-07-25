@@ -98,7 +98,7 @@ public class MediaSniffer extends WebViewClient {
         /** 发现时间戳 */
         public final long foundAtMs;
 
-        MediaResource(String url, String ext, String kind, String resolution,
+        public MediaResource(String url, String ext, String kind, String resolution,
                       String vcodec, String acodec, String pageUrl) {
             this.url = url;
             this.ext = ext;
@@ -108,6 +108,31 @@ public class MediaSniffer extends WebViewClient {
             this.acodec = acodec != null ? acodec : "";
             this.pageUrl = pageUrl != null ? pageUrl : "";
             this.foundAtMs = System.currentTimeMillis();
+        }
+
+        public static MediaResource fromSniffedUrl(String url, String pageUrl) {
+            String lower = url == null ? "" : url.toLowerCase(Locale.US);
+            String ext = "mp4";
+            int q = lower.indexOf('?');
+            String path = q >= 0 ? lower.substring(0, q) : lower;
+            int dot = path.lastIndexOf('.');
+            if (dot >= 0 && dot < path.length() - 1) {
+                ext = path.substring(dot + 1);
+            } else if (lower.contains("mime=audio")) {
+                ext = "m4a";
+            } else if (lower.contains("mime=video")) {
+                ext = "mp4";
+            }
+            String kind;
+            if ("m3u8".equals(ext) || "m3u".equals(ext) || "ts".equals(ext)) {
+                kind = "hls";
+            } else if ("mp3".equals(ext) || "m4a".equals(ext) || "aac".equals(ext)
+                    || "flac".equals(ext) || "ogg".equals(ext) || "wav".equals(ext)) {
+                kind = "audio";
+            } else {
+                kind = "video";
+            }
+            return new MediaResource(url, ext, kind, "", "", "", pageUrl);
         }
 
         /** 获取显示标题。 */

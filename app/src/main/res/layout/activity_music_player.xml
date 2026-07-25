@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/surface_card"
@@ -140,7 +141,7 @@
                     android:background="@drawable/bg_icon_button"
                     android:contentDescription="@string/music_more_actions"
                     android:src="@drawable/ic_settings_gear"
-                    android:tint="@color/text_secondary" />
+                    app:tint="@color/text_secondary" />
             </LinearLayout>
 
             <TextView
@@ -207,7 +208,7 @@
             android:background="@android:color/transparent"
             android:contentDescription="@string/music_lyrics_settings"
             android:src="@drawable/ic_tune_sliders"
-            android:tint="@color/text_secondary" />
+            app:tint="@color/text_secondary" />
 
         <TextView
             android:id="@+id/player_total_time"
@@ -251,7 +252,7 @@
             android:backgroundTint="@color/brand_primary"
             android:scaleType="center"
             android:src="@drawable/ic_play_white"
-            android:tint="@color/surface_card" />
+            app:tint="@color/surface_card" />
 
         <ImageButton
             android:id="@+id/player_next_button"
@@ -277,7 +278,7 @@
             android:background="@drawable/bg_icon_button"
             android:contentDescription="@string/music_mode"
             android:src="@drawable/ic_repeat"
-            android:tint="@color/text_secondary" />
+            app:tint="@color/text_secondary" />
 
         <View
             android:layout_width="0dp"
@@ -291,6 +292,6 @@
             android:background="@drawable/bg_icon_button"
             android:contentDescription="@string/music_queue"
             android:src="@drawable/ic_queue_music"
-            android:tint="@color/text_secondary" />
+            app:tint="@color/text_secondary" />
     </LinearLayout>
 </LinearLayout>

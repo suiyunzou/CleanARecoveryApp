@@ -16,8 +16,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
@@ -240,8 +238,7 @@ public class RealDataTestMain {
                 }
                 // 保存 LRC 文件
                 File lrcFile = new File(OUTPUT_DIR, "lyrics.lrc");
-                Files.write(Paths.get(lrcFile.getAbsolutePath()),
-                        lrc.raw.getBytes(StandardCharsets.UTF_8));
+                writeBytes(lrcFile, lrc.raw.getBytes(StandardCharsets.UTF_8));
                 System.out.println("[歌词] LRC 已保存: " + lrcFile.getAbsolutePath());
 
                 passedTests++;
@@ -282,8 +279,7 @@ public class RealDataTestMain {
 
                 // 保存 KRC 明文
                 File krcFile = new File(OUTPUT_DIR, "lyrics_krc_decoded.txt");
-                Files.write(Paths.get(krcFile.getAbsolutePath()),
-                        krcText.getBytes(StandardCharsets.UTF_8));
+                writeBytes(krcFile, krcText.getBytes(StandardCharsets.UTF_8));
                 System.out.println("[歌词] KRC 明文已保存: " + krcFile.getAbsolutePath());
 
                 passedTests++;
@@ -540,9 +536,15 @@ public class RealDataTestMain {
         JsonObject dl = httpGet(url);
         String content = getStr(dl, "content");
         if (content == null || content.isEmpty()) return null;
-        byte[] bytes = java.util.Base64.getDecoder().decode(content);
+        byte[] bytes = com.example.cleanrecovery.util.Base64Compat.decode(content);
         String lrc = new String(bytes, StandardCharsets.UTF_8);
         return Lyrics.parse(lrc);
+    }
+
+    private static void writeBytes(File file, byte[] data) throws Exception {
+        try (FileOutputStream output = new FileOutputStream(file)) {
+            output.write(data);
+        }
     }
 
     private static String downloadAndDecodeKrc(LyricCandidate candidate) throws Exception {

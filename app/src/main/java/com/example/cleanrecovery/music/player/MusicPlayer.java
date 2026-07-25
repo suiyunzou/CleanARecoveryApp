@@ -118,6 +118,11 @@ public class MusicPlayer {
     public void pause() {
         if (player != null && player.isPlaying()) {
             player.pause();
+            // 停止轮询并推送一次精确位置，确保进度条/歌词停在当前点而非上一帧
+            handler.removeCallbacks(progressRunnable);
+            int cur = player.getCurrentPosition();
+            int dur = player.getDuration();
+            for (Callback cb : callbacks) cb.onProgressChanged(cur, dur);
             setState(State.PAUSED);
         }
     }
@@ -126,6 +131,13 @@ public class MusicPlayer {
         if (player != null && !player.isPlaying()) {
             player.start();
             setState(State.PLAYING);
+            // 立即同步一次并重启轮询：progressRunnable 在暂停时已自行停止，
+            // 不重新 post 会导致恢复后进度条/歌词永久冻结。
+            int cur = player.getCurrentPosition();
+            int dur = player.getDuration();
+            for (Callback cb : callbacks) cb.onProgressChanged(cur, dur);
+            handler.removeCallbacks(progressRunnable);
+            handler.post(progressRunnable);
         }
     }
 

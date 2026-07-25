@@ -444,7 +444,7 @@ public class KugouDataSource implements IMusicDataSource {
             if (isEmpty(content)) return null;
 
             // content 为 Base64 编码的 UTF-8 LRC 明文
-            byte[] bytes = java.util.Base64.getDecoder().decode(content);
+            byte[] bytes = com.example.cleanrecovery.util.Base64Compat.decode(content);
             String lrc = new String(bytes, StandardCharsets.UTF_8);
             return Lyrics.parse(lrc);
         } catch (Exception e) {

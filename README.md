@@ -33,12 +33,12 @@ $env:ANDROID_HOME = 'C:\path\to\Android\sdk'
 
 ## Product behavior
 
-- Non-root, copy-only: the app never deletes or modifies source files.
+- Non-root, copy-only recovery: the scan/recover pipeline never deletes or modifies scanned source files (the built-in file browser has a separate recycle bin).
 - Grant broad storage access, then scan images, videos, audio, or documents.
 - **Image scans** run a three-phase pipeline with shared deduplication:
   1. **File tree** — recursive walk of shared storage for accessible files.
   2. **MediaStore index/trash** (API 29+, images only) — trash, pending, and index entries; not sector recovery.
   3. **Cache profiles + carving** — known OEM/generic cache paths; JPEG blob carving inside matched containers.
 - Video, audio, and document scans use the file tree phase only today.
-- Filter results by existing files or suspected deleted/cache artifacts. The deleted badge is honest: only MediaStore trash items are marked suspected deleted.
+- Filter results by existing files or suspected deleted/cache artifacts. The "suspected deleted" badge marks any candidate whose source is not a normally visible shared file (MediaStore trash, cache thumbnails, carved blobs, etc.); `CandidateSourceKind` must honestly reflect the actual source.
 - Multi-select recovery copies into public `DataRecovery` folders (`content://` URIs and carved blob ranges supported).

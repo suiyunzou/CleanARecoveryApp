@@ -215,19 +215,23 @@ public class LyricsView extends RecyclerView {
             tv.setTypeface(tv.getTypeface(), active ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
             tv.setAlpha(active ? 1f : 0.55f);
             tv.setOnClickListener(v -> {
+                int clickPosition = h.getBindingAdapterPosition();
+                if (clickPosition == RecyclerView.NO_POSITION) {
+                    return;
+                }
                 long now = System.currentTimeMillis();
-                if (pendingTapPosition == position
+                if (pendingTapPosition == clickPosition
                         && now - pendingTapAt <= ViewConfiguration.getDoubleTapTimeout()) {
                     if (pendingSingleTap != null) {
                         ui.removeCallbacks(pendingSingleTap);
                         pendingSingleTap = null;
                     }
                     pendingTapPosition = -1;
-                    long t = lyrics.lines().get(position).timeMs;
+                    long t = lyrics.lines().get(clickPosition).timeMs;
                     if (seekListener != null) seekListener.onSeekTo(t);
                     return;
                 }
-                pendingTapPosition = position;
+                pendingTapPosition = clickPosition;
                 pendingTapAt = now;
                 if (pendingSingleTap != null) ui.removeCallbacks(pendingSingleTap);
                 pendingSingleTap = () -> {

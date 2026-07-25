@@ -3,6 +3,10 @@
     <external-path
         name="external_storage"
         path="." />
+    <!-- P1 A6：DataRecovery/Downloads 下载目录，用于 FileProvider 分享已下载文件 -->
+    <external-path
+        name="data_recovery_downloads"
+        path="DataRecovery/Downloads/" />
     <external-files-path
         name="music_downloads"
         path="Music/downloads/" />

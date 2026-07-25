@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- VIA 38 项菜单全集（顺序对齐 via-analysis §4），feasible 项落地，占位项 Toast 开发中 -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 应用便捷项（VIA 用工具栏 + 按钮，此处保留菜单入口） -->
+    <item
+        android:id="@+id/menu_new_tab"
+        android:icon="@drawable/ic_add"
+        android:title="@string/via_menu_new_tab" />
+    <item
+        android:id="@+id/menu_close_tab"
+        android:icon="@drawable/ic_close_tab"
+        android:title="@string/via_menu_close_tab" />
+
+    <!-- ===== VIA 顺序对齐 ===== -->
+    <item
+        android:id="@+id/menu_open_with"
+        android:icon="@drawable/ic_open_with"
+        android:title="@string/via_menu_open_with" />
+    <item
+        android:id="@+id/menu_reader"
+        android:icon="@drawable/ic_info"
+        android:title="@string/via_menu_reader" />
+    <item
+        android:id="@+id/menu_read_aloud"
+        android:icon="@drawable/ic_queue_music"
+        android:title="@string/via_menu_read_aloud" />
+    <item
+        android:id="@+id/menu_print"
+        android:icon="@drawable/ic_print"
+        android:title="@string/via_menu_print" />
+    <item
+        android:id="@+id/menu_font_size"
+        android:icon="@drawable/ic_text_settings"
+        android:title="@string/via_menu_font_size" />
+    <item
+        android:id="@+id/menu_scripts"
+        android:icon="@drawable/ic_edit"
+        android:title="@string/via_menu_scripts" />
+    <item
+        android:id="@+id/menu_ua"
+        android:icon="@drawable/ic_desktop"
+        android:title="@string/via_menu_ua" />
+    <item
+        android:id="@+id/menu_scan"
+        android:icon="@drawable/ic_scan"
+        android:title="@string/via_menu_scan" />
+    <item
+        android:id="@+id/menu_reload"
+        android:icon="@drawable/ic_reload"
+        android:title="@string/via_menu_reload" />
+    <item
+        android:id="@+id/menu_mark_ad"
+        android:icon="@drawable/ic_filter"
+        android:title="@string/via_menu_mark_ad" />
+    <item
+        android:id="@+id/menu_network_log"
+        android:icon="@drawable/ic_info"
+        android:title="@string/via_menu_network_log" />
+    <item
+        android:id="@+id/menu_offline"
+        android:icon="@drawable/ic_download"
+        android:title="@string/via_menu_offline" />
+    <item
+        android:id="@+id/menu_image_mode"
+        android:icon="@drawable/ic_type_image"
+        android:title="@string/via_menu_image_mode" />
+    <item
+        android:id="@+id/menu_fullscreen"
+        android:icon="@drawable/ic_fullscreen"
+        android:title="@string/via_menu_fullscreen" />
+    <item
+        android:id="@+id/menu_find"
+        android:icon="@drawable/ic_search"
+        android:title="@string/via_menu_find" />
+    <item
+        android:id="@+id/menu_translate"
+        android:icon="@drawable/ic_translate"
+        android:title="@string/via_menu_translate" />
+    <item
+        android:id="@+id/menu_save"
+        android:icon="@drawable/ic_save"
+        android:title="@string/via_menu_save" />
+    <item
+        android:id="@+id/menu_settings"
+        android:icon="@drawable/ic_settings_gear"
+        android:title="@string/via_menu_settings" />
+    <item
+        android:id="@+id/menu_download"
+        android:icon="@drawable/ic_download"
+        android:title="@string/via_menu_download" />
+    <item
+        android:id="@+id/menu_share"
+        android:icon="@drawable/ic_share"
+        android:title="@string/via_menu_share" />
+    <item
+        android:id="@+id/menu_history"
+        android:icon="@drawable/ic_history"
+        android:title="@string/via_menu_history" />
+    <item
+        android:id="@+id/menu_bookmarks"
+        android:icon="@drawable/ic_bookmark"
+        android:title="@string/via_menu_bookmarks" />
+    <item
+        android:id="@+id/menu_add_bookmark"
+        android:icon="@drawable/ic_add"
+        android:title="@string/via_menu_add_bookmark" />
+    <item
+        android:id="@+id/menu_add_favorite"
+        android:icon="@drawable/ic_favorite"
+        android:title="@string/via_menu_add_favorite" />
+    <item
+        android:id="@+id/menu_add_to_home"
+        android:icon="@drawable/ic_add_link"
+        android:title="@string/via_menu_add_to_home" />
+    <item
+        android:id="@+id/menu_incognito"
+        android:icon="@drawable/ic_incognito"
+        android:title="@string/via_menu_incognito" />
+    <item
+        android:id="@+id/menu_night"
+        android:icon="@drawable/ic_night"
+        android:title="@string/via_menu_night" />
+    <item
+        android:id="@+id/menu_game_mode"
+        android:icon="@drawable/ic_speed"
+        android:title="@string/via_menu_game_mode" />
+    <item
+        android:id="@+id/menu_rotation"
+        android:icon="@drawable/ic_rotation"
+        android:title="@string/via_menu_rotation" />
+    <item
+        android:id="@+id/menu_sniff"
+        android:icon="@drawable/ic_sniffer"
+        android:title="@string/via_menu_sniff" />
+    <item
+        android:id="@+id/menu_view_source"
+        android:icon="@drawable/ic_view_source"
+        android:title="@string/via_menu_view_source" />
+    <item
+        android:id="@+id/menu_site_conf"
+        android:icon="@drawable/ic_tune_sliders"
+        android:title="@string/via_menu_site_conf" />
+    <item
+        android:id="@+id/menu_tools"
+        android:icon="@drawable/ic_more_vert"
+        android:title="@string/via_menu_tools" />
+    <item
+        android:id="@+id/menu_useragent"
+        android:icon="@drawable/ic_search_engine"
+        android:title="@string/via_menu_useragent" />
+    <item
+        android:id="@+id/menu_ai"
+        android:icon="@drawable/ic_info"
+        android:title="@string/via_menu_ai" />
+    <item
+        android:id="@+id/menu_adblock"
+        android:icon="@drawable/ic_adblock"
+        android:title="@string/via_menu_adblock" />
+    <item
+        android:id="@+id/menu_customize_menu"
+        android:icon="@drawable/ic_menu"
+        android:title="@string/via_menu_customize_menu" />
+    <item
+        android:id="@+id/menu_report"
+        android:icon="@drawable/ic_info"
+        android:title="@string/via_menu_report" />
+    <item
+        android:id="@+id/menu_clear_data"
+        android:icon="@drawable/ic_delete"
+        android:title="@string/via_menu_clear_data" />
+
+    <!-- 应用专属项（默认进可用池，不在 VIA 首屏） -->
+    <item
+        android:id="@+id/menu_screenshot"
+        android:icon="@drawable/ic_screenshot"
+        android:title="@string/via_menu_screenshot" />
+    <item
+        android:id="@+id/menu_proxy"
+        android:icon="@drawable/ic_proxy"
+        android:title="@string/via_menu_proxy" />
+    <item
+        android:id="@+id/menu_exit"
+        android:icon="@drawable/ic_exit"
+        android:title="@string/via_menu_exit" />
+</menu>

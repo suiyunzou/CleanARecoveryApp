@@ -40,6 +40,7 @@
     <string name="alg_ffmpeg_libs_missing">FFmpeg native libraries not found on this device.</string>
     <string name="alg_reason_log_evidence_only">Finds path/URI clues only; does not recover bytes.</string>
     <string name="alg_reason_offline_requires_image">Requires imported disk image or root/offline workflow.</string>
+    <string name="alg_reason_offline_requires_root">需要 root 权限读取原始分区。</string>
     <string name="scan_phase_type">Scanning %1$s (%2$d of %3$d)&#8230;</string>
     <string name="type_all">全部类型</string>
     <string name="progress_status">Scanned %1$d, found %2$d\n%3$s</string>

@@ -201,8 +201,10 @@ public class RemoteAuthService implements IAuthService {
             try { sessionStore.save(session); } catch (Exception ignored) {}
         }
 
-        // If the refresh token has expired, the session is unrecoverable
-        if (!session.isRefreshable()) {
+        // 会话整体已失效（无 refresh token 可续期，且 access token 也已超出会话有效期）→ 需重登。
+        // 注意：酷狗短信登录不下发 refreshtoken，isRefreshable() 恒 false，
+        // 因此必须同时判断 isUsable()，否则每次重启都会误清登录态。
+        if (!session.isRefreshable() && !session.isUsable()) {
             sessionStore.clear();
             current = null;
             currentToken = null;
@@ -210,8 +212,9 @@ public class RemoteAuthService implements IAuthService {
             return null;
         }
 
-        // If the access token is expired, attempt a silent refresh
-        if (session.isAccessExpired()) {
+        // 仅当存在可用的 refresh token 时才尝试静默续期；
+        // 酷狗无 refresh token 的会话直接沿用现有长期 token。
+        if (session.isAccessExpired() && session.isRefreshable()) {
             try {
                 session = doTokenRefresh(session);
             } catch (AuthException e) {
@@ -331,7 +334,7 @@ public class RemoteAuthService implements IAuthService {
     public boolean isLoggedIn() {
         if (current != null && currentToken != null) return true;
         SecureSessionStore.Session s = sessionStore.restore();
-        return s != null && s.isRefreshable();
+        return s != null && (s.isRefreshable() || s.isUsable());
     }
 
     @Override

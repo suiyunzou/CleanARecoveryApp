@@ -90,6 +90,13 @@ public final class PlaylistDetailActivity extends Activity implements MusicPlaye
     private boolean selectionMode;
     private boolean customSortMode;
 
+    /** 本地歌单的排序方式。自定义顺序落库为 position，因此等同于 ADDED。 */
+    private enum SortMode { ADDED, TITLE, RECENT }
+    private static final String SORT_PREFS = "music_playlist_sort";
+    /** 云歌单自定义顺序的本地覆盖层（酷狗 API 无云端重排接口，仅本机生效）。key=云歌单稳定 id，value=换行分隔的 songKey 顺序。 */
+    private static final String REMOTE_ORDER_PREFS = "music_remote_order";
+    private SortMode sortMode = SortMode.ADDED;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -108,6 +115,7 @@ public final class PlaylistDetailActivity extends Activity implements MusicPlaye
             finish();
             return;
         }
+        sortMode = (remoteMode || downloadedMode) ? SortMode.ADDED : loadSortMode();
 
         bindViews();
         bindListeners();
@@ -257,7 +265,39 @@ public final class PlaylistDetailActivity extends Activity implements MusicPlaye
         }
         items.clear();
         items.addAll(app.playlists.getSongs(playlistName));
+        applySortMode();
         refreshVisibleItems();
+    }
+
+    /** 按当前持久化的排序方式对 items 重新排序（仅本地歌单）。 */
+    private void applySortMode() {
+        switch (sortMode) {
+            case TITLE:
+                Collator collator = Collator.getInstance(Locale.CHINA);
+                Collections.sort(items, (left, right) -> collator.compare(safeTitle(left), safeTitle(right)));
+                break;
+            case RECENT:
+                sortItemsByRecentPlay();
+                break;
+            case ADDED:
+            default:
+                // items 已按数据库 position 顺序加载，无需额外处理
+                break;
+        }
+    }
+
+    private SortMode loadSortMode() {
+        try {
+            String v = getSharedPreferences(SORT_PREFS, MODE_PRIVATE).getString(playlistName, SortMode.ADDED.name());
+            return SortMode.valueOf(v);
+        } catch (Exception e) {
+            return SortMode.ADDED;
+        }
+    }
+
+    private void persistSortMode(SortMode mode) {
+        sortMode = mode;
+        getSharedPreferences(SORT_PREFS, MODE_PRIVATE).edit().putString(playlistName, mode.name()).apply();
     }
 
     private void reloadDownloaded() {
@@ -314,7 +354,7 @@ public final class PlaylistDetailActivity extends Activity implements MusicPlaye
                 List<SongInfo> songs = app.dataSource.getAllUserPlaylistSongs(remotePlaylist, 200);
                 runOnUiThread(() -> {
                     items.clear();
-                    items.addAll(songs);
+                    items.addAll(applyRemoteOrder(songs));
                     refreshVisibleItems();
                 });
             } catch (Exception e) {
@@ -497,11 +537,13 @@ public final class PlaylistDetailActivity extends Activity implements MusicPlaye
 
     private void sortByAddedTime() {
         exitCustomSortMode(false);
+        if (!remoteMode && !downloadedMode) persistSortMode(SortMode.ADDED);
         reload();
     }
 
     private void sortByTitle() {
         exitCustomSortMode(false);
+        if (!remoteMode && !downloadedMode) persistSortMode(SortMode.TITLE);
         Collator collator = Collator.getInstance(Locale.CHINA);
         Collections.sort(items, (left, right) -> collator.compare(safeTitle(left), safeTitle(right)));
         refreshVisibleItems();
@@ -509,6 +551,12 @@ public final class PlaylistDetailActivity extends Activity implements MusicPlaye
 
     private void sortByRecentPlay() {
         exitCustomSortMode(false);
+        if (!remoteMode && !downloadedMode) persistSortMode(SortMode.RECENT);
+        sortItemsByRecentPlay();
+        refreshVisibleItems();
+    }
+
+    private void sortItemsByRecentPlay() {
         List<String> recentKeys = new ArrayList<>();
         if (remoteMode) {
             try {
@@ -534,7 +582,6 @@ public final class PlaylistDetailActivity extends Activity implements MusicPlaye
                 return Integer.compare(leftIndex, rightIndex);
             }
         });
-        refreshVisibleItems();
     }
 
     private void enterCustomSortMode() {
@@ -566,12 +613,90 @@ public final class PlaylistDetailActivity extends Activity implements MusicPlaye
     }
 
     private void saveCustomOrderIfNeeded(boolean showToast) {
-        if (!customSortMode && !remoteMode && !downloadedMode && searchQuery.trim().isEmpty()) {
+        // 拖拽过程中（customSortMode 仍为 true）不落盘，统一在退出自定义模式时保存。
+        if (customSortMode) return;
+        // 不持久化“搜索过滤态”下的局部顺序。
+        if (!searchQuery.trim().isEmpty()) return;
+        if (downloadedMode) return;
+
+        if (remoteMode) {
+            // 酷狗云端无重排接口，自定义顺序仅按云歌单 id 存本机，拉取后覆盖回来。
+            saveRemoteOrder();
+        } else {
             app.playlists.setOrder(playlistName, items);
-            if (showToast) {
-                Toast.makeText(this, R.string.music_playlist_order_saved, Toast.LENGTH_SHORT).show();
+            // 自定义顺序已落库为 position，后续按"添加时间"(=DB 顺序)展示即为该自定义顺序
+            persistSortMode(SortMode.ADDED);
+        }
+        if (showToast) {
+            Toast.makeText(this, R.string.music_playlist_order_saved, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    // ---- 云歌单自定义顺序：本地覆盖层 -------------------------------------
+
+    /** 云歌单的稳定标识，用作本地顺序存储的 key。 */
+    private String remoteOrderKey() {
+        if (remotePlaylist == null) return "";
+        String id = firstNonEmpty(remotePlaylist.globalCollectionId, remotePlaylist.listId, remotePlaylist.id);
+        return id == null ? "" : id;
+    }
+
+    /** 将当前 items 的 songKey 顺序保存到本地。 */
+    private void saveRemoteOrder() {
+        String key = remoteOrderKey();
+        if (key.isEmpty()) return;
+        StringBuilder sb = new StringBuilder();
+        for (SongInfo song : items) {
+            if (sb.length() > 0) sb.append('\n');
+            sb.append(songKey(song));
+        }
+        getSharedPreferences(REMOTE_ORDER_PREFS, MODE_PRIVATE).edit().putString(key, sb.toString()).apply();
+    }
+
+    private List<String> loadRemoteOrder() {
+        String key = remoteOrderKey();
+        List<String> out = new ArrayList<>();
+        if (key.isEmpty()) return out;
+        String value = getSharedPreferences(REMOTE_ORDER_PREFS, MODE_PRIVATE).getString(key, "");
+        if (value.isEmpty()) return out;
+        for (String part : value.split("\n")) {
+            if (!part.isEmpty()) out.add(part);
+        }
+        return out;
+    }
+
+    /**
+     * 用本地保存的自定义顺序重排服务器返回的歌曲：
+     * 已记录的歌按记录顺序排前；新出现（未记录）的歌按服务器顺序追加到末尾；
+     * 已删除的歌自然忽略。无本地记录时原样返回。
+     */
+    private List<SongInfo> applyRemoteOrder(List<SongInfo> songs) {
+        List<SongInfo> source = songs == null ? new ArrayList<>() : songs;
+        List<String> savedOrder = loadRemoteOrder();
+        if (savedOrder.isEmpty()) return new ArrayList<>(source);
+        boolean[] used = new boolean[source.size()];
+        List<SongInfo> result = new ArrayList<>(source.size());
+        for (String key : savedOrder) {
+            for (int i = 0; i < source.size(); i++) {
+                if (!used[i] && key.equals(songKey(source.get(i)))) {
+                    result.add(source.get(i));
+                    used[i] = true;
+                    break; // 每个记录顺序项消费一首，兼容重复歌曲
+                }
             }
         }
+        for (int i = 0; i < source.size(); i++) {
+            if (!used[i]) result.add(source.get(i)); // 新歌：保持服务器顺序追加
+        }
+        return result;
+    }
+
+    private String firstNonEmpty(String... values) {
+        if (values == null) return "";
+        for (String value : values) {
+            if (value != null && !value.isEmpty()) return value;
+        }
+        return "";
     }
 
     private void startDrag(RecyclerView.ViewHolder holder) {

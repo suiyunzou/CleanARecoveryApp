@@ -57,18 +57,17 @@ public final class AlgorithmRegistry {
 
     static boolean shouldRunInMode(RecoveryAlgorithm algorithm, ScanMode mode) {
         String id = algorithm.id();
+        // Expensive or specialised algorithms run only in the experimental sweep:
+        //  - jpeg_known_blob_carver: full-storage embedded-JPEG carving
+        //  - log_evidence_import: stale-record evidence (no byte recovery)
+        //  - offline_f2fs_image / offline_ext4_journal: root-only raw partition carve
+        //  - ffmpeg_deep_validation: native decode validation
         if (JpegKnownBlobCarverAlgorithm.ID.equals(id)
                 || LogEvidenceImportAlgorithm.ID.equals(id)
                 || OfflineF2fsImageAlgorithm.ID.equals(id)
-                || OfflineExt4JournalAlgorithm.ID.equals(id)) {
-            return false;
-        }
-        // FFmpeg deep validation is expensive — experimental only
-        if (DeepValidationAlgorithm.ID.equals(id) && mode != ScanMode.EXPERIMENTAL_ALL) {
-            return false;
-        }
-        if (mode == ScanMode.DEFAULT) {
-            return true;
+                || OfflineExt4JournalAlgorithm.ID.equals(id)
+                || DeepValidationAlgorithm.ID.equals(id)) {
+            return mode == ScanMode.EXPERIMENTAL_ALL;
         }
         return true;
     }

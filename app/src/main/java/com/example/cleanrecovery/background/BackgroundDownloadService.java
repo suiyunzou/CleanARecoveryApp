@@ -1,12 +1,20 @@
 package com.example.cleanrecovery.background;
 
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
+import android.content.pm.ServiceInfo;
+import android.os.Build;
 import android.os.Environment;
 import android.os.IBinder;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
+import androidx.core.app.NotificationCompat;
 
 import com.example.cleanrecovery.download.UniversalDownloadManager;
 
@@ -19,8 +27,8 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * 后台下载服务（隐藏模块）。
  *
- * <p>作为后台服务运行，从 {@link DownloadQueueManager} 获取任务并执行下载。
- * 完全无 UI，所有操作静默执行。</p>
+ * <p>作为<b>前台服务</b>运行（{@code foregroundServiceType=dataSync}），从
+ * {@link DownloadQueueManager} 获取任务并执行下载。完全无 UI，所有操作静默执行。</p>
  *
  * <h3>核心功能</h3>
  * <ul>
@@ -32,6 +40,16 @@ import java.util.concurrent.atomic.AtomicLong;
  *   <li>内存优化：分片下载，流式合并</li>
  *   <li>安全存储：文件存放在应用私有目录</li>
  * </ul>
+ *
+ * <h3>P0 A1 改动：前台服务化</h3>
+ * <p>Android 14+（API 34）对后台下载限制严格，普通后台服务在息屏/省电模式下
+ * 极易被系统杀死导致下载中断。本服务转为 {@code dataSync} 类型前台服务，通过
+ * 常驻通知保证进程存活，下载过程不被系统回收。</p>
+ * <ul>
+ *   <li>{@code onCreate} 创建通知渠道</li>
+ *   <li>{@code onStartCommand} 调用 {@link #startForeground} 提升为前台服务</li>
+ *   <li>{@link #stopForegroundSelf} 在队列空闲时降级回普通服务（可选）</li>
+ * </ul>
  */
 public final class BackgroundDownloadService extends Service
         implements DownloadQueueManager.TaskExecutor {
@@ -42,21 +60,127 @@ public final class BackgroundDownloadService extends Service
     /** 缓冲区大小（64KB，平衡内存和效率）。 */
     private static final int BUFFER_SIZE = 64 * 1024;
 
+    /** 通知渠道 ID。 */
+    private static final String CHANNEL_ID = "bg_download_channel";
+    /** 前台服务通知 ID（固定值，避免与其它通知冲突）。 */
+    private static final int FOREGROUND_NOTIFICATION_ID = 1001;
+
     private DownloadQueueManager queueManager;
     private final AtomicLong totalDownloadedBytes = new AtomicLong(0);
     private final AtomicLong totalTasksCompleted = new AtomicLong(0);
+    private NotificationManager notificationManager;
+    private volatile boolean foregroundStarted = false;
 
     @Override
     public void onCreate() {
         super.onCreate();
         Log.i(TAG, "后台下载服务启动");
+        notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        createNotificationChannel();
         queueManager = DownloadQueueManager.getInstance();
         queueManager.setExecutor(this);
+        // P0 A2：从 SQLite 恢复未完成任务（应用被杀重启后能续跑）
+        queueManager.init(this);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        // P0 A1：立即提升为前台服务，避免下载中被系统杀死
+        startForegroundIfNeeded();
         return START_STICKY; // 服务被杀后自动重启
+    }
+
+    /** 创建通知渠道（Android 8.0+ 必需）。 */
+    private void createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && notificationManager != null) {
+            NotificationChannel channel = new NotificationChannel(
+                    CHANNEL_ID,
+                    "后台下载服务",
+                    NotificationManager.IMPORTANCE_LOW);
+            channel.setDescription("下载服务运行状态通知，下载期间会常驻");
+            channel.setShowBadge(false);
+            channel.enableVibration(false);
+            channel.enableLights(false);
+            channel.setSound(null, null);
+            notificationManager.createNotificationChannel(channel);
+        }
+    }
+
+    /** 提升为前台服务（如尚未提升）。 */
+    private void startForegroundIfNeeded() {
+        if (foregroundStarted) return;
+        try {
+            Notification notification = buildForegroundNotification("下载服务运行中", null);
+            // Android 14+（API 34）要求指定 foregroundServiceType
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(FOREGROUND_NOTIFICATION_ID, notification,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC);
+            } else {
+                startForeground(FOREGROUND_NOTIFICATION_ID, notification);
+            }
+            foregroundStarted = true;
+            Log.i(TAG, "已提升为前台服务 (dataSync)");
+        } catch (SecurityException e) {
+            // 缺少 POST_NOTIFICATIONS 权限或 FOREGROUND_SERVICE_DATA_SYNC 权限时降级
+            Log.w(TAG, "前台服务启动失败，降级为后台服务: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 构建前台服务通知。
+     *
+     * @param contentText 通知正文（如"下载服务运行中"或"正在下载: xxx.mp4"）
+     * @param mainIntent  点击通知跳转的 Intent（可为 null）
+     */
+    private Notification buildForegroundNotification(String contentText, Intent mainIntent) {
+        PendingIntent pi = null;
+        if (mainIntent != null) {
+            int flag = PendingIntent.FLAG_UPDATE_CURRENT;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                flag |= PendingIntent.FLAG_IMMUTABLE;
+            }
+            pi = PendingIntent.getActivity(this, 0, mainIntent, flag);
+        }
+        NotificationCompat.Builder b = new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("数据恢复下载")
+                .setContentText(contentText)
+                .setSmallIcon(android.R.drawable.stat_sys_download)
+                .setOngoing(true)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setCategory(NotificationCompat.CATEGORY_PROGRESS);
+        if (pi != null) {
+            b.setContentIntent(pi);
+        }
+        return b.build();
+    }
+
+    /**
+     * 更新前台服务通知文本（用于反映当前下载进度/状态）。
+     * M1 简化：仅在任务切换时更新，不在每帧进度时更新（避免通知频繁刷新）。
+     */
+    public void updateNotification(String contentText) {
+        if (!foregroundStarted || notificationManager == null) return;
+        try {
+            Notification notification = buildForegroundNotification(contentText, null);
+            notificationManager.notify(FOREGROUND_NOTIFICATION_ID, notification);
+        } catch (Exception e) {
+            Log.w(TAG, "更新通知失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 队列空闲时可选降级为普通后台服务（释放通知栏位）。
+     * <p>调用 {@link #stopForeground} 移除通知，但服务进程仍在。</p>
+     */
+    public void stopForegroundSelf() {
+        if (!foregroundStarted) return;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(Service.STOP_FOREGROUND_REMOVE);
+        } else {
+            stopForeground(true);
+        }
+        foregroundStarted = false;
+        Log.i(TAG, "已从前台降级");
     }
 
     @Nullable
@@ -77,6 +201,10 @@ public final class BackgroundDownloadService extends Service
     @Override
     public File executeTask(DownloadQueueManager.DownloadTask task) {
         Log.i(TAG, "执行任务#" + task.id + " URL=" + task.url.substring(0, Math.min(60, task.url.length())));
+        // 更新前台通知，反映当前正在下载的任务（P0 A1）
+        String displayName = (task.pageTitle != null && !task.pageTitle.isEmpty())
+                ? task.pageTitle : ("任务#" + task.id);
+        updateNotification("正在下载: " + displayName);
 
         // 1. 分类链接
         VideoLinkClassifier.ClassifyResult classifyResult =

@@ -37,8 +37,8 @@ public class DouyinExtractor implements Extractor {
     private static final String NAME = "douyin";
 
     private static final Pattern VALID_URL = Pattern.compile(
-            "https?://(?:www\\.)?(?:douyin|iesdouyin)\\.com/(?:video/|share/video/)(?<id>\\d+)" +
-            "|https?://v\\.douyin\\.com/(?<shortid>[a-zA-Z0-9]+)/?");
+            "https?://(?:www\\.)?(?:douyin|iesdouyin)\\.com/(?:video/|share/video/)(\\d+)" +
+            "|https?://v\\.douyin\\.com/([a-zA-Z0-9]+)/?");
 
     @Override
     public String name() { return NAME; }
@@ -60,7 +60,7 @@ public class DouyinExtractor implements Extractor {
         if (!m.find()) {
             throw new ExtractorException(ExtractorException.Kind.UNSUPPORTED, "无法识别的抖音 URL");
         }
-        String videoId = m.group("id");
+        String videoId = m.group(1);
         if (videoId == null) {
             throw new ExtractorException(ExtractorException.Kind.UNSUPPORTED, "无法提取视频 ID");
         }

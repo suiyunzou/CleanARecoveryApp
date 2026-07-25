@@ -41,8 +41,8 @@ public class BilibiliExtractor implements Extractor {
     /** _VALID_URL（对应 yt-dlp BiliBiliIE._VALID_URL）。 */
     private static final Pattern VALID_URL = Pattern.compile(
             "https?://(?:www\\.|m\\.)?bilibili\\.com/(?:video/|festival/[^/?#]+\\?(?:[^#]*&)?bvid=)" +
-            "(?<prefix>[aAbB][vV])(?<id>[^/?#&]+)" +
-            "|https?://b23\\.tv/(?<shortid>[a-zA-Z0-9]+)");
+            "([aAbB][vV])([^/?#&]+)" +
+            "|https?://b23\\.tv/([a-zA-Z0-9]+)");
 
     /** __INITIAL_STATE__ 正则。 */
     private static final Pattern INITIAL_STATE_PATTERN =
@@ -86,8 +86,8 @@ public class BilibiliExtractor implements Extractor {
         if (!m.find()) {
             throw new ExtractorException(ExtractorException.Kind.UNSUPPORTED, "无法识别的 Bilibili URL");
         }
-        String prefix = m.group("prefix");
-        String videoId = m.group("id");
+        String prefix = m.group(1);
+        String videoId = m.group(2);
         if (prefix == null || videoId == null) {
             throw new ExtractorException(ExtractorException.Kind.UNSUPPORTED, "无法提取视频 ID");
         }
@@ -188,7 +188,7 @@ public class BilibiliExtractor implements Extractor {
                     ExtractorResult.Format fmt = new ExtractorResult.Format(
                             durlUrl, "mp4", data.optInt("quality", 32),
                             "unknown", "unknown", 0, 0, 0, size,
-                            QUALITY_NAMES.getOrDefault(data.optInt("quality", 32), "MP4"));
+                            qualityName(data.optInt("quality", 32), "MP4"));
                     formats.add(fmt);
                 }
             }
@@ -293,7 +293,7 @@ public class BilibiliExtractor implements Extractor {
                 String codecs = v.optString("codecs", "unknown");
                 String mime = v.optString("mimeType", v.optString("mime_type", "video/mp4"));
                 String ext = mimeToExt(mime, "mp4");
-                String desc = QUALITY_NAMES.getOrDefault(quality, height + "p");
+                String desc = qualityName(quality, height + "p");
 
                 formats.add(new ExtractorResult.Format(
                         vurl, ext, quality, codecs, "none",
@@ -359,6 +359,11 @@ public class BilibiliExtractor implements Extractor {
         }
 
         return formats;
+    }
+
+    private static String qualityName(int quality, String fallback) {
+        String name = QUALITY_NAMES.get(quality);
+        return name != null ? name : fallback;
     }
 
     /** MIME 转扩展名（简化版）。 */

@@ -34,4 +34,13 @@
     <color name="overlay_scrim">#80111827</color>
     <color name="preview_backdrop">#111827</color>
     <color name="algorithm_log_bg">#FFFFFF</color>
+
+    <!-- VIA 浏览器配色（via-analysis.md §7）：品牌红 + 深色 -->
+    <color name="via_accent">#FFD64146</color>
+    <color name="via_dark">#FF232323</color>
+    <color name="via_dark_surface">#FF1C1B1D</color>
+    <color name="via_text_light">#FFF0F0F0</color>
+    <color name="via_grid_item_bg">#FFF5F5F5</color>
+    <color name="via_proxy_on">#FFD64146</color>
+    <color name="via_proxy_off">#FF9F9F9F</color>
 </resources>

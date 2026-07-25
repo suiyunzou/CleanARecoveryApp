@@ -28,14 +28,20 @@ public final class AlgorithmRegistryTest {
     }
 
     @Test
-    public void offlineAndEvidenceAlgorithmsAreNotRunnable() {
+    public void offlineAlgorithmsRequireRootSoNotRunnableOnHost() {
+        // On a non-rooted/host JVM the offline cards stay disabled.
         AlgorithmContext context = new AlgorithmContext(null, RecoveryType.IMAGE);
-        assertFalse(AlgorithmRegistry.resolvedAvailability(
-                AlgorithmRegistry.byId(LogEvidenceImportAlgorithm.ID), context).isRunnable());
         assertFalse(AlgorithmRegistry.resolvedAvailability(
                 AlgorithmRegistry.byId(OfflineF2fsImageAlgorithm.ID), context).isRunnable());
         assertFalse(AlgorithmRegistry.resolvedAvailability(
                 AlgorithmRegistry.byId(OfflineExt4JournalAlgorithm.ID), context).isRunnable());
+    }
+
+    @Test
+    public void logEvidenceImportIsRunnable() {
+        AlgorithmContext context = new AlgorithmContext(null, RecoveryType.IMAGE);
+        assertTrue(AlgorithmRegistry.resolvedAvailability(
+                AlgorithmRegistry.byId(LogEvidenceImportAlgorithm.ID), context).isRunnable());
     }
 
     @Test

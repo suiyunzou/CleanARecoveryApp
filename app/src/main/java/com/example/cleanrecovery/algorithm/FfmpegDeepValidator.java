@@ -79,14 +79,73 @@ public final class FfmpegDeepValidator {
         if (len < 512L) {
             return new ProbeResult(false, 0, 0, 0, "too_small");
         }
+        // Cheap magic-byte gate first: avoids spinning up the platform
+        // extractor on files that obviously aren't media.
         try {
             FileSignatureProbe.ProbeResult sig = FileSignatureProbe.probe(file);
             if (sig == null) {
                 return new ProbeResult(false, 0, 0, 0, "no_signature");
             }
-            return new ProbeResult(true, 1, 0, 0, "fallback_ok");
         } catch (Exception e) {
             return new ProbeResult(false, 0, 0, 0, "io_error");
+        }
+        // Real decodability check via the platform extractor.  This actually
+        // parses the container and reports true dimensions/duration, so a
+        // false-positive header match (e.g. truncated ftyp) is rejected here.
+        android.media.MediaMetadataRetriever retriever = new android.media.MediaMetadataRetriever();
+        try {
+            retriever.setDataSource(filePath);
+            String hasVideo = retriever.extractMetadata(
+                    android.media.MediaMetadataRetriever.METADATA_KEY_HAS_VIDEO);
+            String hasAudio = retriever.extractMetadata(
+                    android.media.MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO);
+            long durationMs = parseLong(retriever.extractMetadata(
+                    android.media.MediaMetadataRetriever.METADATA_KEY_DURATION));
+            int width = parseInt(retriever.extractMetadata(
+                    android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH));
+            int height = parseInt(retriever.extractMetadata(
+                    android.media.MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT));
+            boolean isVideo = "yes".equalsIgnoreCase(hasVideo) || width > 0 || height > 0;
+            if (isVideo && width > 0 && height > 0) {
+                return new ProbeResult(true, 1, width, height, "fallback_video_ok");
+            }
+            if (("yes".equalsIgnoreCase(hasAudio) || durationMs > 0L) && !isVideo) {
+                return new ProbeResult(true, 1, 0, 0, "fallback_audio_ok");
+            }
+            // Some valid containers expose only duration without dimensions.
+            if (durationMs > 0L) {
+                return new ProbeResult(true, 1, Math.max(width, 0), Math.max(height, 0), "fallback_ok");
+            }
+            return new ProbeResult(false, 0, 0, 0, "fallback_undecodable");
+        } catch (RuntimeException e) {
+            return new ProbeResult(false, 0, 0, 0, "fallback_undecodable");
+        } finally {
+            try {
+                retriever.release();
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
+    private static long parseLong(String value) {
+        if (value == null) {
+            return 0L;
+        }
+        try {
+            return Long.parseLong(value.trim());
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
+    }
+
+    private static int parseInt(String value) {
+        if (value == null) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            return 0;
         }
     }
 

@@ -1,11 +1,13 @@
 package com.example.cleanrecovery.background;
 
+import android.content.Context;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
 
 import java.io.File;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -36,6 +38,10 @@ public final class DownloadQueueManager {
     private volatile boolean running = false;
     private final AtomicInteger taskIdGenerator = new AtomicInteger(0);
     private TaskExecutor executor;
+
+    // P0 A2：SQLite 持久化（应用被杀后重启可恢复未完成任务）
+    private DownloadTaskDbHelper dbHelper;
+    private volatile boolean initialized = false;
 
     /** 下载任务。 */
     public static final class DownloadTask implements Comparable<DownloadTask> {
@@ -104,6 +110,51 @@ public final class DownloadQueueManager {
         return instance;
     }
 
+    /**
+     * P0 A2：初始化数据库并恢复未完成任务。
+     *
+     * <p>由 {@link BackgroundDownloadService#onCreate} 调用，确保服务被系统杀死重启后
+     * 能从 SQLite 中恢复未完成的下载任务。该方法<b>幂等</b>，多次调用安全。</p>
+     *
+     * <p>恢复策略：</p>
+     * <ol>
+     *   <li>查询 status ∈ {PENDING, RUNNING} 的任务</li>
+     *   <li>RUNNING 任务重置为 PENDING（上次执行被中断）</li>
+     *   <li>恢复 taskIdGenerator 为数据库中最大 ID</li>
+     *   <li>重新入队恢复的任务（不写回 DB，避免重复 INSERT）</li>
+     * </ol>
+     */
+    public void init(Context context) {
+        if (initialized) return;
+        synchronized (lock) {
+            if (initialized) return;
+            dbHelper = new DownloadTaskDbHelper(context);
+
+            // 恢复 taskIdGenerator 为数据库中最大 ID
+            int maxId = dbHelper.getMaxTaskId();
+            if (maxId > taskIdGenerator.get()) {
+                taskIdGenerator.set(maxId);
+            }
+
+            // 查询并恢复未完成任务
+            List<DownloadTask> restorable = dbHelper.getRestorableTasks();
+            if (!restorable.isEmpty()) {
+                for (DownloadTask task : restorable) {
+                    if (!taskMap.containsKey(task.url)) {
+                        taskMap.put(task.url, task);
+                        queue.add(task);
+                        Log.i(TAG, "恢复任务#" + task.id + " " + task);
+                    }
+                }
+                Log.i(TAG, "从数据库恢复 " + restorable.size() + " 个未完成任务");
+                startProcessing();
+            } else {
+                Log.i(TAG, "数据库无未完成任务");
+            }
+            initialized = true;
+        }
+    }
+
     /** 设置任务执行器。 */
     public void setExecutor(TaskExecutor executor) {
         this.executor = executor;
@@ -135,6 +186,15 @@ public final class DownloadQueueManager {
                     taskIdGenerator.incrementAndGet(), url, mimeType, pageUrl, pageTitle, priority);
             taskMap.put(url, task);
             queue.add(task);
+
+            // P0 A2：持久化到 SQLite（init 未调用则跳过，退化为无持久化模式）
+            if (dbHelper != null) {
+                try {
+                    dbHelper.insertTask(task);
+                } catch (Exception e) {
+                    Log.w(TAG, "持久化任务失败（不影响内存队列）: " + e.getMessage());
+                }
+            }
 
             Log.i(TAG, "入队任务#" + task.id + " 优先级=" + priority + " URL="
                     + url.substring(0, Math.min(60, url.length())));
@@ -199,10 +259,12 @@ public final class DownloadQueueManager {
 
         while (task.retryCount <= MAX_RETRY) {
             task.status = DownloadTask.TaskStatus.RUNNING;
+            persistStatus(task);
             try {
                 if (executor == null) {
                     task.errorMessage = "未设置执行器";
                     task.status = DownloadTask.TaskStatus.FAILED;
+                    persistStatus(task);
                     break;
                 }
 
@@ -211,6 +273,8 @@ public final class DownloadQueueManager {
                     task.resultPath = result.getAbsolutePath();
                     task.fileSize = result.length();
                     task.status = DownloadTask.TaskStatus.COMPLETED;
+                    // P0 A2：持久化完成结果（路径+大小+哈希+状态）
+                    persistResult(task);
                     Log.i(TAG, "任务完成 " + task + " -> " + result.getName()
                             + " (" + result.length() + " bytes)");
                     return;
@@ -233,6 +297,7 @@ public final class DownloadQueueManager {
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                     task.status = DownloadTask.TaskStatus.FAILED;
+                    persistStatus(task);
                     break;
                 }
             }
@@ -240,6 +305,7 @@ public final class DownloadQueueManager {
 
         if (task.status != DownloadTask.TaskStatus.COMPLETED) {
             task.status = DownloadTask.TaskStatus.FAILED;
+            persistStatus(task);
             Log.w(TAG, "任务最终失败 " + task + ": " + task.errorMessage);
         }
 
@@ -251,11 +317,32 @@ public final class DownloadQueueManager {
         }
     }
 
+    /** P0 A2：持久化任务状态到 SQLite（init 未调用则跳过）。 */
+    private void persistStatus(DownloadTask task) {
+        if (dbHelper == null) return;
+        try {
+            dbHelper.updateStatus(task.id, task.status, task.errorMessage);
+        } catch (Exception e) {
+            Log.w(TAG, "持久化状态失败: " + e.getMessage());
+        }
+    }
+
+    /** P0 A2：持久化完成结果到 SQLite（init 未调用则跳过）。 */
+    private void persistResult(DownloadTask task) {
+        if (dbHelper == null) return;
+        try {
+            dbHelper.updateResult(task.id, task.resultPath, task.fileSize, task.fileHash);
+        } catch (Exception e) {
+            Log.w(TAG, "持久化结果失败: " + e.getMessage());
+        }
+    }
+
     /** 取消所有任务。 */
     public void cancelAll() {
         synchronized (lock) {
             for (DownloadTask task : queue) {
                 task.status = DownloadTask.TaskStatus.CANCELLED;
+                persistStatus(task);
             }
             queue.clear();
             taskMap.clear();
