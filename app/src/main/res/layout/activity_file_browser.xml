@@ -380,4 +380,6 @@
                 android:textSize="@dimen/text_caption" />
         </LinearLayout>
     </LinearLayout>
+
+    <include layout="@layout/include_app_bottom_nav" />
 </LinearLayout>

@@ -67,7 +67,8 @@
         <activity
             android:name=".ui.activity.MainActivity"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher">
+            android:icon="@mipmap/ic_launcher"
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -131,6 +132,9 @@
         <activity android:name="com.example.cleanrecovery.ui.activity.BrowserDownloadsActivity" android:exported="false" />
         <activity android:name="com.example.cleanrecovery.ui.activity.BrowserOfflinePagesActivity" android:exported="false" />
         <activity android:name="com.example.cleanrecovery.ui.activity.BrowserSettingsActivity" android:exported="false" />
+        <activity android:name="com.example.cleanrecovery.ui.activity.BrowserSiteSettingsActivity" android:exported="false" />
+        <activity android:name="com.example.cleanrecovery.ui.activity.BrowserSearchSettingsActivity" android:exported="false" />
+        <activity android:name="com.example.cleanrecovery.ui.activity.BrowserHomeCustomizeActivity" android:exported="false" />
         <activity android:name="com.example.cleanrecovery.ui.activity.TabsActivity" android:exported="false" />
         <service
             android:name="com.example.cleanrecovery.background.BackgroundDownloadService"

@@ -5,6 +5,7 @@ import com.example.cleanrecovery.recovery.RecoveryOutputPaths;
 import com.example.cleanrecovery.recovery.RecoveryType;
 import com.example.cleanrecovery.recycle.RecycleBin;
 import com.example.cleanrecovery.ui.adapter.FileBrowserAdapter;
+import com.example.cleanrecovery.ui.widget.AppBottomNavBinder;
 import com.example.cleanrecovery.ui.widget.FileBrowserMime;
 import com.example.cleanrecovery.ui.widget.SystemUiHelper;
 
@@ -125,6 +126,7 @@ public final class FileBrowserActivity extends Activity {
         super.onCreate(savedInstanceState);
         SystemUiHelper.apply(this);
         setContentView(R.layout.activity_file_browser);
+        AppBottomNavBinder.bind(this, AppBottomNavBinder.Tab.FOLDER);
 
         toolbar = findViewById(R.id.file_browser_toolbar);
         multiSelectBar = findViewById(R.id.file_browser_multiselect_bar);

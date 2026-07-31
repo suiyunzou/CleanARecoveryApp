@@ -15,6 +15,7 @@ import com.example.cleanrecovery.scan.ScanProgressTracker;
 import com.example.cleanrecovery.storage.StorageAccessController;
 import com.example.cleanrecovery.ui.adapter.AlgorithmStepAdapter;
 import com.example.cleanrecovery.ui.adapter.RecoveryGridAdapter;
+import com.example.cleanrecovery.ui.widget.AppBottomNavBinder;
 import com.example.cleanrecovery.ui.widget.ParticleScanView;
 import com.example.cleanrecovery.ui.widget.SystemUiHelper;
 import com.example.cleanrecovery.util.PathManager;
@@ -53,6 +54,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class MainActivity extends Activity {
+    public static final String EXTRA_SHOW_HOME = "extra_show_home";
+    public static final String EXTRA_SHOW_RESULTS = "extra_show_results";
+
     private static final int REQUEST_ONBOARDING = 5100;
     private static final long PROGRESS_TICK_MS = 200L;
 
@@ -78,7 +82,9 @@ public final class MainActivity extends Activity {
     private LinearLayout permissionBanner;
     private TextView permissionBannerTitle;
     private TextView permissionBannerAction;
+    private ImageView permissionBadgeIcon;
     private TextView lastScanSummary;
+    private View recentScansEmpty;
     private ParticleScanView scanParticleView;
     private TextView scanPathToggle;
     private TextView scanCurrentPath;
@@ -140,8 +146,39 @@ public final class MainActivity extends Activity {
         refreshHome();
         maybeLaunchOnboarding();
         updateBottomNav(Panel.HOME);
+        handleNavIntent(getIntent());
         // 初始化应用工作目录并异步清理过期回收站条目（>30 天）
         initializeAppPaths();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleNavIntent(intent);
+    }
+
+    public void requestShowHomeFromNav() {
+        showPanel(Panel.HOME);
+    }
+
+    public void requestShowResultsFromNav() {
+        openResultsTab();
+    }
+
+    private void handleNavIntent(Intent intent) {
+        if (intent == null) {
+            return;
+        }
+        if (intent.getBooleanExtra(EXTRA_SHOW_RESULTS, false)) {
+            intent.removeExtra(EXTRA_SHOW_RESULTS);
+            openResultsTab();
+            return;
+        }
+        if (intent.getBooleanExtra(EXTRA_SHOW_HOME, false)) {
+            intent.removeExtra(EXTRA_SHOW_HOME);
+            showPanel(Panel.HOME);
+        }
     }
 
     /**
@@ -233,7 +270,9 @@ public final class MainActivity extends Activity {
         permissionBanner = findViewById(R.id.permission_banner);
         permissionBannerTitle = findViewById(R.id.permission_banner_title);
         permissionBannerAction = findViewById(R.id.permission_banner_action);
+        permissionBadgeIcon = findViewById(R.id.permission_badge_icon);
         lastScanSummary = findViewById(R.id.last_scan_summary);
+        recentScansEmpty = findViewById(R.id.recent_scans_empty);
         scanParticleView = findViewById(R.id.scan_particle_view);
         resultsCount = findViewById(R.id.results_count);
         resultsSummaryScope = findViewById(R.id.results_summary_scope);
@@ -314,18 +353,26 @@ public final class MainActivity extends Activity {
     }
 
     private void bindActions() {
-        findViewById(R.id.scan_all_button).setOnClickListener(new View.OnClickListener() {
+        View.OnClickListener startScanAllClick = new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 performLightHaptic(view);
                 startScanAll();
             }
-        });
-        findViewById(R.id.experimental_scan_button).setOnClickListener(new View.OnClickListener() {
+        };
+        findViewById(R.id.scan_all_button).setOnClickListener(startScanAllClick);
+        findViewById(R.id.experimental_scan_button).setOnClickListener(startScanAllClick);
+        findViewById(R.id.scan_all_types_link).setOnClickListener(startScanAllClick);
+        findViewById(R.id.recent_scans_view_all).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                performLightHaptic(view);
-                showExperimentalTypePicker();
+                openResultsTab();
+            }
+        });
+        findViewById(R.id.recent_scans_card).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                openResultsTab();
             }
         });
         permissionBanner.setOnClickListener(new View.OnClickListener() {
@@ -350,11 +397,6 @@ public final class MainActivity extends Activity {
                 showPanel(Panel.HOME);
             }
         });
-        findViewById(R.id.nav_home).setOnClickListener(v -> showPanel(Panel.HOME));
-        findViewById(R.id.nav_results).setOnClickListener(v -> openResultsTab());
-        findViewById(R.id.nav_folder).setOnClickListener(v -> openRecoveryFolder());
-        findViewById(R.id.nav_about).setOnClickListener(v ->
-                startActivity(new Intent(MainActivity.this, AboutActivity.class)));
         resultsStatusFilterButton.setOnClickListener(v -> showStatusFilterSheet());
         filterTypeAll.setOnClickListener(v -> setTypeFilter(null));
         filterTypeImages.setOnClickListener(v -> setTypeFilter(RecoveryType.IMAGE));
@@ -393,7 +435,11 @@ public final class MainActivity extends Activity {
 
     private void refreshHome() {
         ScanHistoryStore.Snapshot snapshot = ScanHistoryStore.read(this);
-        if (snapshot.hasScanHistory()) {
+        boolean hasHistory = snapshot.hasScanHistory();
+        if (recentScansEmpty != null) {
+            recentScansEmpty.setVisibility(hasHistory ? View.GONE : View.VISIBLE);
+        }
+        if (hasHistory) {
             CharSequence when = DateUtils.getRelativeTimeSpanString(
                     snapshot.lastScanTimeMs,
                     System.currentTimeMillis(),
@@ -404,8 +450,10 @@ public final class MainActivity extends Activity {
                     when,
                     snapshot.lastFoundCount
             ));
+            lastScanSummary.setVisibility(View.VISIBLE);
         } else {
             lastScanSummary.setText(R.string.last_scan_empty);
+            lastScanSummary.setVisibility(View.GONE);
         }
         updateCategoryCounts(snapshot);
         refreshPermissionBanner();
@@ -429,12 +477,17 @@ public final class MainActivity extends Activity {
 
     private void refreshPermissionBanner() {
         boolean granted = storageAccessController.hasStorageAccess();
-        permissionBannerTitle.setText(granted ? R.string.storage_access_granted : R.string.storage_access_missing);
+        permissionBannerTitle.setText(granted
+                ? R.string.storage_permission_badge_on
+                : R.string.storage_permission_badge_off);
         permissionBannerTitle.setTextColor(resolveColorRes(granted ? R.color.status_success : R.color.status_warning));
-        permissionBannerAction.setVisibility(granted ? View.GONE : View.VISIBLE);
-        if (!granted) {
-            permissionBannerAction.setText(R.string.button_grant_access);
+        if (permissionBadgeIcon != null) {
+            permissionBadgeIcon.setVisibility(granted ? View.VISIBLE : View.GONE);
         }
+        permissionBannerAction.setVisibility(View.GONE);
+        permissionBanner.setBackgroundResource(granted
+                ? R.drawable.bg_permission_badge
+                : R.drawable.bg_permission_banner_ok);
     }
 
     private void startScan(RecoveryType type) {
@@ -893,28 +946,17 @@ public final class MainActivity extends Activity {
     }
 
     private void updateBottomNav(Panel panel) {
-        bottomNav.setVisibility(panel == Panel.SCAN ? View.GONE : View.VISIBLE);
-        if (panel == Panel.SCAN) {
-            return;
+        if (bottomNav != null) {
+            bottomNav.setVisibility(View.VISIBLE);
         }
-        int activeColor = resolveColorRes(R.color.brand_primary);
-        int inactiveColor = resolveColorRes(R.color.text_secondary);
-
-        styleNavItem(findViewById(R.id.nav_home), navHomeIcon, navHomeLabel, panel == Panel.HOME, activeColor, inactiveColor);
-        styleNavItem(findViewById(R.id.nav_results), navResultsIcon, navResultsLabel, panel == Panel.RESULTS,
-                activeColor, inactiveColor);
-        navResultsIcon.setEnabled(true);
-        navResultsLabel.setEnabled(true);
-        findViewById(R.id.nav_results).setEnabled(true);
-        styleNavItem(findViewById(R.id.nav_folder), navFolderIcon, navFolderLabel, false, activeColor, inactiveColor);
-        styleNavItem(findViewById(R.id.nav_about), navAboutIcon, navAboutLabel, false, activeColor, inactiveColor);
-    }
-
-    private void styleNavItem(View container, ImageView icon, TextView label, boolean active, int activeColor, int inactiveColor) {
-        int color = active ? activeColor : inactiveColor;
-        container.setBackgroundResource(active ? R.drawable.bg_nav_item_active : android.R.color.transparent);
-        icon.setColorFilter(color);
-        label.setTextColor(color);
+        AppBottomNavBinder.Tab tab;
+        if (panel == Panel.RESULTS || panel == Panel.SCAN) {
+            // Bottom "Scan" is the results destination; home CTAs start new scans.
+            tab = AppBottomNavBinder.Tab.SCAN;
+        } else {
+            tab = AppBottomNavBinder.Tab.HOME;
+        }
+        AppBottomNavBinder.bind(this, tab);
     }
 
     private void performLightHaptic(View view) {
