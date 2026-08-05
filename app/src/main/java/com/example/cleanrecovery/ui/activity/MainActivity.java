@@ -19,6 +19,7 @@ import com.example.cleanrecovery.ui.widget.AppBottomNavBinder;
 import com.example.cleanrecovery.ui.widget.ParticleScanView;
 import com.example.cleanrecovery.ui.widget.SystemUiHelper;
 import com.example.cleanrecovery.util.PathManager;
+import com.example.cleanrecovery.util.RootShell;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -85,6 +86,9 @@ public final class MainActivity extends Activity {
     private ImageView permissionBadgeIcon;
     private TextView lastScanSummary;
     private View recentScansEmpty;
+    private View recentScansContent;
+    private TextView lastScanWhen;
+    private TextView lastScanFoundCount;
     private ParticleScanView scanParticleView;
     private TextView scanPathToggle;
     private TextView scanCurrentPath;
@@ -273,6 +277,9 @@ public final class MainActivity extends Activity {
         permissionBadgeIcon = findViewById(R.id.permission_badge_icon);
         lastScanSummary = findViewById(R.id.last_scan_summary);
         recentScansEmpty = findViewById(R.id.recent_scans_empty);
+        recentScansContent = findViewById(R.id.recent_scans_content);
+        lastScanWhen = findViewById(R.id.last_scan_when);
+        lastScanFoundCount = findViewById(R.id.last_scan_found_count);
         scanParticleView = findViewById(R.id.scan_particle_view);
         resultsCount = findViewById(R.id.results_count);
         resultsSummaryScope = findViewById(R.id.results_summary_scope);
@@ -343,6 +350,8 @@ public final class MainActivity extends Activity {
         title.setText(type.labelResId);
         icon.setImageResource(iconResId);
         icon.setBackgroundTintList(android.content.res.ColorStateList.valueOf(resolveColorRes(accentColorRes)));
+        icon.setImageTintList(android.content.res.ColorStateList.valueOf(resolveColorRes(R.color.text_on_primary)));
+        card.setBackgroundResource(R.drawable.bg_category_card_surface);
         card.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -361,12 +370,11 @@ public final class MainActivity extends Activity {
             }
         };
         findViewById(R.id.scan_all_button).setOnClickListener(startScanAllClick);
-        findViewById(R.id.experimental_scan_button).setOnClickListener(startScanAllClick);
-        findViewById(R.id.scan_all_types_link).setOnClickListener(startScanAllClick);
-        findViewById(R.id.recent_scans_view_all).setOnClickListener(new View.OnClickListener() {
+        findViewById(R.id.experimental_scan_button).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                openResultsTab();
+                performLightHaptic(view);
+                showAlgorithmicRecoveryPicker();
             }
         });
         findViewById(R.id.recent_scans_card).setOnClickListener(new View.OnClickListener() {
@@ -415,7 +423,9 @@ public final class MainActivity extends Activity {
         });
         findViewById(R.id.recover_button).setOnClickListener(v -> recoverSelected());
         findViewById(R.id.rescan_button).setOnClickListener(v -> {
-            if (scanAllMode) {
+            if (experimentalMode && scanAllMode) {
+                startExperimentalScanAll();
+            } else if (scanAllMode) {
                 startScanAll();
             } else if (experimentalMode && currentScanType != null) {
                 startExperimentalScan(currentScanType);
@@ -439,19 +449,30 @@ public final class MainActivity extends Activity {
         if (recentScansEmpty != null) {
             recentScansEmpty.setVisibility(hasHistory ? View.GONE : View.VISIBLE);
         }
+        if (recentScansContent != null) {
+            recentScansContent.setVisibility(hasHistory ? View.VISIBLE : View.GONE);
+        }
         if (hasHistory) {
             CharSequence when = DateUtils.getRelativeTimeSpanString(
                     snapshot.lastScanTimeMs,
                     System.currentTimeMillis(),
                     DateUtils.MINUTE_IN_MILLIS
             );
-            lastScanSummary.setText(getString(
-                    R.string.last_scan_compact,
-                    when,
-                    snapshot.lastFoundCount
-            ));
-            lastScanSummary.setVisibility(View.VISIBLE);
-        } else {
+            if (lastScanWhen != null) {
+                lastScanWhen.setText(when);
+            }
+            if (lastScanFoundCount != null) {
+                lastScanFoundCount.setText(String.valueOf(snapshot.lastFoundCount));
+            }
+            if (lastScanSummary != null) {
+                lastScanSummary.setText(getString(
+                        R.string.last_scan_compact,
+                        when,
+                        snapshot.lastFoundCount
+                ));
+                lastScanSummary.setVisibility(View.GONE);
+            }
+        } else if (lastScanSummary != null) {
             lastScanSummary.setText(R.string.last_scan_empty);
             lastScanSummary.setVisibility(View.GONE);
         }
@@ -502,36 +523,76 @@ public final class MainActivity extends Activity {
         beginScan(false, true, type);
     }
 
-    private void showExperimentalTypePicker() {
+    private void startExperimentalScanAll() {
+        beginScan(true, true, null);
+    }
+
+    /** Entry for 「实现性算法恢复」: type picker → root gate → confirm → EXPERIMENTAL_ALL. */
+    private void showAlgorithmicRecoveryPicker() {
         final RecoveryType[] types = RecoveryType.scannableValues();
-        CharSequence[] labels = new CharSequence[types.length];
+        CharSequence[] labels = new CharSequence[types.length + 1];
+        labels[0] = getString(R.string.algorithmic_recovery_all_types);
         for (int i = 0; i < types.length; i++) {
-            labels[i] = getString(types[i].labelResId);
+            labels[i + 1] = getString(types[i].labelResId);
         }
         new AlertDialog.Builder(this)
-                .setTitle(R.string.experimental_scan_title)
+                .setTitle(R.string.algorithmic_recovery_title)
                 .setItems(labels, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        showExperimentalConfirmDialog(types[which]);
+                        if (which == 0) {
+                            gateAlgorithmicRecovery(null, true);
+                        } else {
+                            gateAlgorithmicRecovery(types[which - 1], false);
+                        }
                     }
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
     }
 
-    private void showExperimentalConfirmDialog(final RecoveryType type) {
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.experimental_scan_title)
-                .setMessage(R.string.experimental_scan_warning)
-                .setPositiveButton(R.string.experimental_scan_confirm, new DialogInterface.OnClickListener() {
+    private void gateAlgorithmicRecovery(final RecoveryType type, final boolean allTypes) {
+        // Root probe may open a localhost socket (emulator bridge) — never on UI thread.
+        Toast.makeText(this, R.string.algorithmic_recovery_checking_root, Toast.LENGTH_SHORT).show();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                RootShell.clearCache();
+                final boolean available = RootShell.isRootAvailable();
+                runOnUiThread(new Runnable() {
                     @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        startExperimentalScan(type);
+                    public void run() {
+                        if (isFinishing()) {
+                            return;
+                        }
+                        if (!available) {
+                            new AlertDialog.Builder(MainActivity.this)
+                                    .setTitle(R.string.algorithmic_recovery_title)
+                                    .setMessage(R.string.algorithmic_recovery_requires_root)
+                                    .setPositiveButton(android.R.string.ok, null)
+                                    .show();
+                            return;
+                        }
+                        new AlertDialog.Builder(MainActivity.this)
+                                .setTitle(R.string.algorithmic_recovery_title)
+                                .setMessage(R.string.algorithmic_recovery_warning)
+                                .setPositiveButton(R.string.experimental_scan_confirm,
+                                        new DialogInterface.OnClickListener() {
+                                            @Override
+                                            public void onClick(DialogInterface dialog, int which) {
+                                                if (allTypes) {
+                                                    startExperimentalScanAll();
+                                                } else {
+                                                    startExperimentalScan(type);
+                                                }
+                                            }
+                                        })
+                                .setNegativeButton(android.R.string.cancel, null)
+                                .show();
                     }
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+                });
+            }
+        }, "root-gate").start();
     }
 
     private void beginScan(boolean allTypes, boolean experimental, RecoveryType type) {
@@ -563,18 +624,18 @@ public final class MainActivity extends Activity {
         pathExpanded = false;
         if (experimental && type != null) {
             prepareExperimentalAlgorithmLog(type);
+        } else if (experimental && allTypes) {
+            prepareExperimentalAlgorithmLog(RecoveryType.IMAGE);
         } else {
             algorithmStepAdapter.setRows(new ArrayList<AlgorithmStepAdapter.Row>());
             runningAlgorithmId = null;
         }
-        if (allTypes) {
-        } else if (experimental) {
-        } else {
-        }
         showPanel(Panel.SCAN);
         progressHandler.removeCallbacks(progressTick);
         progressHandler.post(progressTick);
-        if (allTypes) {
+        if (experimental && allTypes) {
+            recoveryCoordinator.startExperimentalScanAll();
+        } else if (allTypes) {
             recoveryCoordinator.startScanAll();
         } else if (experimental) {
             recoveryCoordinator.startExperimentalScan(type);

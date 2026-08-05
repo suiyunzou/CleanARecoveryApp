@@ -2,7 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background_app"
+    android:background="@drawable/bg_home_gradient"
     android:fitsSystemWindows="true"
     android:orientation="vertical">
 
@@ -16,8 +16,9 @@
             android:id="@+id/home_panel"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:background="@drawable/bg_home_gradient"
             android:clipToPadding="false"
-            android:fillViewport="false">
+            android:fillViewport="true">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -26,101 +27,102 @@
                 android:paddingStart="@dimen/space_lg"
                 android:paddingTop="@dimen/space_md"
                 android:paddingEnd="@dimen/space_lg"
-                android:paddingBottom="@dimen/space_xl">
+                android:paddingBottom="@dimen/space_md">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                    android:orientation="vertical">
 
                     <LinearLayout
-                        android:layout_width="0dp"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:paddingEnd="@dimen/space_sm">
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
 
                         <TextView
-                            android:layout_width="match_parent"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:letterSpacing="-0.01"
+                            android:paddingEnd="@dimen/space_sm"
                             android:text="@string/home_title"
                             android:textColor="@color/text_primary"
-                            android:textSize="@dimen/text_title"
+                            android:textSize="26sp"
                             android:textStyle="bold" />
 
-                        <TextView
-                            android:layout_width="match_parent"
+                        <LinearLayout
+                            android:id="@+id/permission_banner"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:paddingTop="2dp"
-                            android:text="@string/home_subtitle"
-                            android:textColor="@color/text_muted"
-                            android:textSize="@dimen/text_caption" />
+                            android:background="@drawable/bg_permission_badge"
+                            android:clickable="true"
+                            android:focusable="true"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingStart="@dimen/space_md"
+                            android:paddingTop="5dp"
+                            android:paddingEnd="@dimen/space_md"
+                            android:paddingBottom="5dp">
+
+                            <ImageView
+                                android:id="@+id/permission_badge_icon"
+                                android:layout_width="14dp"
+                                android:layout_height="14dp"
+                                android:contentDescription="@null"
+                                android:importantForAccessibility="no"
+                                android:src="@drawable/ic_check_small" />
+
+                            <TextView
+                                android:id="@+id/permission_banner_title"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:paddingStart="4dp"
+                                android:text="@string/storage_permission_badge_on"
+                                android:textColor="@color/status_success"
+                                android:textSize="@dimen/text_micro"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/permission_banner_action"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/button_grant_access"
+                                android:visibility="gone" />
+                        </LinearLayout>
                     </LinearLayout>
 
-                    <LinearLayout
-                        android:id="@+id/permission_banner"
-                        android:layout_width="wrap_content"
+                    <TextView
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:background="@drawable/bg_permission_badge"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal"
-                        android:paddingStart="@dimen/space_md"
-                        android:paddingTop="@dimen/space_sm"
-                        android:paddingEnd="@dimen/space_md"
-                        android:paddingBottom="@dimen/space_sm">
-
-                        <ImageView
-                            android:id="@+id/permission_badge_icon"
-                            android:layout_width="14dp"
-                            android:layout_height="14dp"
-                            android:contentDescription="@null"
-                            android:importantForAccessibility="no"
-                            android:src="@drawable/ic_check_small" />
-
-                        <TextView
-                            android:id="@+id/permission_banner_title"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:paddingStart="4dp"
-                            android:text="@string/storage_permission_badge_on"
-                            android:textColor="@color/status_success"
-                            android:textSize="@dimen/text_micro"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/permission_banner_action"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="@string/button_grant_access"
-                            android:visibility="gone" />
-                    </LinearLayout>
+                        android:paddingTop="4dp"
+                        android:text="@string/home_subtitle"
+                        android:textColor="@color/text_hint"
+                        android:textSize="@dimen/text_caption" />
                 </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/experimental_scan_button"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_lg"
+                    android:layout_marginTop="@dimen/space_md"
                     android:background="@drawable/bg_quick_recovery_card"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center_vertical"
-                    android:minHeight="72dp"
+                    android:minHeight="48dp"
                     android:orientation="horizontal"
                     android:paddingStart="@dimen/space_md"
-                    android:paddingTop="@dimen/space_md"
+                    android:paddingTop="6dp"
                     android:paddingEnd="@dimen/space_md"
-                    android:paddingBottom="@dimen/space_md">
+                    android:paddingBottom="6dp">
 
                     <ImageView
-                        android:layout_width="44dp"
-                        android:layout_height="44dp"
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
                         android:background="@drawable/bg_icon_surface"
                         android:contentDescription="@string/quick_recovery_title"
-                        android:padding="8dp"
+                        android:padding="6dp"
                         android:src="@drawable/ic_experimental_recovery" />
 
                     <LinearLayout
@@ -135,24 +137,25 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:text="@string/quick_recovery_title"
-                            android:textColor="@color/text_primary"
-                            android:textSize="@dimen/text_section"
+                            android:textColor="@color/text_card_title"
+                            android:textSize="@dimen/text_body"
                             android:textStyle="bold" />
 
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:ellipsize="end"
-                            android:maxLines="2"
-                            android:paddingTop="2dp"
+                            android:maxLines="1"
+                            android:paddingTop="1dp"
                             android:text="@string/quick_recovery_hint"
-                            android:textColor="@color/text_secondary"
+                            android:textColor="@color/text_hint"
                             android:textSize="@dimen/text_caption" />
                     </LinearLayout>
 
                     <ImageView
-                        android:layout_width="18dp"
-                        android:layout_height="18dp"
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:alpha="0.45"
                         android:contentDescription="@null"
                         android:importantForAccessibility="no"
                         android:src="@drawable/ic_chevron_right" />
@@ -160,18 +163,22 @@
 
                 <LinearLayout
                     android:id="@+id/scan_all_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="52dp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="44dp"
+                    android:layout_gravity="center_horizontal"
                     android:layout_marginTop="@dimen/space_md"
-                    android:background="@drawable/bg_button_primary"
+                    android:background="@drawable/bg_button_start_scan"
                     android:clickable="true"
                     android:focusable="true"
                     android:gravity="center"
-                    android:orientation="horizontal">
+                    android:minWidth="156dp"
+                    android:orientation="horizontal"
+                    android:paddingStart="24dp"
+                    android:paddingEnd="24dp">
 
                     <ImageView
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
+                        android:layout_width="18dp"
+                        android:layout_height="18dp"
                         android:contentDescription="@null"
                         android:importantForAccessibility="no"
                         android:src="@drawable/ic_search_on_primary" />
@@ -189,156 +196,224 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_xl"
+                    android:layout_marginTop="@dimen/space_md"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
+
+                    <View
+                        android:layout_width="3dp"
+                        android:layout_height="12dp"
+                        android:background="@drawable/bg_section_accent_bar" />
 
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_sm"
                         android:layout_weight="1"
                         android:text="@string/scan_by_type_title"
-                        android:textColor="@color/text_primary"
+                        android:textColor="@color/text_card_title"
                         android:textSize="@dimen/text_body"
                         android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/scan_all_types_link"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:background="?android:attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:paddingStart="@dimen/space_sm"
-                        android:paddingTop="@dimen/space_xs"
-                        android:paddingEnd="0dp"
-                        android:paddingBottom="@dimen/space_xs"
-                        android:text="@string/scan_all_types_link"
-                        android:textColor="@color/text_muted"
-                        android:textSize="@dimen/text_caption" />
                 </LinearLayout>
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_sm"
-                    android:orientation="horizontal">
+                    android:orientation="vertical">
 
-                    <include
-                        android:id="@+id/card_images"
-                        layout="@layout/item_category_card"
-                        android:layout_width="0dp"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginEnd="@dimen/space_sm"
-                        android:layout_weight="1" />
+                        android:orientation="horizontal">
 
-                    <include
-                        android:id="@+id/card_videos"
-                        layout="@layout/item_category_card"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="@dimen/space_sm"
-                        android:layout_weight="1" />
+                        <include
+                            android:id="@+id/card_images"
+                            layout="@layout/item_category_card"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="@dimen/space_sm"
+                            android:layout_weight="1" />
 
-                    <include
-                        android:id="@+id/card_audio"
-                        layout="@layout/item_category_card"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="@dimen/space_sm"
-                        android:layout_weight="1" />
+                        <include
+                            android:id="@+id/card_videos"
+                            layout="@layout/item_category_card"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1" />
+                    </LinearLayout>
 
-                    <include
-                        android:id="@+id/card_documents"
-                        layout="@layout/item_category_card"
-                        android:layout_width="0dp"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1" />
+                        android:layout_marginTop="@dimen/space_xs"
+                        android:orientation="horizontal">
+
+                        <include
+                            android:id="@+id/card_audio"
+                            layout="@layout/item_category_card"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="@dimen/space_sm"
+                            android:layout_weight="1" />
+
+                        <include
+                            android:id="@+id/card_documents"
+                            layout="@layout/item_category_card"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1" />
+                    </LinearLayout>
                 </LinearLayout>
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_xl"
+                    android:layout_marginTop="@dimen/space_md"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
+
+                    <View
+                        android:layout_width="3dp"
+                        android:layout_height="12dp"
+                        android:background="@drawable/bg_section_accent_bar" />
 
                     <TextView
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_sm"
                         android:layout_weight="1"
                         android:text="@string/recent_scans_title"
-                        android:textColor="@color/text_primary"
+                        android:textColor="@color/text_card_title"
                         android:textSize="@dimen/text_body"
                         android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/recent_scans_view_all"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:background="?android:attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:focusable="true"
-                        android:paddingStart="@dimen/space_sm"
-                        android:paddingTop="@dimen/space_xs"
-                        android:paddingEnd="0dp"
-                        android:paddingBottom="@dimen/space_xs"
-                        android:text="@string/view_all_link"
-                        android:textColor="@color/text_muted"
-                        android:textSize="@dimen/text_caption" />
                 </LinearLayout>
 
                 <LinearLayout
                     android:id="@+id/recent_scans_card"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
+                    android:layout_height="0dp"
                     android:layout_marginTop="@dimen/space_sm"
+                    android:layout_weight="1"
                     android:background="@drawable/bg_recent_scan_card"
                     android:gravity="center"
-                    android:minHeight="160dp"
+                    android:minHeight="96dp"
                     android:orientation="vertical"
-                    android:padding="@dimen/space_lg">
+                    android:paddingStart="@dimen/space_md"
+                    android:paddingTop="@dimen/space_sm"
+                    android:paddingEnd="@dimen/space_md"
+                    android:paddingBottom="@dimen/space_sm">
 
                     <LinearLayout
                         android:id="@+id/recent_scans_empty"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:gravity="center"
-                        android:orientation="vertical">
+                        android:orientation="vertical"
+                        android:paddingTop="@dimen/space_xs"
+                        android:paddingBottom="@dimen/space_xs">
 
                         <ImageView
-                            android:layout_width="88dp"
-                            android:layout_height="88dp"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
                             android:contentDescription="@string/recent_scans_empty_title"
                             android:src="@drawable/ill_empty_folder" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:paddingTop="@dimen/space_sm"
+                            android:paddingTop="4dp"
                             android:text="@string/recent_scans_empty_title"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="@dimen/text_body"
+                            android:textColor="@color/text_card_title"
+                            android:textSize="@dimen/text_caption"
                             android:textStyle="bold" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:gravity="center"
-                            android:paddingTop="2dp"
+                            android:paddingTop="1dp"
                             android:text="@string/recent_scans_empty_hint"
-                            android:textColor="@color/text_muted"
-                            android:textSize="@dimen/text_caption" />
+                            android:textColor="@color/text_hint"
+                            android:textSize="@dimen/text_micro" />
                     </LinearLayout>
 
-                    <TextView
-                        android:id="@+id/last_scan_summary"
+                    <LinearLayout
+                        android:id="@+id/recent_scans_content"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:gravity="center"
-                        android:text="@string/last_scan_empty"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="@dimen/text_body"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:visibility="gone">
+
+                        <ImageView
+                            android:layout_width="36dp"
+                            android:layout_height="36dp"
+                            android:background="@drawable/bg_recent_scan_icon"
+                            android:contentDescription="@string/last_scan_title"
+                            android:padding="8dp"
+                            android:src="@drawable/ic_history"
+                            android:tint="@color/text_on_primary" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/space_md"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="@string/last_scan_title"
+                                android:textColor="@color/text_card_title"
+                                android:textSize="@dimen/text_body"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/last_scan_when"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:paddingTop="2dp"
+                                android:textColor="@color/text_muted"
+                                android:textSize="@dimen/text_caption" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/space_sm"
+                            android:background="@drawable/bg_recent_scan_stat"
+                            android:gravity="center"
+                            android:minWidth="64dp"
+                            android:orientation="vertical"
+                            android:paddingStart="@dimen/space_md"
+                            android:paddingTop="@dimen/space_sm"
+                            android:paddingEnd="@dimen/space_md"
+                            android:paddingBottom="@dimen/space_sm">
+
+                            <TextView
+                                android:id="@+id/last_scan_found_count"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textColor="@color/brand_primary"
+                                android:textSize="@dimen/text_section"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/last_scan_found_label"
+                                android:textColor="@color/text_hint"
+                                android:textSize="@dimen/text_micro" />
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- Kept for legacy id lookups; content is driven by recent_scans_content. -->
+                    <TextView
+                        android:id="@+id/last_scan_summary"
+                        android:layout_width="0dp"
+                        android:layout_height="0dp"
                         android:visibility="gone" />
                 </LinearLayout>
             </LinearLayout>
@@ -377,6 +452,7 @@
             android:id="@+id/results_panel"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:background="@color/background_app"
             android:orientation="vertical"
             android:visibility="gone">
 
