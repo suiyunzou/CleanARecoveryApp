@@ -5,29 +5,20 @@ import com.example.cleanrecovery.recovery.RecoveryOutputPaths;
 import com.example.cleanrecovery.ui.widget.SystemUiHelper;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.TextView;
 import com.example.cleanrecovery.ui.widget.GlassToast;
 
-import androidx.core.content.FileProvider;
 
 import com.example.cleanrecovery.music.ui.MusicHomeActivity;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 
 /**
  * 设置页（原型 A5）：扫描 / 恢复 / 工具 / 关于 四组。
@@ -49,24 +40,22 @@ public final class AboutActivity extends Activity {
         super.onCreate(savedInstanceState);
         SystemUiHelper.apply(this);
         setContentView(R.layout.activity_about);
-        findViewById(R.id.settings_update_row).setOnClickListener(v -> startActivity(new Intent(this, AppUpdateActivity.class)));
+        findViewById(R.id.settings_about_row).setOnClickListener(v -> startActivity(new Intent(this, AppAboutActivity.class)));
         com.example.cleanrecovery.ui.widget.AppBottomNavBinder.bind(this,
                 com.example.cleanrecovery.ui.widget.AppBottomNavBinder.Tab.SETTINGS);
         prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
 
         String version = "0.1.0";
-        int code = 0;
         try {
             PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), 0);
             if (info.versionName != null) {
                 version = info.versionName;
             }
-            code = info.versionCode;
         } catch (PackageManager.NameNotFoundException ignored) {
         }
         ((TextView) findViewById(R.id.about_version)).setText(
-                getString(R.string.about_version, version) + " (" + code + ")");
+                getString(R.string.about_version, version));
 
         scanModeValue = findViewById(R.id.settings_scan_mode_value);
         deepHintSwitch = findViewById(R.id.settings_deep_hint_switch);
@@ -106,9 +95,7 @@ public final class AboutActivity extends Activity {
         openDownload.setOnClickListener(view ->
                 startActivity(new Intent(AboutActivity.this, UniversalDownloadActivity.class)));
 
-        findViewById(R.id.settings_share_row).setOnClickListener(v -> shareApk());
-        findViewById(R.id.settings_privacy_row).setOnClickListener(v -> showPrivacyDialog());
-        findViewById(R.id.settings_license_row).setOnClickListener(v -> showLicenseDialog());
+
     }
 
     private void refreshValues() {
@@ -133,63 +120,8 @@ public final class AboutActivity extends Activity {
         GlassToast.makeText(this, R.string.settings_path_copied, GlassToast.LENGTH_SHORT).show();
     }
 
-    private void showPrivacyDialog() {
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.about_privacy_title)
-                .setMessage(getString(R.string.about_feature_1).trim() + "\n"
-                        + getString(R.string.about_feature_2).trim() + "\n"
-                        + getString(R.string.about_feature_3).trim())
-                .setPositiveButton(android.R.string.ok, null)
-                .show();
-    }
-
-    private void showLicenseDialog() {
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.settings_license)
-                .setMessage(R.string.settings_license_body)
-                .setPositiveButton(android.R.string.ok, null)
-                .show();
-    }
-
     private void toast(int resId) {
         GlassToast.makeText(this, resId, GlassToast.LENGTH_SHORT).show();
     }
 
-    private void shareApk() {
-        File apkFile = copyApkToCache();
-        if (apkFile == null) return;
-
-        Uri uri = FileProvider.getUriForFile(
-                this, getPackageName() + ".fileprovider", apkFile);
-        Intent intent = new Intent(Intent.ACTION_SEND);
-        intent.setType("application/vnd.android.package-archive");
-        intent.putExtra(Intent.EXTRA_STREAM, uri);
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(intent, getString(R.string.about_share)));
-    }
-
-    private File copyApkToCache() {
-        File cacheDir = new File(getCacheDir(), "share");
-        if (!cacheDir.exists()) cacheDir.mkdirs();
-        File outFile = new File(cacheDir, "QingxunRecovery.apk");
-
-        try {
-            InputStream in = new FileInputStream(getApplicationInfo().sourceDir);
-            try {
-                OutputStream out = new FileOutputStream(outFile);
-                try {
-                    byte[] buf = new byte[8192];
-                    int n;
-                    while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
-                } finally {
-                    out.close();
-                }
-            } finally {
-                in.close();
-            }
-            return outFile;
-        } catch (IOException e) {
-            return null;
-        }
-    }
 }

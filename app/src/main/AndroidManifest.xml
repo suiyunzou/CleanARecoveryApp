@@ -57,6 +57,7 @@
         <activity
             android:name=".ui.activity.OnboardingActivity"
             android:exported="false" />
+        <activity android:name=".ui.activity.AppAboutActivity" android:exported="false" />
         <activity
             android:name=".ui.activity.AboutActivity"
             android:exported="false" />
