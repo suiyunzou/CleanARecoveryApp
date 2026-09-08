@@ -14,6 +14,7 @@
 !/.github/workflows/
 /.github/workflows/*
 !/.github/workflows/android.yml
+!/.github/scripts/
 !/.githooks/
 /.githooks/*
 !/.githooks/post-commit

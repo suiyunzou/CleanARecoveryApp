@@ -83,7 +83,9 @@ sh gradlew :app:assembleRelease --console=plain
 
 ## 参与开发与发布
 
-请在开发分支提交修改，并通过 Pull Request 合入 `main`。
+日常开发使用 `codex/*` 分支。推送后自动构建和测试，成功后创建（或复用）Pull Request、合入 `main`，并自动启动新版发布，无需逐次点击 Compare、Create PR 和 Merge。
+
+如果 main 有新提交，流程会先同步开发分支并重新测试。构建失败、合并冲突、草稿 PR、要求修改的审查或未解决的审查讨论会停止自动合并，需处理问题后重新推送或重跑任务。旧提交的构建不会合并较新的未验证代码。其他分支及外部贡献者的 PR 仍按手动流程处理。
 
 - **开发分支**：推送后自动构建 Release APK 并运行测试，构建产物保留 14 天。
 - **Pull Request**：构建用于验证，不读取发布签名密钥，产物不作为用户更新包。
@@ -93,6 +95,10 @@ sh gradlew :app:assembleRelease --console=plain
 
 <details>
 <summary>维护者配置：签名、版本编号与自动推送</summary>
+
+首次启用自动 PR 需要在仓库 Settings → Actions → General 勾选 **Allow GitHub Actions to create and approve pull requests**。默认工作流权限仍可保持只读；仅自动集成任务声明写入代码、PR 和触发 Actions 所需的权限。脚本不会自动批准审查，也不会绕过仓库的合并规则。
+
+自动合并使用 GitHub 内置令牌，并显式触发 `main` 的 `workflow_dispatch` 发布任务，因此不需要额外存储个人访问令牌。关闭自动集成可移除 `.github/workflows/android.yml` 中的 `integrate` 任务。
 
 发布签名保存在仓库 Actions Secret `ANDROID_KEYSTORE_BASE64` 中，不应提交到源码。工作流会校验签名，缺少密钥或证书不匹配时不会发布。
 
