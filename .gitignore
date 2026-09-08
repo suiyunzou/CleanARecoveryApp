@@ -13,6 +13,9 @@
 !/.github/workflows/
 /.github/workflows/*
 !/.github/workflows/android.yml
+!/.githooks/
+/.githooks/*
+!/.githooks/post-commit
 !/gradle/
 /gradle/*
 !/gradle/wrapper/

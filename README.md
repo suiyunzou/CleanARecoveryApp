@@ -58,6 +58,15 @@ APK 位于 `app/build/outputs/apk/release/`。具体文件名及签名方式以�
 
 `.github/workflows/android.yml` 是必要的构建发布配置，纳入源码仓库。
 
-本开发工作区已配置本地 `post-commit` 钩子：成功执行 `git commit` 后推送当前分支到 `origin`。钩子留在 `.git/hooks/`，不上传；新克隆或其他电脑不会自动继承。离线、鉴权失败或远端有新提交时保留本地提交并明确报错，解决问题后执行 `git push`，不会强推。可用 `git config --local shu.autoPush false` 关闭，设为 `true` 恢复。
+仓库提供 `.githooks/post-commit`：成功执行 `git commit` 后推送当前分支到 `origin`。本工作区已启用。新电脑克隆后，在仓库目录执行一次：
+
+```sh
+git config --local core.hooksPath .githooks
+git config --local shu.autoPush true
+```
+
+Windows 安装 Git for Windows 即可执行该钩子，无需额外安装 Python。还需在新电脑登录 GitHub，确保有推送权限。Git 不会在克隆后自动启用仓库提供的钩子，因此这一步需要手动执行。GitHub 上的构建发布流程不受本地钩子是否启用影响，手动 `git push` 同样触发。
+
+离线、鉴权失败或远端有新提交时，钩子保留本地提交并明确报错，解决问题后执行 `git push`，不会强推。可用 `git config --local shu.autoPush false` 关闭，设为 `true` 恢复。变基过程和 detached HEAD 不自动推送。
 
 本地默认版本为 `0.1.2 (3)`。若设备已安装云端较高版本，本地覆盖验证需显式传入更高的 `-PreleaseVersionCode=<编号>`，不能卸载用户应用来绕过版本或签名问题。
