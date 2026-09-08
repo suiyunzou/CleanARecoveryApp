@@ -1,74 +1,112 @@
 # 枢（Shu）
 
-Android 多功能应用，包含文件扫描与恢复、文件浏览、音乐播放、视频下载、网页浏览和本地代理等功能。项目采用 Java 与 Gradle，应用模块为 `app`。
+枢是一款 Android 多功能应用，将网页浏览、文件管理、音乐播放、视频下载与本地代理集中在一起，方便在日常使用中切换。
 
-## 构建
+[下载最新版](https://github.com/suiyunzou/CleanARecoveryApp/releases/latest) · [查看版本记录](https://github.com/suiyunzou/CleanARecoveryApp/releases) · [反馈问题](https://github.com/suiyunzou/CleanARecoveryApp/issues)
 
-准备 JDK 17 和 Android SDK。SDK 平台版本以 `app/build.gradle` 的 `compileSdk` 为准，在本地 `local.properties` 中配置 SDK 路径（该文件不提交）：
+## 主要功能
+
+- **网页浏览**：书签与历史记录、脚本管理、主页定制、二维码扫描。
+- **文件管理**：浏览本地文件，扫描可恢复的文件。
+- **音乐与视频**：音乐播放、视频下载与播放。
+- **本地代理**：配置和使用代理服务。
+
+文件恢复能力受 Android 权限、存储加密及文件状态影响，无法保证找回已经彻底删除的数据。在线内容和代理连接需要相应服务可用。
+
+## 下载与安装
+
+1. 打开 [最新版本页面](https://github.com/suiyunzou/CleanARecoveryApp/releases/latest)。
+2. 在 **Assets（资源）** 中下载以 `.apk` 结尾的安装包，不要选择 Source code 压缩包。
+3. 打开 APK，按 Android 提示允许当前来源安装应用，并完成安装。
+
+项目最低支持 Android 6.0（实际功能可用性受系统版本和设备权限影响）。安装包名称为 `CleanARecovery-<版本编号>.apk`。
+
+### 更新应用
+
+在应用设置中选择 **检查更新**。发现新版后，可在应用内下载，或点击 **前往 GitHub 下载** 打开对应版本页面；尚未获取版本信息时，该按钮打开最新发布页。
+
+应用也会定期检查新版。下载完成后仍需在 Android 系统安装界面确认安装。如果检查或下载失败，可以直接访问上方的下载链接。更新时请使用同一发布渠道的安装包，通常无需卸载已有应用。
+
+## 问题反馈
+
+请在 [Issues](https://github.com/suiyunzou/CleanARecoveryApp/issues) 中描述问题，并尽量提供：
+
+- 应用版本、手机型号和 Android 版本。
+- 出现问题的操作步骤，以及预期与实际表现。
+- 有助于定位的截图或录屏；提交前请遮挡账号、令牌等个人信息。
+
+## 从源码构建
+
+开发环境需要 **JDK 17** 和 **Android SDK 35**。克隆仓库后，在本地 `local.properties` 中配置 SDK 路径，例如：
 
 ```properties
 sdk.dir=D:/Android/SDK
 ```
 
-Windows PowerShell：
+构建 Release APK：
 
 ```powershell
+# Windows PowerShell
 .\gradlew.bat :app:assembleRelease --console=plain
 ```
 
-Linux / macOS：
-
 ```sh
+# Linux / macOS
 sh gradlew :app:assembleRelease --console=plain
 ```
 
-APK 位于 `app/build/outputs/apk/release/`。具体文件名及签名方式以所选分支的构建配置为准；Release 构建类型不代表已使用正式发布证书。发布新版本时需保持应用 ID 和签名一致，并增加 `versionCode`。
+输出文件为 `app/build/outputs/apk/release/app-release.apk`。
 
-如本机 JVM 出现 G1 启动或内存错误，可附加以下构建参数：
+当前构建沿用 Android Debug 证书签署 Release 包，以保持现有安装的更新兼容性。Release 是构建类型，并不代表使用了正式发布证书。本地默认读取 `~/.android/debug.keystore`，也可以通过 `RELEASE_KEYSTORE_PATH` 指定兼容密钥；构建前需确保密钥存在。自行构建时，不同签名的 APK 无法直接覆盖官方发布包。
 
-```text
---no-daemon --max-workers=2 -Dorg.gradle.jvmargs="-Xmx2048m -XX:+UseSerialGC -Dfile.encoding=UTF-8"
+本地默认版本为 `0.1.2 (3)`。需要覆盖已安装的云端版本时，使用 `-PreleaseVersionCode=<更高编号>` 指定版本编号，并保持应用 ID 和签名一致。
+
+### 测试
+
+运行与持续集成相同的单元测试：
+
+```powershell
+.\gradlew.bat :app:testReleaseUnitTest -PexternalServiceTests=false --console=plain
 ```
 
-## 源码结构
+将 `externalServiceTests` 设为 `true` 可额外运行依赖第三方服务的联网检查。这些检查可能受登录状态、地区限制或网络延迟影响。
 
-- `app/src/main/`：应用代码、界面资源、清单与运行时依赖资源。
-- `app/src/test/`：本地单元测试。
-- `app/src/androidTest/`：设备测试与测试夹具。
-- `app/build.gradle`：应用构建配置。
-- `gradle/wrapper/`：Gradle Wrapper。
+### 代码结构
 
-## 使用说明
+| 路径 | 内容 |
+| --- | --- |
+| `app/src/main/` | 应用代码与资源 |
+| `app/src/test/` | 本地单元测试 |
+| `app/src/androidTest/` | Android 设备测试 |
+| `app/build.gradle` | 应用构建配置 |
+| `.github/workflows/android.yml` | 持续集成与发布流程 |
 
-文件扫描与恢复受系统权限、存储加密及文件是否仍存在影响，无法保证找回已彻底删除的数据。网络、音乐和代理功能需要相应服务可用，部分操作需要用户授予权限。
+## 参与开发与发布
 
-## 仓库范围
+请在开发分支提交修改，并通过 Pull Request 合入 `main`。
 
-仓库仅维护应用源码、必要资源、测试、构建文件和本 README。开发笔记、参考工程、个人工具配置、测试输出及 APK 保留在本地，不纳入 Git 跟踪。
+- **开发分支**：推送后自动构建 Release APK 并运行测试，构建产物保留 14 天。
+- **Pull Request**：构建用于验证，不读取发布签名密钥，产物不作为用户更新包。
+- **main**：构建和测试成功后发布 GitHub Release，包含 APK、SHA-256 校验文件及应用更新清单。
 
-## 提交、构建与发布
+给用户安装的版本以 [Releases](https://github.com/suiyunzou/CleanARecoveryApp/releases) 为准。
 
-- 开发分支推送后，GitHub Actions 自动构建 **Release APK** 并运行单元测试；构建产物保留 14 天，不发布给普通用户。
-- 云端使用 `-PexternalServiceTests=false`，仅排除 `LiveExtractorJvmTest` 的第三方实链检查和 `LoggedInIntegrationTest.testResolveDownloadUrlResponseTime` 的公网耗时断言。其余测试仍必须通过，JUnit 报告随运行保存。手动执行 `:app:testReleaseUnitTest -PexternalServiceTests=true` 可包含这些联网验收；第三方登录、地区限制及网络延迟可能影响结果。
-- 通过 Pull Request 将改动合入 `main` 后，构建成功才创建公开 GitHub Release，附带 APK、SHA-256 校验文件和 `update.json` 更新清单。
-- 应用的“检查更新”从 GitHub 获取新版，用户确认后下载并调用 Android 系统安装界面。系统安装仍需用户确认。
-- 更新页始终提供“前往 GitHub 下载”：已识别新版时打开对应版本的发布页，否则打开最新发布页；检查或应用内下载失败后仍可使用此入口。
-- 云端 `versionCode` 为 `100000 + GITHUB_RUN_NUMBER`，版本名为 `0.1.2.<运行序号>`，无需为每次构建提交版本号变更。保留工作流文件名称及运行序号；迁移工作流时必须保证新编号高于所有已发布版本。
-- APK 固定命名为 `CleanARecovery-<versionCode>.apk`。同一次运行重试不会覆盖已公开的安装包。
-- 签名材料存储于仓库 Actions Secret `ANDROID_KEYSTORE_BASE64`，不能提交到代码仓库。当前沿用已有 Android Debug 证书以兼容已安装用户，并非新生成的正式证书。缺少签名或证书不匹配时禁止发布。
-- Pull Request 构建不读取签名密钥，产物仅用于检查；同仓库分支 push 构建沿用现有签名。给用户安装的版本以 Releases 页面为准。
+<details>
+<summary>维护者配置：签名、版本编号与自动推送</summary>
 
-`.github/workflows/android.yml` 是必要的构建发布配置，纳入源码仓库。
+发布签名保存在仓库 Actions Secret `ANDROID_KEYSTORE_BASE64` 中，不应提交到源码。工作流会校验签名，缺少密钥或证书不匹配时不会发布。
 
-仓库提供 `.githooks/post-commit`：成功执行 `git commit` 后推送当前分支到 `origin`。本工作区已启用。新电脑克隆后，在仓库目录执行一次：
+云端版本编号为 `100000 + GITHUB_RUN_NUMBER`，版本名为 `0.1.2.<运行序号>`。迁移工作流时，必须保证新版本编号高于所有已发布版本；同一次运行重试不会覆盖已公开的安装包。
+
+仓库提供可选的提交后自动推送钩子。新电脑克隆后，确认已具备 GitHub 推送权限，再在仓库目录执行：
 
 ```sh
 git config --local core.hooksPath .githooks
 git config --local shu.autoPush true
 ```
 
-Windows 安装 Git for Windows 即可执行该钩子，无需额外安装 Python。还需在新电脑登录 GitHub，确保有推送权限。Git 不会在克隆后自动启用仓库提供的钩子，因此这一步需要手动执行。GitHub 上的构建发布流程不受本地钩子是否启用影响，手动 `git push` 同样触发。
+Windows 使用 Git for Windows 即可。启用后，提交会自动推送当前分支到 `origin`；失败时保留本地提交，解决网络、权限或分支问题后可手动执行 `git push`。钩子不会强推，变基过程中及 detached HEAD 状态下不自动推送。
 
-离线、鉴权失败或远端有新提交时，钩子保留本地提交并明确报错，解决问题后执行 `git push`，不会强推。可用 `git config --local shu.autoPush false` 关闭，设为 `true` 恢复。变基过程和 detached HEAD 不自动推送。
+使用 `git config --local shu.autoPush false` 可关闭自动推送。无论是否启用钩子，手动推送都会触发 GitHub 上的构建流程。
 
-本地默认版本为 `0.1.2 (3)`。若设备已安装云端较高版本，本地覆盖验证需显式传入更高的 `-PreleaseVersionCode=<编号>`，不能卸载用户应用来绕过版本或签名问题。
+</details>
