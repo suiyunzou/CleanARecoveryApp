@@ -49,6 +49,7 @@ APK 位于 `app/build/outputs/apk/release/`。具体文件名及签名方式以�
 ## 提交、构建与发布
 
 - 开发分支推送后，GitHub Actions 自动构建 **Release APK** 并运行单元测试；构建产物保留 14 天，不发布给普通用户。
+- 云端使用 `-PexternalServiceTests=false`，仅排除 `LiveExtractorJvmTest` 的第三方实链检查和 `LoggedInIntegrationTest.testResolveDownloadUrlResponseTime` 的公网耗时断言。其余测试仍必须通过，JUnit 报告随运行保存。手动执行 `:app:testReleaseUnitTest -PexternalServiceTests=true` 可包含这些联网验收；第三方登录、地区限制及网络延迟可能影响结果。
 - 通过 Pull Request 将改动合入 `main` 后，构建成功才创建公开 GitHub Release，附带 APK、SHA-256 校验文件和 `update.json` 更新清单。
 - 应用的“检查更新”从 GitHub 获取新版，用户确认后下载并调用 Android 系统安装界面。系统安装仍需用户确认。
 - 云端 `versionCode` 为 `100000 + GITHUB_RUN_NUMBER`，版本名为 `0.1.2.<运行序号>`，无需为每次构建提交版本号变更。保留工作流文件名称及运行序号；迁移工作流时必须保证新编号高于所有已发布版本。

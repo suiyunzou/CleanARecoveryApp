@@ -86,6 +86,17 @@ dependencies {
     androidTestImplementation "androidx.test:rules:1.5.0"
 }
 
+// Live third-party services have region, login and latency constraints. Keep them
+// available locally, but exclude only these external checks from the CI gate.
+tasks.withType(Test).configureEach {
+    if (providers.gradleProperty("externalServiceTests").getOrElse("true") == "false") {
+        filter {
+            excludeTestsMatching "com.example.cleanrecovery.extractor.LiveExtractorJvmTest"
+            excludeTestsMatching "com.example.cleanrecovery.music.api.LoggedInIntegrationTest.testResolveDownloadUrlResponseTime"
+        }
+    }
+}
+
 /**
  * 真实数据测试任务：在电脑端 JVM 直接运行酷狗 API 真实数据测试。
  *
