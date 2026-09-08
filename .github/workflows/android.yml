@@ -24,6 +24,8 @@ jobs:
       name: ${{ steps.version.outputs.name }}
     steps:
       - uses: actions/checkout@v4
+      - name: Test automatic integration guards
+        run: node --test .github/scripts/auto-integrate.test.cjs
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -95,6 +97,31 @@ jobs:
       - name: Remove signing key
         if: always()
         run: rm -f "$HOME/.android/debug.keystore"
+
+  integrate:
+    name: Create PR and merge tested changes
+    needs: build
+    if: >-
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      startsWith(github.ref, 'refs/heads/codex/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: auto-integrate-main
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const integrate = require('./.github/scripts/auto-integrate.cjs');
+            await integrate({ github, context, core });
 
   publish:
     name: Publish GitHub Release
