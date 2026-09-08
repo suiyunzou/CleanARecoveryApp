@@ -8,7 +8,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.widget.ImageButton;
 import android.widget.TextView;
-import android.widget.Toast;
+import com.example.cleanrecovery.ui.widget.GlassToast;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -44,7 +44,7 @@ public final class TextViewerActivity extends Activity {
 
         File file = new File(path);
         if (!file.exists() || !file.canRead()) {
-            Toast.makeText(this, R.string.preview_missing, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.preview_missing, GlassToast.LENGTH_SHORT).show();
             finish();
             return;
         }
@@ -52,7 +52,7 @@ public final class TextViewerActivity extends Activity {
         try {
             content.setText(readPreview(file));
         } catch (Exception exception) {
-            Toast.makeText(this, R.string.text_viewer_read_error, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.text_viewer_read_error, GlassToast.LENGTH_SHORT).show();
             finish();
         }
     }

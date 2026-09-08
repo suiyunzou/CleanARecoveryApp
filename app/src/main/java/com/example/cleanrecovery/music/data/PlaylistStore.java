@@ -235,6 +235,21 @@ public class PlaylistStore extends SQLiteOpenHelper {
         return list;
     }
 
+    /**
+     * 队列/会话恢复的歌曲回查 VIP 权益：hash 精确命中，或 标题+歌手 一致即算。
+     * 队列条目可能来自下载目录扫描（无 VIP 元数据），按歌单库补齐（图2 口径）。
+     */
+    public boolean isVipAnywhere(String hash, String title, String artist) {
+        if (title == null || title.isEmpty()) return false;
+        try (Cursor c = getReadableDatabase().rawQuery(
+                "SELECT 1 FROM songs WHERE vip_required=1 AND ("
+                        + "(hash IS NOT NULL AND hash<>'' AND hash=?) "
+                        + "OR (title=? AND artist IS ?)) LIMIT 1",
+                new String[]{hash == null ? "" : hash, title, artist})) {
+            return c.moveToFirst();
+        }
+    }
+
     public int songCount(String playlistName) {
         long pid = playlistId(playlistName);
         if (pid < 0) return 0;

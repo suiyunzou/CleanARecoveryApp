@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 歌单「播放全部」小胶囊（酷狗概念版：仅播放三角，歌曲数在胶囊外） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/queue_playing_accent" />
+    <corners android:radius="14dp" />
+</shape>

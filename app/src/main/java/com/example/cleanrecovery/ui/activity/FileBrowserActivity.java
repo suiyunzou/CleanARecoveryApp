@@ -5,6 +5,7 @@ import com.example.cleanrecovery.recovery.RecoveryOutputPaths;
 import com.example.cleanrecovery.recovery.RecoveryType;
 import com.example.cleanrecovery.recycle.RecycleBin;
 import com.example.cleanrecovery.ui.adapter.FileBrowserAdapter;
+import com.example.cleanrecovery.ui.widget.AppBottomNavBinder;
 import com.example.cleanrecovery.ui.widget.FileBrowserMime;
 import com.example.cleanrecovery.ui.widget.SystemUiHelper;
 
@@ -43,7 +44,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.TextView;
-import android.widget.Toast;
+import com.example.cleanrecovery.ui.widget.GlassToast;
 
 import androidx.appcompat.widget.SearchView;
 import androidx.core.content.FileProvider;
@@ -56,6 +57,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashSet;
@@ -86,7 +88,6 @@ public final class FileBrowserActivity extends Activity {
     private String filterQuery = "";
     private File suggestedDownloadDir;
     private boolean staticDownloadHintDismissed;
-    private boolean downloadHintCopyCollapsed;
     private String pendingLocatePath;
 
     private RecyclerView listView;
@@ -114,7 +115,8 @@ public final class FileBrowserActivity extends Activity {
     private final Runnable hideDownloadHintRunnable = new Runnable() {
         @Override
         public void run() {
-            collapseDownloadHintCopy();
+            // 展示 5 秒后整条收起，不再残留塌缩芯片；入口保留在右上角菜单「查看最近下载」
+            dismissDownloadHint();
         }
     };
     private View undoSnackbarView;
@@ -124,6 +126,7 @@ public final class FileBrowserActivity extends Activity {
         super.onCreate(savedInstanceState);
         SystemUiHelper.apply(this);
         setContentView(R.layout.activity_file_browser);
+        AppBottomNavBinder.bind(this, AppBottomNavBinder.Tab.FOLDER);
 
         toolbar = findViewById(R.id.file_browser_toolbar);
         multiSelectBar = findViewById(R.id.file_browser_multiselect_bar);
@@ -186,7 +189,6 @@ public final class FileBrowserActivity extends Activity {
         downloadHintClose.setOnClickListener(v -> dismissDownloadHint());
 
         moreButton = findViewById(R.id.file_browser_more);
-        findViewById(R.id.file_browser_back).setOnClickListener(v -> finish());
         moreButton.setOnClickListener(this::showToolbarMenu);
         findViewById(R.id.file_browser_batch_delete).setOnClickListener(v -> confirmBatchDelete());
         findViewById(R.id.file_browser_cancel_select).setOnClickListener(v -> exitMultiSelectMode());
@@ -210,7 +212,7 @@ public final class FileBrowserActivity extends Activity {
         searchInput.setQueryHint(getString(R.string.file_browser_search_hint));
         searchInput.setMaxWidth(Integer.MAX_VALUE);
 
-        SearchView.SearchAutoComplete searchText =
+        EditText searchText =
                 searchInput.findViewById(androidx.appcompat.R.id.search_src_text);
         if (searchText != null) {
             searchText.setTextColor(getColorCompat(R.color.text_primary));
@@ -247,7 +249,7 @@ public final class FileBrowserActivity extends Activity {
             @Override
             public void run() {
                 searchInput.requestFocus();
-                SearchView.SearchAutoComplete searchText =
+                EditText searchText =
                         searchInput.findViewById(androidx.appcompat.R.id.search_src_text);
                 View focusTarget = searchInput;
                 if (searchText != null) {
@@ -301,6 +303,13 @@ public final class FileBrowserActivity extends Activity {
             return;
         }
         super.onBackPressed();
+        overridePendingTransition(0, 0);
+    }
+
+    @Override
+    public void finish() {
+        super.finish();
+        overridePendingTransition(0, 0);
     }
 
     public static void open(Activity activity, File directory) {
@@ -335,7 +344,7 @@ public final class FileBrowserActivity extends Activity {
 
     private void openDirectory(File directory) {
         if (directory == null || !directory.isDirectory() || !isAccessible(directory)) {
-            Toast.makeText(this, R.string.file_browser_unreadable, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_unreadable, GlassToast.LENGTH_SHORT).show();
             return;
         }
         exitMultiSelectMode();
@@ -404,35 +413,24 @@ public final class FileBrowserActivity extends Activity {
             return;
         }
         renderDownloadHintPanel();
-        if (!wasVisible && !downloadHintCopyCollapsed) {
+        if (!wasVisible) {
             downloadHintHandler.removeCallbacks(hideDownloadHintRunnable);
             downloadHintHandler.postDelayed(hideDownloadHintRunnable, DOWNLOAD_HINT_VISIBLE_MS);
         }
     }
 
     private void renderDownloadHintPanel() {
-        boolean expanded = !downloadHintCopyCollapsed;
         if (downloadHintCopy != null) {
-            downloadHintCopy.setVisibility(expanded ? View.VISIBLE : View.GONE);
+            downloadHintCopy.setVisibility(View.VISIBLE);
         }
-        downloadHintClose.setVisibility(expanded ? View.VISIBLE : View.GONE);
-        if (expanded) {
-            downloadHintTitle.setText(R.string.file_browser_download_hint_title);
-            downloadHintMessage.setText(getString(
-                    R.string.file_browser_download_hint_message,
-                    displayDownloadPath(suggestedDownloadDir)
-            ));
-        }
+        downloadHintClose.setVisibility(View.VISIBLE);
+        downloadHintTitle.setText(R.string.file_browser_download_hint_title);
+        downloadHintMessage.setText(R.string.file_browser_download_hint_message);
         downloadHintAction.setText(R.string.file_browser_recent_downloads_action);
     }
 
-    private void collapseDownloadHintCopy() {
-        downloadHintCopyCollapsed = true;
-        renderDownloadHintPanel();
-    }
-
     private void showRecentDownloads() {
-        Toast.makeText(this, R.string.file_browser_recent_downloads_scanning, Toast.LENGTH_SHORT).show();
+        GlassToast.makeText(this, R.string.file_browser_recent_downloads_scanning, GlassToast.LENGTH_SHORT).show();
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -497,7 +495,7 @@ public final class FileBrowserActivity extends Activity {
             scanRecentDownloadFiles(root, 0, cutoff, visitedDirs, emittedFiles, results, scannedFiles);
         }
 
-        results.sort(new Comparator<RecentDownloadCandidate>() {
+        Collections.sort(results, new Comparator<RecentDownloadCandidate>() {
             @Override
             public int compare(RecentDownloadCandidate left, RecentDownloadCandidate right) {
                 return Long.compare(right.lastModified, left.lastModified);
@@ -723,7 +721,7 @@ public final class FileBrowserActivity extends Activity {
             openDirectory(suggestedDownloadDir);
             return;
         }
-        Toast.makeText(this, R.string.file_browser_download_hint_missing, Toast.LENGTH_SHORT).show();
+        GlassToast.makeText(this, R.string.file_browser_download_hint_missing, GlassToast.LENGTH_SHORT).show();
     }
 
     private void dismissDownloadHint() {
@@ -748,7 +746,7 @@ public final class FileBrowserActivity extends Activity {
     private void openDirectoryAndLocate(File file) {
         File parent = file == null ? null : file.getParentFile();
         if (parent == null || !parent.isDirectory() || !isAccessible(parent)) {
-            Toast.makeText(this, R.string.file_browser_download_hint_missing, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_download_hint_missing, GlassToast.LENGTH_SHORT).show();
             return;
         }
         pendingLocatePath = canonicalPath(file);
@@ -807,7 +805,7 @@ public final class FileBrowserActivity extends Activity {
     }
 
     private void sortEntries(List<FileEntry> target) {
-        target.sort(new Comparator<FileEntry>() {
+        Collections.sort(target, new Comparator<FileEntry>() {
             @Override
             public int compare(FileEntry left, FileEntry right) {
                 if (left.directory != right.directory) {
@@ -1048,7 +1046,7 @@ public final class FileBrowserActivity extends Activity {
 
     private void enterMultiSelectMode() {
         if (!canWriteInCurrentDir()) {
-            Toast.makeText(this, R.string.file_browser_not_writable, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_not_writable, GlassToast.LENGTH_SHORT).show();
             return;
         }
         closeSearch(false);
@@ -1128,7 +1126,7 @@ public final class FileBrowserActivity extends Activity {
         exitMultiSelectMode();
         reloadEntries();
         if (moved[0] == 0) {
-            Toast.makeText(this, R.string.file_browser_recycle_bin_move_failed, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_recycle_bin_move_failed, GlassToast.LENGTH_SHORT).show();
         } else if (total[0] > 0) {
             // 文件管理 V2：批量删除也支持 Snackbar 撤销
             showUndoSnackbar(getString(R.string.file_browser_snackbar_deleted),
@@ -1172,7 +1170,7 @@ public final class FileBrowserActivity extends Activity {
             }
         }
         if (uris.isEmpty()) {
-            Toast.makeText(this, R.string.file_browser_share, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_share, GlassToast.LENGTH_SHORT).show();
             return;
         }
         launchShareIntent(uris);
@@ -1187,7 +1185,7 @@ public final class FileBrowserActivity extends Activity {
         try {
             startActivity(Intent.createChooser(intent, getString(R.string.file_browser_share)));
         } catch (ActivityNotFoundException e) {
-            Toast.makeText(this, R.string.file_browser_share, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_share, GlassToast.LENGTH_SHORT).show();
         }
     }
 
@@ -1203,7 +1201,7 @@ public final class FileBrowserActivity extends Activity {
         // 列出当前根下所有可写子目录作为候选目标
         final List<File> candidates = listMoveDestinations();
         if (candidates.isEmpty()) {
-            Toast.makeText(this, R.string.file_browser_move_failed, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_move_failed, GlassToast.LENGTH_SHORT).show();
             return;
         }
         final String[] names = new String[candidates.size()];
@@ -1234,7 +1232,7 @@ public final class FileBrowserActivity extends Activity {
         }
         final List<File> candidates = listMoveDestinations();
         if (candidates.isEmpty()) {
-            Toast.makeText(this, R.string.file_browser_copy_failed, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_copy_failed, GlassToast.LENGTH_SHORT).show();
             return;
         }
         final String[] names = new String[candidates.size()];
@@ -1279,7 +1277,7 @@ public final class FileBrowserActivity extends Activity {
     /** 执行批量移动，完成后显示 Snackbar 撤销 */
     private void performBatchMove(Set<String> selectedPaths, final File dest) {
         if (dest.equals(currentDir)) {
-            Toast.makeText(this, R.string.file_browser_move_same_dir, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_move_same_dir, GlassToast.LENGTH_SHORT).show();
             return;
         }
         final List<String[]> moved = new ArrayList<>(); // {src, dest}
@@ -1297,7 +1295,7 @@ public final class FileBrowserActivity extends Activity {
         exitMultiSelectMode();
         reloadEntries();
         if (moved.isEmpty()) {
-            Toast.makeText(this, R.string.file_browser_move_failed, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_move_failed, GlassToast.LENGTH_SHORT).show();
         } else {
             showUndoSnackbar(getString(R.string.file_browser_snackbar_moved, dest.getName()),
                     R.string.file_browser_undo, () -> {
@@ -1314,7 +1312,7 @@ public final class FileBrowserActivity extends Activity {
     /** 执行批量复制，完成后显示 Snackbar */
     private void performBatchCopy(Set<String> selectedPaths, final File dest) {
         if (dest.equals(currentDir)) {
-            Toast.makeText(this, R.string.file_browser_move_same_dir, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_move_same_dir, GlassToast.LENGTH_SHORT).show();
             return;
         }
         final List<String> copied = new ArrayList<>();
@@ -1335,7 +1333,7 @@ public final class FileBrowserActivity extends Activity {
         exitMultiSelectMode();
         reloadEntries();
         if (copied.isEmpty()) {
-            Toast.makeText(this, R.string.file_browser_copy_failed, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_copy_failed, GlassToast.LENGTH_SHORT).show();
         } else {
             showUndoSnackbar(getString(R.string.file_browser_snackbar_copied, dest.getName()),
                     R.string.file_browser_undo, () -> {
@@ -1414,10 +1412,10 @@ public final class FileBrowserActivity extends Activity {
                                 try {
                                     startActivity(settings);
                                 } catch (ActivityNotFoundException ignored) {
-                                    Toast.makeText(
+                                    GlassToast.makeText(
                                             FileBrowserActivity.this,
                                             R.string.file_browser_apk_install_blocked_message,
-                                            Toast.LENGTH_LONG
+                                            GlassToast.LENGTH_LONG
                                     ).show();
                                 }
                             }
@@ -1521,7 +1519,7 @@ public final class FileBrowserActivity extends Activity {
 
     private void showCreateFolderDialog() {
         if (!canWriteInCurrentDir()) {
-            Toast.makeText(this, R.string.file_browser_not_writable, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_not_writable, GlassToast.LENGTH_SHORT).show();
             return;
         }
         final EditText input = new EditText(this);
@@ -1545,23 +1543,23 @@ public final class FileBrowserActivity extends Activity {
 
     private void createFolder(String rawName) {
         if (currentDir == null || !canWriteInCurrentDir()) {
-            Toast.makeText(this, R.string.file_browser_not_writable, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_not_writable, GlassToast.LENGTH_SHORT).show();
             return;
         }
         String name = rawName == null ? "" : rawName.trim();
         if (!FileBrowserMime.isValidName(name)) {
-            Toast.makeText(this, R.string.file_browser_invalid_name, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_invalid_name, GlassToast.LENGTH_SHORT).show();
             return;
         }
         File target = new File(currentDir, name);
         if (target.exists()) {
-            Toast.makeText(this, R.string.file_browser_name_exists, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_name_exists, GlassToast.LENGTH_SHORT).show();
             return;
         }
         if (target.mkdir()) {
             reloadEntries();
         } else {
-            Toast.makeText(this, R.string.file_browser_create_failed, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_create_failed, GlassToast.LENGTH_SHORT).show();
         }
     }
 
@@ -1654,29 +1652,29 @@ public final class FileBrowserActivity extends Activity {
 
     private void renameEntry(FileEntry entry, String rawName) {
         if (!canModify(entry.file)) {
-            Toast.makeText(this, R.string.file_browser_not_writable, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_not_writable, GlassToast.LENGTH_SHORT).show();
             return;
         }
         String name = rawName == null ? "" : rawName.trim();
         if (!FileBrowserMime.isValidName(name)) {
-            Toast.makeText(this, R.string.file_browser_invalid_name, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_invalid_name, GlassToast.LENGTH_SHORT).show();
             return;
         }
         File target = new File(entry.file.getParentFile(), name);
         if (target.exists()) {
-            Toast.makeText(this, R.string.file_browser_name_exists, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_name_exists, GlassToast.LENGTH_SHORT).show();
             return;
         }
         if (entry.file.renameTo(target)) {
             reloadEntries();
         } else {
-            Toast.makeText(this, R.string.file_browser_rename_failed, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_rename_failed, GlassToast.LENGTH_SHORT).show();
         }
     }
 
     private void confirmDelete(final FileEntry entry) {
         if (entry.directory && !isDirectoryEmpty(entry.file)) {
-            Toast.makeText(this, R.string.file_browser_delete_not_empty, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_delete_not_empty, GlassToast.LENGTH_SHORT).show();
             return;
         }
         new AlertDialog.Builder(this)
@@ -1694,7 +1692,7 @@ public final class FileBrowserActivity extends Activity {
 
     private void deleteEntry(FileEntry entry) {
         if (!canModify(entry.file)) {
-            Toast.makeText(this, R.string.file_browser_not_writable, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_not_writable, GlassToast.LENGTH_SHORT).show();
             return;
         }
         // 空目录直接删除；非空目录不允许删除；文件进回收站
@@ -1703,7 +1701,7 @@ public final class FileBrowserActivity extends Activity {
             if (deleted) {
                 reloadEntries();
             } else {
-                Toast.makeText(this, R.string.file_browser_delete_failed, Toast.LENGTH_SHORT).show();
+                GlassToast.makeText(this, R.string.file_browser_delete_failed, GlassToast.LENGTH_SHORT).show();
             }
             return;
         }
@@ -1715,10 +1713,10 @@ public final class FileBrowserActivity extends Activity {
                 showUndoSnackbar(getString(R.string.file_browser_snackbar_deleted),
                         R.string.file_browser_undo, () -> restoreFromTrash(bin, entry.file.getName()));
             } else {
-                Toast.makeText(this, R.string.file_browser_recycle_bin_move_failed, Toast.LENGTH_SHORT).show();
+                GlassToast.makeText(this, R.string.file_browser_recycle_bin_move_failed, GlassToast.LENGTH_SHORT).show();
             }
         } catch (IOException e) {
-            Toast.makeText(this, R.string.file_browser_recycle_bin_move_failed, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_recycle_bin_move_failed, GlassToast.LENGTH_SHORT).show();
         }
     }
 
@@ -1726,7 +1724,7 @@ public final class FileBrowserActivity extends Activity {
     private void showUndoSnackbar(String message, int actionLabel, final Runnable undoAction) {
         FrameLayout root = findViewById(android.R.id.content);
         if (root == null) {
-            Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, message, GlassToast.LENGTH_SHORT).show();
             return;
         }
 
@@ -1778,7 +1776,7 @@ public final class FileBrowserActivity extends Activity {
             undoSnackbarHandler.removeCallbacks(dismissAction);
             removeUndoSnackbar();
             undoAction.run();
-            Toast.makeText(this, R.string.file_browser_snackbar_restored, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_snackbar_restored, GlassToast.LENGTH_SHORT).show();
         });
     }
 
@@ -1811,7 +1809,7 @@ public final class FileBrowserActivity extends Activity {
             bin.restoreByNameSync(fileName);
             reloadEntries();
         } catch (IOException e) {
-            Toast.makeText(this, R.string.file_browser_recycle_bin_move_failed, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.file_browser_recycle_bin_move_failed, GlassToast.LENGTH_SHORT).show();
         }
     }
 

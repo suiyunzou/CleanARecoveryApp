@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 代理开关轨道：开=品牌色，关=明显灰（白卡片上可辨） -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/brand_primary" android:state_checked="true" />
+    <item android:color="#B9C6C2" />
+</selector>

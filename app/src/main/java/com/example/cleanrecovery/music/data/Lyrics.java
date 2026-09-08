@@ -13,13 +13,50 @@ import java.util.regex.Pattern;
  */
 public class Lyrics {
 
-    /** A single timed lyric line. */
+    /** A single timed lyric line, optionally with a translation line (概念版双语歌词). */
     public static class Line {
         public final long timeMs;
         public final String text;
+        /** Same-timestamp second line (usually the translation); may be empty. */
+        public final String translation;
+        public final List<Word> words;
+
         public Line(long timeMs, String text) {
+            this(timeMs, text, "");
+        }
+
+        public Line(long timeMs, String text, String translation) {
+            this(timeMs, text, translation, Collections.emptyList());
+        }
+
+        public Line(long timeMs, String text, String translation, List<Word> words) {
             this.timeMs = timeMs;
             this.text = text == null ? "" : text;
+            this.translation = translation == null ? "" : translation;
+            this.words = Collections.unmodifiableList(new ArrayList<>(words));
+        }
+
+        /** Only tokens whose real start time has arrived are sung; seeking is reversible. */
+        public int sungTextEnd(long positionMs) {
+            int end = 0;
+            for (Word word : words) {
+                if (positionMs >= word.timeMs) end = Math.max(end, word.end);
+            }
+            return end;
+        }
+    }
+
+    public static class Word {
+        public final long timeMs;
+        public final long durationMs;
+        public final int start;
+        public final int end;
+
+        public Word(long timeMs, long durationMs, int start, int end) {
+            this.timeMs = timeMs;
+            this.durationMs = durationMs;
+            this.start = start;
+            this.end = end;
         }
     }
 
@@ -30,6 +67,12 @@ public class Lyrics {
     private Lyrics(List<Line> lines, String raw) {
         this.lines = lines;
         this.raw = raw;
+    }
+
+    public static Lyrics fromLines(List<Line> lines, String raw) {
+        List<Line> sorted = new ArrayList<>(lines);
+        Collections.sort(sorted, (a, b) -> Long.compare(a.timeMs, b.timeMs));
+        return new Lyrics(Collections.unmodifiableList(sorted), raw);
     }
 
     /** Returns an empty lyrics object (no lines). */
@@ -91,7 +134,41 @@ public class Lyrics {
             }
         }
         Collections.sort(out, (a, b) -> Long.compare(a.timeMs, b.timeMs));
-        return new Lyrics(out, lrc);
+        return new Lyrics(mergeTranslations(out), lrc);
+    }
+
+    /**
+     * 双语歌词合并：KRC 转换/部分 LRC 会把翻译行与原文行写成相同时间戳的相邻两行，
+     * 这里把同时间戳的连续行合并为一行（原文 + translation），与概念版歌词展示一致。
+     */
+    private static List<Line> mergeTranslations(List<Line> sorted) {
+        List<Line> merged = new ArrayList<>();
+        int i = 0;
+        while (i < sorted.size()) {
+            Line cur = sorted.get(i);
+            if (i + 1 < sorted.size() && sorted.get(i + 1).timeMs == cur.timeMs) {
+                Line next = sorted.get(i + 1);
+                // 时间戳相同：先出现的一般是原文，第二行为翻译；空文本时对调
+                if (cur.text.isEmpty() && !next.text.isEmpty()) {
+                    merged.add(new Line(cur.timeMs, next.text, cur.text));
+                } else {
+                    merged.add(new Line(cur.timeMs, cur.text, next.text));
+                }
+                i += 2;
+                // 极少数同时间戳超过两行，多余的并入翻译尾部
+                while (i < sorted.size() && sorted.get(i).timeMs == cur.timeMs) {
+                    Line extra = merged.remove(merged.size() - 1);
+                    String tr = extra.translation.isEmpty()
+                            ? sorted.get(i).text : extra.translation + " " + sorted.get(i).text;
+                    merged.add(new Line(cur.timeMs, extra.text, tr));
+                    i++;
+                }
+            } else {
+                merged.add(cur);
+                i++;
+            }
+        }
+        return merged;
     }
 
     private static long parseTimestamp(Matcher m) {

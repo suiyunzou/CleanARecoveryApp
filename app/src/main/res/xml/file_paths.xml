@@ -1,8 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="app_updates" path="updates/" />
     <external-path
         name="external_storage"
         path="." />
+    <!-- P1 A6：DataRecovery/Downloads 下载目录，用于 FileProvider 分享已下载文件 -->
+    <external-path
+        name="data_recovery_downloads"
+        path="DataRecovery/Downloads/" />
     <external-files-path
         name="music_downloads"
         path="Music/downloads/" />

@@ -1,16 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="56dp"
+    android:layout_height="wrap_content"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:paddingHorizontal="@dimen/space_md"
-    android:background="@drawable/bg_card">
+    android:paddingStart="@dimen/space_lg"
+    android:paddingEnd="@dimen/space_lg"
+    android:paddingTop="10dp"
+    android:paddingBottom="10dp">
 
     <FrameLayout
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:background="@drawable/bg_card">
+        android:layout_width="42dp"
+        android:layout_height="42dp"
+        android:background="@drawable/bg_song_tile"
+        android:clipToOutline="true">
+
+        <ImageView
+            android:id="@+id/song_row_cover"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="@null"
+            android:importantForAccessibility="no"
+            android:scaleType="centerCrop"
+            android:visibility="gone" />
 
         <TextView
             android:id="@+id/song_row_icon"
@@ -18,8 +31,8 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:text="♪"
-            android:textSize="16sp"
-            android:textColor="@color/brand_primary" />
+            android:textSize="15sp"
+            android:textColor="@color/text_secondary" />
     </FrameLayout>
 
     <LinearLayout
@@ -43,19 +56,19 @@
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:textColor="@color/text_primary"
-                android:textSize="@dimen/text_body" />
+                android:textSize="14.5sp" />
 
             <TextView
                 android:id="@+id/song_row_vip_badge"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/space_sm"
-                android:background="@drawable/bg_badge_existing"
+                android:background="@drawable/bg_vip_outline"
                 android:gravity="center"
                 android:paddingHorizontal="5dp"
                 android:paddingVertical="1dp"
                 android:text="VIP"
-                android:textColor="@color/badge_existing_text"
+                android:textColor="@color/vip_gold"
                 android:textSize="9sp"
                 android:textStyle="bold"
                 android:visibility="gone" />
@@ -68,8 +81,8 @@
             android:layout_marginTop="2dp"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="@color/text_secondary"
-            android:textSize="@dimen/text_caption" />
+            android:textColor="@color/text_hint"
+            android:textSize="11.5sp" />
     </LinearLayout>
 
     <TextView
@@ -81,16 +94,16 @@
         android:textColor="@color/text_muted"
         android:textSize="@dimen/text_caption" />
 
-    <!-- 添加到歌单按钮（搜索结果页显示，默认隐藏）：红色心形 -->
+    <!-- 行内更多操作（下一首播放/添加队列/稍后听/歌单）：竖点避免与"我喜欢"歧义 -->
     <ImageButton
         android:id="@+id/song_row_add"
         android:layout_width="36dp"
         android:layout_height="36dp"
         android:layout_marginStart="@dimen/space_sm"
         android:background="@android:color/transparent"
-        android:contentDescription="@string/music_add_to_playlist"
-        android:src="@drawable/ic_favorite"
-        android:tint="@color/accent_red"
+        android:contentDescription="@string/music_row_more"
+        android:src="@drawable/ic_more_vert"
+        app:tint="@color/text_secondary"
         android:visibility="gone" />
 
     <TextView

@@ -1,6 +1,7 @@
 package com.example.cleanrecovery.ui.activity;
 
 import com.example.cleanrecovery.R;
+import com.example.cleanrecovery.recovery.MediaStoreTrashRestorer;
 import com.example.cleanrecovery.recovery.PreviewSession;
 import com.example.cleanrecovery.recovery.RecoveryCoordinator;
 import com.example.cleanrecovery.recovery.RecoveryItem;
@@ -15,14 +16,18 @@ import com.example.cleanrecovery.scan.ScanProgressTracker;
 import com.example.cleanrecovery.storage.StorageAccessController;
 import com.example.cleanrecovery.ui.adapter.AlgorithmStepAdapter;
 import com.example.cleanrecovery.ui.adapter.RecoveryGridAdapter;
-import com.example.cleanrecovery.ui.widget.ParticleScanView;
+import com.example.cleanrecovery.ui.widget.AppBottomNavBinder;
+import com.example.cleanrecovery.ui.widget.ProgressScanView;
 import com.example.cleanrecovery.ui.widget.SystemUiHelper;
 import com.example.cleanrecovery.util.PathManager;
+import com.example.cleanrecovery.util.RootShell;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.PendingIntent;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.SharedPreferences;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
@@ -36,7 +41,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
-import android.widget.Toast;
+import com.example.cleanrecovery.ui.widget.GlassToast;
 
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -53,7 +58,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class MainActivity extends Activity {
+    public static final String EXTRA_SHOW_HOME = "extra_show_home";
+    public static final String EXTRA_SHOW_RESULTS = "extra_show_results";
+
     private static final int REQUEST_ONBOARDING = 5100;
+    private static final int REQUEST_RESTORE_TRASH = 5200;
     private static final long PROGRESS_TICK_MS = 200L;
 
     private final RecoveryState recoveryState = new RecoveryState();
@@ -71,6 +80,7 @@ public final class MainActivity extends Activity {
     private int lastScannedCount;
     private int lastFoundCount;
     private int multiTypeCompletedScanned;
+    private List<RecoveryItem> pendingRestoredItems;
 
     private View homePanel;
     private View scanPanel;
@@ -78,8 +88,14 @@ public final class MainActivity extends Activity {
     private LinearLayout permissionBanner;
     private TextView permissionBannerTitle;
     private TextView permissionBannerAction;
+    private ImageView permissionBadgeIcon;
     private TextView lastScanSummary;
-    private ParticleScanView scanParticleView;
+    private View recentScansEmpty;
+    private View recentScansContent;
+    private TextView lastScanWhen;
+    private TextView lastScanFoundCount;
+    private TextView lastScanFoundLabel;
+    private ProgressScanView scanParticleView;
     private TextView scanPathToggle;
     private TextView scanCurrentPath;
     private TextView resultsCount;
@@ -140,8 +156,49 @@ public final class MainActivity extends Activity {
         refreshHome();
         maybeLaunchOnboarding();
         updateBottomNav(Panel.HOME);
+
+        // 开屏内容：按「设置→启动后显示」冷启动路由（默认音乐不跳）。
+        // 首启引导：onboarding 已完成的老用户直接弹；未完成的等 onboarding 结束再弹。
+        if (savedInstanceState == null) {
+            if (AppStartup.choiceMade(this)) {
+                AppStartup.routeIfConfigured(this);
+            } else if (ScanHistoryStore.isOnboardingComplete(this)) {
+                AppStartup.maybeShowFirstRunChoice(this);
+            }
+        }
+        handleNavIntent(getIntent());
         // 初始化应用工作目录并异步清理过期回收站条目（>30 天）
         initializeAppPaths();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleNavIntent(intent);
+    }
+
+    public void requestShowHomeFromNav() {
+        showPanel(Panel.HOME);
+    }
+
+    public void requestShowResultsFromNav() {
+        openResultsTab();
+    }
+
+    private void handleNavIntent(Intent intent) {
+        if (intent == null) {
+            return;
+        }
+        if (intent.getBooleanExtra(EXTRA_SHOW_RESULTS, false)) {
+            intent.removeExtra(EXTRA_SHOW_RESULTS);
+            openResultsTab();
+            return;
+        }
+        if (intent.getBooleanExtra(EXTRA_SHOW_HOME, false)) {
+            intent.removeExtra(EXTRA_SHOW_HOME);
+            showPanel(Panel.HOME);
+        }
     }
 
     /**
@@ -217,7 +274,56 @@ public final class MainActivity extends Activity {
         if (requestCode == REQUEST_ONBOARDING) {
             refreshPermissionBanner();
             refreshHome();
+            // onboarding 完成后引导一次「启动后显示」
+            if (resultCode == RESULT_OK) {
+                AppStartup.maybeShowFirstRunChoice(this);
+            }
+        } else if (requestCode == REQUEST_RESTORE_TRASH) {
+            handleTrashRestoreResult(resultCode);
         }
+    }
+
+    /** 系统回收站还原结果:成功则把已还原条目从结果列表移除并展示完成页。 */
+    private void handleTrashRestoreResult(int resultCode) {
+        List<RecoveryItem> restored = pendingRestoredItems;
+        pendingRestoredItems = null;
+        if (restored == null || restored.isEmpty()) {
+            return;
+        }
+        if (resultCode != RESULT_OK) {
+            GlassToast.makeText(this, R.string.restore_trash_cancelled, GlassToast.LENGTH_SHORT).show();
+            return;
+        }
+        recoveryState.removeAll(restored);
+        for (RecoveryItem item : restored) {
+            item.selected = false;
+        }
+        RecoveryResultsSession.saveFrom(
+                recoveryState,
+                currentScanType,
+                scanAllMode,
+                experimentalMode,
+                lastScannedCount,
+                recoveryState.getAllCount()
+        );
+        RecoveryResultsStore.saveFrom(
+                this,
+                recoveryState,
+                currentScanType,
+                scanAllMode,
+                experimentalMode,
+                lastScannedCount,
+                recoveryState.getAllCount()
+        );
+        gridAdapter.notifyDataSetChanged();
+        updateResultsSummary();
+        updateCounters();
+        Intent intent = new Intent(this, RecoverCompleteActivity.class);
+        intent.putExtra(RecoverCompleteActivity.EXTRA_SUCCESS, restored.size());
+        intent.putExtra(RecoverCompleteActivity.EXTRA_FAILED, 0);
+        intent.putExtra(RecoverCompleteActivity.EXTRA_OUTPUT_PATH,
+                getString(R.string.restore_trash_output_location));
+        startActivity(intent);
     }
 
     @Override
@@ -233,7 +339,13 @@ public final class MainActivity extends Activity {
         permissionBanner = findViewById(R.id.permission_banner);
         permissionBannerTitle = findViewById(R.id.permission_banner_title);
         permissionBannerAction = findViewById(R.id.permission_banner_action);
+        permissionBadgeIcon = findViewById(R.id.permission_badge_icon);
         lastScanSummary = findViewById(R.id.last_scan_summary);
+        recentScansEmpty = findViewById(R.id.recent_scans_empty);
+        recentScansContent = findViewById(R.id.recent_scans_content);
+        lastScanWhen = findViewById(R.id.last_scan_when);
+        lastScanFoundCount = findViewById(R.id.last_scan_found_count);
+        lastScanFoundLabel = findViewById(R.id.last_scan_found_label);
         scanParticleView = findViewById(R.id.scan_particle_view);
         resultsCount = findViewById(R.id.results_count);
         resultsSummaryScope = findViewById(R.id.results_summary_scope);
@@ -301,9 +413,10 @@ public final class MainActivity extends Activity {
     private void setupCategoryCard(View card, final RecoveryType type, int iconResId, int accentColorRes) {
         ImageView icon = card.findViewById(R.id.category_icon);
         TextView title = card.findViewById(R.id.category_title);
-        title.setText(type.labelResId);
+        title.setText(homeCategoryTitleRes(type));
         icon.setImageResource(iconResId);
-        icon.setBackgroundTintList(android.content.res.ColorStateList.valueOf(resolveColorRes(accentColorRes)));
+        icon.setImageTintList(android.content.res.ColorStateList.valueOf(resolveColorRes(R.color.text_secondary)));
+        card.setBackgroundResource(R.drawable.bg_category_card_surface);
         card.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -314,18 +427,23 @@ public final class MainActivity extends Activity {
     }
 
     private void bindActions() {
-        findViewById(R.id.scan_all_button).setOnClickListener(new View.OnClickListener() {
+        View.OnClickListener startScanAllClick = new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 performLightHaptic(view);
-                startScanAll();
+                SharedPreferences prefs = getSharedPreferences(AboutActivity.PREFS_NAME, MODE_PRIVATE);
+                if (prefs.getBoolean(AboutActivity.KEY_DEFAULT_DEEP, false)) {
+                    startExperimentalScanAll();
+                } else {
+                    startScanAll();
+                }
             }
-        });
-        findViewById(R.id.experimental_scan_button).setOnClickListener(new View.OnClickListener() {
+        };
+        findViewById(R.id.scan_all_button).setOnClickListener(startScanAllClick);
+        findViewById(R.id.recent_scans_card).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                performLightHaptic(view);
-                showExperimentalTypePicker();
+                openResultsTab();
             }
         });
         permissionBanner.setOnClickListener(new View.OnClickListener() {
@@ -344,17 +462,6 @@ public final class MainActivity extends Activity {
                 finishScanUi(lastScannedCount, lastFoundCount);
             }
         });
-        findViewById(R.id.results_back_button).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                showPanel(Panel.HOME);
-            }
-        });
-        findViewById(R.id.nav_home).setOnClickListener(v -> showPanel(Panel.HOME));
-        findViewById(R.id.nav_results).setOnClickListener(v -> openResultsTab());
-        findViewById(R.id.nav_folder).setOnClickListener(v -> openRecoveryFolder());
-        findViewById(R.id.nav_about).setOnClickListener(v ->
-                startActivity(new Intent(MainActivity.this, AboutActivity.class)));
         resultsStatusFilterButton.setOnClickListener(v -> showStatusFilterSheet());
         filterTypeAll.setOnClickListener(v -> setTypeFilter(null));
         filterTypeImages.setOnClickListener(v -> setTypeFilter(RecoveryType.IMAGE));
@@ -373,7 +480,9 @@ public final class MainActivity extends Activity {
         });
         findViewById(R.id.recover_button).setOnClickListener(v -> recoverSelected());
         findViewById(R.id.rescan_button).setOnClickListener(v -> {
-            if (scanAllMode) {
+            if (experimentalMode && scanAllMode) {
+                startExperimentalScanAll();
+            } else if (scanAllMode) {
                 startScanAll();
             } else if (experimentalMode && currentScanType != null) {
                 startExperimentalScan(currentScanType);
@@ -393,22 +502,70 @@ public final class MainActivity extends Activity {
 
     private void refreshHome() {
         ScanHistoryStore.Snapshot snapshot = ScanHistoryStore.read(this);
-        if (snapshot.hasScanHistory()) {
+        boolean hasHistory = snapshot.hasScanHistory();
+        if (recentScansEmpty != null) {
+            recentScansEmpty.setVisibility(View.GONE);
+        }
+        if (recentScansContent != null) {
+            recentScansContent.setVisibility(View.VISIBLE);
+        }
+        if (hasHistory) {
             CharSequence when = DateUtils.getRelativeTimeSpanString(
                     snapshot.lastScanTimeMs,
                     System.currentTimeMillis(),
                     DateUtils.MINUTE_IN_MILLIS
             );
-            lastScanSummary.setText(getString(
-                    R.string.last_scan_compact,
-                    when,
-                    snapshot.lastFoundCount
-            ));
+            if (lastScanWhen != null) {
+                lastScanWhen.setText(when);
+            }
+            bindLastScanFound(snapshot.lastFoundCount);
+            if (lastScanSummary != null) {
+                lastScanSummary.setText(getString(
+                        R.string.last_scan_compact,
+                        when,
+                        snapshot.lastFoundCount
+                ));
+                lastScanSummary.setVisibility(View.GONE);
+            }
         } else {
-            lastScanSummary.setText(R.string.last_scan_empty);
+            if (lastScanWhen != null) {
+                lastScanWhen.setText(R.string.last_scan_none_when);
+            }
+            bindLastScanFound(0);
+            if (lastScanSummary != null) {
+                lastScanSummary.setText(R.string.last_scan_empty);
+                lastScanSummary.setVisibility(View.GONE);
+            }
         }
         updateCategoryCounts(snapshot);
         refreshPermissionBanner();
+    }
+
+    private void bindLastScanFound(int foundCount) {
+        if (lastScanFoundCount != null) {
+            lastScanFoundCount.setVisibility(View.GONE);
+        }
+        if (lastScanFoundLabel == null) {
+            return;
+        }
+        if (foundCount > 0) {
+            lastScanFoundLabel.setText(getString(R.string.recent_scan_summary, foundCount));
+        } else {
+            lastScanFoundLabel.setText(R.string.last_scan_none_found);
+        }
+    }
+
+    private static int homeCategoryTitleRes(RecoveryType type) {
+        if (type == RecoveryType.IMAGE) {
+            return R.string.home_category_images;
+        }
+        if (type == RecoveryType.VIDEO) {
+            return R.string.home_category_videos;
+        }
+        if (type == RecoveryType.AUDIO) {
+            return R.string.home_category_audio;
+        }
+        return R.string.home_category_documents;
     }
 
     private void updateCategoryCounts(ScanHistoryStore.Snapshot snapshot) {
@@ -429,12 +586,17 @@ public final class MainActivity extends Activity {
 
     private void refreshPermissionBanner() {
         boolean granted = storageAccessController.hasStorageAccess();
-        permissionBannerTitle.setText(granted ? R.string.storage_access_granted : R.string.storage_access_missing);
+        permissionBannerTitle.setText(granted
+                ? R.string.storage_permission_badge_on
+                : R.string.storage_permission_badge_off);
         permissionBannerTitle.setTextColor(resolveColorRes(granted ? R.color.status_success : R.color.status_warning));
-        permissionBannerAction.setVisibility(granted ? View.GONE : View.VISIBLE);
-        if (!granted) {
-            permissionBannerAction.setText(R.string.button_grant_access);
+        if (permissionBadgeIcon != null) {
+            permissionBadgeIcon.setVisibility(granted ? View.VISIBLE : View.GONE);
         }
+        permissionBannerAction.setVisibility(View.GONE);
+        permissionBanner.setBackgroundResource(granted
+                ? R.drawable.bg_permission_badge
+                : R.drawable.bg_permission_banner_ok);
     }
 
     private void startScan(RecoveryType type) {
@@ -449,36 +611,91 @@ public final class MainActivity extends Activity {
         beginScan(false, true, type);
     }
 
-    private void showExperimentalTypePicker() {
+    private void startExperimentalScanAll() {
+        beginScan(true, true, null);
+    }
+
+    /** Entry for 「实现性算法恢复」: type picker → root gate → confirm → EXPERIMENTAL_ALL. */
+    private void showAlgorithmicRecoveryPicker() {
         final RecoveryType[] types = RecoveryType.scannableValues();
-        CharSequence[] labels = new CharSequence[types.length];
+        CharSequence[] labels = new CharSequence[types.length + 1];
+        labels[0] = getString(R.string.algorithmic_recovery_all_types);
         for (int i = 0; i < types.length; i++) {
-            labels[i] = getString(types[i].labelResId);
+            labels[i + 1] = getString(types[i].labelResId);
         }
         new AlertDialog.Builder(this)
-                .setTitle(R.string.experimental_scan_title)
+                .setTitle(R.string.algorithmic_recovery_title)
                 .setItems(labels, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        showExperimentalConfirmDialog(types[which]);
+                        if (which == 0) {
+                            gateAlgorithmicRecovery(null, true);
+                        } else {
+                            gateAlgorithmicRecovery(types[which - 1], false);
+                        }
                     }
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
     }
 
-    private void showExperimentalConfirmDialog(final RecoveryType type) {
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.experimental_scan_title)
-                .setMessage(R.string.experimental_scan_warning)
-                .setPositiveButton(R.string.experimental_scan_confirm, new DialogInterface.OnClickListener() {
+    private void gateAlgorithmicRecovery(final RecoveryType type, final boolean allTypes) {
+        // Root probe may open a localhost socket (emulator bridge) — never on UI thread.
+        GlassToast.makeText(this, R.string.algorithmic_recovery_checking_root, GlassToast.LENGTH_SHORT).show();
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                RootShell.clearCache();
+                final boolean available = RootShell.isRootAvailable();
+                runOnUiThread(new Runnable() {
                     @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        startExperimentalScan(type);
+                    public void run() {
+                        if (isFinishing()) {
+                            return;
+                        }
+                        if (!available) {
+                            new AlertDialog.Builder(MainActivity.this)
+                                    .setTitle(R.string.algorithmic_recovery_title)
+                                    .setMessage(R.string.algorithmic_recovery_requires_root)
+                                    .setPositiveButton(android.R.string.ok, null)
+                                    .show();
+                            return;
+                        }
+        final SharedPreferences prefs = getSharedPreferences(AboutActivity.PREFS_NAME, MODE_PRIVATE);
+        final boolean showHint = prefs.getBoolean(AboutActivity.KEY_DEEP_HINT, true);
+        if (!showHint) {
+            if (allTypes) {
+                startExperimentalScanAll();
+            } else {
+                startExperimentalScan(type);
+            }
+            return;
+        }
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+        new AlertDialog.Builder(MainActivity.this)
+                                .setTitle(R.string.algorithmic_recovery_title)
+                                .setMessage(R.string.algorithmic_recovery_warning)
+                                .setPositiveButton(R.string.experimental_scan_confirm,
+                                        new DialogInterface.OnClickListener() {
+                                            @Override
+                                            public void onClick(DialogInterface dialog, int which) {
+                                                if (allTypes) {
+                                                    startExperimentalScanAll();
+                                                } else {
+                                                    startExperimentalScan(type);
+                                                }
+                                            }
+                                        })
+                                .setNegativeButton(android.R.string.cancel, null)
+                                .show();
+            }
+        });
                     }
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+                });
+            }
+        }, "root-gate").start();
     }
 
     private void beginScan(boolean allTypes, boolean experimental, RecoveryType type) {
@@ -486,7 +703,7 @@ public final class MainActivity extends Activity {
             return;
         }
         if (!storageAccessController.hasStorageAccess()) {
-            Toast.makeText(this, R.string.storage_access_required, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.storage_access_required, GlassToast.LENGTH_SHORT).show();
             storageAccessController.requestStorageAccess();
             return;
         }
@@ -510,18 +727,18 @@ public final class MainActivity extends Activity {
         pathExpanded = false;
         if (experimental && type != null) {
             prepareExperimentalAlgorithmLog(type);
+        } else if (experimental && allTypes) {
+            prepareExperimentalAlgorithmLog(RecoveryType.IMAGE);
         } else {
             algorithmStepAdapter.setRows(new ArrayList<AlgorithmStepAdapter.Row>());
             runningAlgorithmId = null;
         }
-        if (allTypes) {
-        } else if (experimental) {
-        } else {
-        }
         showPanel(Panel.SCAN);
         progressHandler.removeCallbacks(progressTick);
         progressHandler.post(progressTick);
-        if (allTypes) {
+        if (experimental && allTypes) {
+            recoveryCoordinator.startExperimentalScanAll();
+        } else if (allTypes) {
             recoveryCoordinator.startScanAll();
         } else if (experimental) {
             recoveryCoordinator.startExperimentalScan(type);
@@ -536,8 +753,30 @@ public final class MainActivity extends Activity {
         }
         List<RecoveryItem> selected = recoveryState.getSelectedItems();
         if (selected.isEmpty()) {
-            Toast.makeText(this, R.string.no_files_selected, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.no_files_selected, GlassToast.LENGTH_SHORT).show();
             return;
+        }
+        // 真恢复优先:系统回收站里的条目走官方还原流程,恢复到原位置,
+        // 而不是复制一份到 DataRecovery。提供方拒绝/不支持时回退为复制。
+        if (MediaStoreTrashRestorer.anyMediaStoreRestorable(selected)) {
+            PendingIntent request = MediaStoreTrashRestorer.createRestoreRequest(this, selected);
+            if (request != null) {
+                try {
+                    pendingRestoredItems = new ArrayList<>();
+                    for (RecoveryItem item : selected) {
+                        if (MediaStoreTrashRestorer.isMediaStoreRestorable(item)) {
+                            pendingRestoredItems.add(item);
+                        }
+                    }
+                    startIntentSenderForResult(request.getIntentSender(), REQUEST_RESTORE_TRASH, null, 0, 0, 0);
+                    return;
+                } catch (android.content.IntentSender.SendIntentException exception) {
+                    pendingRestoredItems = null;
+                    GlassToast.makeText(this, R.string.restore_trash_failed, GlassToast.LENGTH_SHORT).show();
+                }
+            } else {
+                GlassToast.makeText(this, R.string.restore_trash_unavailable, GlassToast.LENGTH_SHORT).show();
+            }
         }
         recoveryCoordinator.recoverSelected(selected);
     }
@@ -635,7 +874,7 @@ public final class MainActivity extends Activity {
     private void styleTypeChip(TextView chip, boolean active, String label, int count) {
         chip.setText(getString(R.string.results_type_chip_format, label, count));
         chip.setBackgroundResource(active ? R.drawable.bg_results_chip_selected : R.drawable.bg_results_chip_unselected);
-        chip.setTextColor(resolveColorRes(active ? R.color.text_on_primary : R.color.text_secondary));
+        chip.setTextColor(resolveColorRes(active ? R.color.brand_primary_dark : R.color.text_hint));
     }
 
     private void styleStatusFilterButton() {
@@ -645,11 +884,11 @@ public final class MainActivity extends Activity {
     }
 
     private String labelForStatusFilter(RecoveryState.FilterMode filter) {
-        if (filter == RecoveryState.FilterMode.EXISTING) {
-            return getString(R.string.filter_existing);
+        if (filter == RecoveryState.FilterMode.RECOVERABLE) {
+            return getString(R.string.filter_recoverable);
         }
-        if (filter == RecoveryState.FilterMode.DELETED) {
-            return getString(R.string.filter_deleted);
+        if (filter == RecoveryState.FilterMode.INDEX_ONLY) {
+            return getString(R.string.filter_index_only);
         }
         return getString(R.string.filter_all);
     }
@@ -658,8 +897,8 @@ public final class MainActivity extends Activity {
         BottomSheetDialog dialog = new BottomSheetDialog(this);
         View sheet = getLayoutInflater().inflate(R.layout.bottom_sheet_results_status_filter, null);
         bindStatusFilterOption(dialog, sheet, R.id.status_filter_all, RecoveryState.FilterMode.ALL);
-        bindStatusFilterOption(dialog, sheet, R.id.status_filter_existing, RecoveryState.FilterMode.EXISTING);
-        bindStatusFilterOption(dialog, sheet, R.id.status_filter_deleted, RecoveryState.FilterMode.DELETED);
+        bindStatusFilterOption(dialog, sheet, R.id.status_filter_existing, RecoveryState.FilterMode.RECOVERABLE);
+        bindStatusFilterOption(dialog, sheet, R.id.status_filter_deleted, RecoveryState.FilterMode.INDEX_ONLY);
         dialog.setContentView(sheet);
         dialog.show();
     }
@@ -690,13 +929,14 @@ public final class MainActivity extends Activity {
                 R.string.results_summary_compact,
                 currentScanLabel(),
                 recoveryState.getAllCount(),
-                recoveryState.countSuspectedDeleted()));
+                recoveryState.countRecoverable()));
         resultsCount.setText(getString(
                 R.string.results_summary_found,
                 recoveryState.getAllCount()));
         resultsSummaryDeleted.setText(getString(
-                R.string.results_summary_deleted,
-                recoveryState.countSuspectedDeleted()));
+                R.string.results_summary_recoverable,
+                recoveryState.countRecoverable(),
+                recoveryState.countIndexOnly()));
         resultsSummaryOutput.setText(getString(
                 R.string.results_summary_output,
                 RecoveryOutputPaths.primaryDataRecoveryDir().getAbsolutePath()));
@@ -893,28 +1133,17 @@ public final class MainActivity extends Activity {
     }
 
     private void updateBottomNav(Panel panel) {
-        bottomNav.setVisibility(panel == Panel.SCAN ? View.GONE : View.VISIBLE);
-        if (panel == Panel.SCAN) {
-            return;
+        if (bottomNav != null) {
+            bottomNav.setVisibility(View.VISIBLE);
         }
-        int activeColor = resolveColorRes(R.color.brand_primary);
-        int inactiveColor = resolveColorRes(R.color.text_secondary);
-
-        styleNavItem(findViewById(R.id.nav_home), navHomeIcon, navHomeLabel, panel == Panel.HOME, activeColor, inactiveColor);
-        styleNavItem(findViewById(R.id.nav_results), navResultsIcon, navResultsLabel, panel == Panel.RESULTS,
-                activeColor, inactiveColor);
-        navResultsIcon.setEnabled(true);
-        navResultsLabel.setEnabled(true);
-        findViewById(R.id.nav_results).setEnabled(true);
-        styleNavItem(findViewById(R.id.nav_folder), navFolderIcon, navFolderLabel, false, activeColor, inactiveColor);
-        styleNavItem(findViewById(R.id.nav_about), navAboutIcon, navAboutLabel, false, activeColor, inactiveColor);
-    }
-
-    private void styleNavItem(View container, ImageView icon, TextView label, boolean active, int activeColor, int inactiveColor) {
-        int color = active ? activeColor : inactiveColor;
-        container.setBackgroundResource(active ? R.drawable.bg_nav_item_active : android.R.color.transparent);
-        icon.setColorFilter(color);
-        label.setTextColor(color);
+        AppBottomNavBinder.Tab tab;
+        if (panel == Panel.RESULTS || panel == Panel.SCAN) {
+            // Bottom "Scan" is the results destination; home CTAs start new scans.
+            tab = AppBottomNavBinder.Tab.SCAN;
+        } else {
+            tab = AppBottomNavBinder.Tab.HOME;
+        }
+        AppBottomNavBinder.bind(this, tab);
     }
 
     private void performLightHaptic(View view) {

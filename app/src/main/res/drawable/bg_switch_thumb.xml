@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 设置页拨动开关滑块：白色圆钮带软阴影 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:top="1dp">
+        <shape android:shape="oval">
+            <solid android:color="#1F000000" />
+            <size android:width="26dp" android:height="26dp" />
+        </shape>
+    </item>
+    <item android:bottom="1dp">
+        <shape android:shape="oval">
+            <solid android:color="#FFFFFF" />
+            <size android:width="26dp" android:height="26dp" />
+        </shape>
+    </item>
+</layer-list>

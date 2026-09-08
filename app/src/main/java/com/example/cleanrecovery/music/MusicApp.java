@@ -52,16 +52,34 @@ public final class MusicApp {
         downloadStore = new DownloadStore(ctx);
         downloads = new DownloadManager(ctx, dataSource, downloadStore);
         player = MusicPlayer.get();
+        player.restoreLastSession(context); // 恢复上次播放会话（暂停态，迷你条可见上次歌曲）
         updateDataSourceAuth();
         refreshEntitlementAsync();
         MusicPlayer.setPlayUrlResolver(song -> {
+            String url = null;
+            Exception failure = null;
             try {
-                String url = dataSource.resolvePlayUrl(song);
-                if (url == null || url.isEmpty()) url = dataSource.resolveTrialUrl(song);
-                return url;
-            } catch (Exception ignored) {
-                return null;
+                url = dataSource.resolvePlayUrl(song);
+            } catch (Exception e) {
+                failure = e;
             }
+            if (url == null || url.isEmpty()) {
+                try {
+                    url = dataSource.resolveTrialUrl(song);
+                } catch (Exception e) {
+                    if (failure == null) failure = e;
+                }
+            }
+            if (url == null || url.isEmpty()) {
+                // 把真实失败原因（VIP 权益/版权/无音源）抛给播放器错误链路，
+                // 替代笼统的"播放失败"，UI 据此给出针对性提示
+                String reason = failure != null && failure.getMessage() != null
+                        && !failure.getMessage().isEmpty()
+                        ? failure.getMessage() : dataSource.lastResolveFailReason;
+                throw new IllegalStateException(reason != null && !reason.isEmpty()
+                        ? reason : "无可用音源");
+            }
+            return url;
         });
     }
 

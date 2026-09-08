@@ -17,16 +17,6 @@
         android:paddingStart="@dimen/space_sm"
         android:paddingEnd="@dimen/space_sm">
 
-        <ImageButton
-            android:id="@+id/file_browser_back"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:background="@drawable/bg_icon_button"
-            android:contentDescription="@string/button_back"
-            android:padding="10dp"
-            android:scaleType="centerInside"
-            android:src="@drawable/ic_back" />
-
         <TextView
             android:id="@+id/file_browser_title"
             android:layout_width="0dp"
@@ -177,12 +167,15 @@
             android:layout_marginStart="@dimen/space_sm"
             android:background="@drawable/bg_button_secondary"
             android:clickable="true"
+            android:drawableStart="@drawable/ic_history_chip"
+            android:drawablePadding="4dp"
             android:focusable="true"
-            android:minHeight="36dp"
+            android:gravity="center"
+            android:minHeight="32dp"
             android:paddingStart="@dimen/space_sm"
-            android:paddingTop="@dimen/space_xs"
+            android:paddingTop="6dp"
             android:paddingEnd="@dimen/space_sm"
-            android:paddingBottom="@dimen/space_xs"
+            android:paddingBottom="6dp"
             android:textColor="@color/brand_primary_dark"
             android:textSize="@dimen/text_caption"
             android:textStyle="bold" />
@@ -285,7 +278,7 @@
                 android:layout_height="24dp"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_move"
-                android:tint="@color/text_primary" />
+                app:tint="@color/text_primary" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -313,7 +306,7 @@
                 android:layout_height="24dp"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_copy"
-                android:tint="@color/text_primary" />
+                app:tint="@color/text_primary" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -341,7 +334,7 @@
                 android:layout_height="24dp"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_share"
-                android:tint="@color/text_primary" />
+                app:tint="@color/text_primary" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -369,7 +362,7 @@
                 android:layout_height="24dp"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_delete"
-                android:tint="@color/accent_red" />
+                app:tint="@color/accent_red" />
 
             <TextView
                 android:layout_width="wrap_content"
@@ -380,4 +373,6 @@
                 android:textSize="@dimen/text_caption" />
         </LinearLayout>
     </LinearLayout>
+
+    <include layout="@layout/include_app_bottom_nav" />
 </LinearLayout>

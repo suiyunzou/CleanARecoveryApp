@@ -582,7 +582,8 @@ public final class KugouAuthClient {
     private static String rsaLiteEncrypt(String data) throws AuthException {
         try {
             // Parse the Lite RSA public key (X.509 SubjectPublicKeyInfo format)
-            byte[] keyBytes = java.util.Base64.getDecoder().decode(RSA_LITE_PUBLIC_KEY_B64);
+            byte[] keyBytes = com.example.cleanrecovery.util.Base64Compat.decode(
+                    RSA_LITE_PUBLIC_KEY_B64);
             java.security.spec.X509EncodedKeySpec keySpec = new java.security.spec.X509EncodedKeySpec(keyBytes);
             java.security.KeyFactory kf = java.security.KeyFactory.getInstance("RSA");
             java.security.interfaces.RSAPublicKey pubKey =

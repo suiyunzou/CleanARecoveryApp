@@ -38,6 +38,11 @@ public final class WechatDirectoryScannerAlgorithm implements RecoveryAlgorithm 
         "appbrand", "bizimg", "cdntran", "hdheadimg",
     };
 
+    // Bound the general (pre-WeChat) descent so deeply nested trees do not
+    // blow up scan cost; /Android/data/com.tencent.mm/MicroMsg sits ~4 levels
+    // below the storage root, so 8 leaves comfortable headroom.
+    private static final int MAX_GENERAL_DEPTH = 8;
+
     private final Set<String> visitedDirs = new HashSet<>();
     private final Set<String> emittedHashes = new HashSet<>();
 
@@ -63,14 +68,19 @@ public final class WechatDirectoryScannerAlgorithm implements RecoveryAlgorithm 
 
     @Override
     public void scan(AlgorithmContext context, AlgorithmCallback callback) {
+        scanRoot(Environment.getExternalStorageDirectory(), context, callback);
+    }
+
+    /** Test seam: scan an explicit storage root. */
+    void scanRoot(File root, AlgorithmContext context, AlgorithmCallback callback) {
         visitedDirs.clear();
         emittedHashes.clear();
         final int[] processed = {0};
-        File root = Environment.getExternalStorageDirectory();
-        findAndScanWechatDirs(root, context, callback, processed);
+        findAndScanWechatDirs(root, context, callback, processed, 0);
     }
 
-    private void findAndScanWechatDirs(File dir, AlgorithmContext context, AlgorithmCallback callback, int[] processed) {
+    private void findAndScanWechatDirs(File dir, AlgorithmContext context, AlgorithmCallback callback,
+                                       int[] processed, int depth) {
         if (callback.isCancelled() || dir == null || !dir.exists() || !dir.canRead()) {
             return;
         }
@@ -87,29 +97,27 @@ public final class WechatDirectoryScannerAlgorithm implements RecoveryAlgorithm 
             walkMediaFiles(dir, context, callback, processed);
             return;
         }
-        if (isWechatBasePath(normCanon)) {
-            File[] children = listFiles(dir);
-            if (children != null) {
-                for (File child : children) {
-                    if (callback.isCancelled()) break;
-                    if (child.isDirectory()) {
-                        findAndScanWechatDirs(child, context, callback, processed);
-                    }
-                }
-            }
+
+        boolean insideWechat = isWechatBasePath(normCanon);
+        // Outside a known WeChat subtree we still need a general descent so that
+        // nested paths like /Android/data/com.tencent.mm/MicroMsg are reached,
+        // but bound the depth to keep the scan affordable. Once inside a WeChat
+        // base path, explore the whole subtree freely.
+        if (!insideWechat && depth > MAX_GENERAL_DEPTH) {
             return;
         }
 
         File[] children = listFiles(dir);
-        if (children == null) return;
+        if (children == null) {
+            return;
+        }
         for (File child : children) {
-            if (callback.isCancelled()) break;
+            if (callback.isCancelled()) {
+                break;
+            }
             if (child.isDirectory()) {
-                String childNorm = normalize(canonicalPath(child));
-                if (isWechatBasePath(childNorm)) {
-                    findAndScanWechatDirs(child, context, callback, processed);
-                }
-                // Only recurse 2 levels deep outside known paths to limit scan cost
+                findAndScanWechatDirs(child, context, callback, processed,
+                        insideWechat ? depth : depth + 1);
             }
         }
     }

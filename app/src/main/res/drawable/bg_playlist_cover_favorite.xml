@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 我喜欢歌单封面：粉色渐变 + 白色爱心 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <gradient android:angle="270"
+                android:startColor="#FF97A6"
+                android:endColor="#FF6E82" />
+            <corners android:radius="16dp" />
+        </shape>
+    </item>
+    <item android:gravity="center" android:drawable="@drawable/ic_cover_heart" />
+</layer-list>

@@ -80,6 +80,11 @@ public final class RecoveryCoordinator {
         startScanInternal(new RecoveryType[] {type}, false, ScanMode.EXPERIMENTAL_ALL);
     }
 
+    /** Deep / algorithmic recovery across all scannable types (root offline algos included). */
+    public void startExperimentalScanAll() {
+        startScanInternal(RecoveryType.scannableValues(), true, ScanMode.EXPERIMENTAL_ALL);
+    }
+
     public void startScanAll() {
         startScanInternal(RecoveryType.scannableValues(), true, ScanMode.DEFAULT);
     }
@@ -142,6 +147,14 @@ public final class RecoveryCoordinator {
                 }
 
                 flushBatch(pendingBatch);
+                // 回收站保底：扫描结束时把系统回收站内容快照进私有保险库，
+                // 用户清空回收站后仍可字节级还原（FBE 设备上唯一的诚实恢复通路）。
+                try {
+                    int vaulted = TrashVault.guardPass(context);
+                    ScanDiagnostics.trackerEvent("trash_vault added=" + vaulted);
+                } catch (Exception exception) {
+                    ScanDiagnostics.error("trash_vault", "guardPass failed", exception);
+                }
                 final int finalScanned = session.cumulativeScannedCount();
                 final int finalFound = session.foundCount;
                 ScanDiagnostics.scanComplete(

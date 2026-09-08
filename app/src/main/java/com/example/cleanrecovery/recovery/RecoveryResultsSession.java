@@ -111,7 +111,9 @@ public final class RecoveryResultsSession {
                     item.width,
                     item.height,
                     item.suspectedDeleted,
-                    item.sourceKind
+                    item.sourceKind,
+                    item.recoverable,
+                    item.expiresAt
             ));
             copies.get(copies.size() - 1).selected = item.selected;
         }

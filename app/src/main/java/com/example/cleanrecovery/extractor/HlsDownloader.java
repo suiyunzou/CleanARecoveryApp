@@ -3,9 +3,14 @@ package com.example.cleanrecovery.extractor;
 import android.util.Log;
 
 import com.example.cleanrecovery.download.DownloadProgressCallback;
+import com.example.cleanrecovery.ytdlp.CookieJar;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -14,8 +19,11 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -30,16 +38,23 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li>若是 Master Playlist（含多码率），选择最高码率的子播放列表</li>
  *   <li>解析 Media Playlist，提取所有 TS 分片 URL</li>
  *   <li>依次下载每个 TS 分片，追加到输出文件</li>
- *   <li>支持断点续传：记录已下载分片数到 .part.meta 文件</li>
+ *   <li>支持断点续传：记录已下载分片数到 .ytdl JSON 文件（C1）</li>
  * </ol>
  *
- * <p>支持的 m3u8 特性：</p>
+ * <h3>P0 C1 改动：JSON .ytdl 续传元数据</h3>
+ * <p>原 {@code .meta} 文件仅存储一个整数（已下载分片数），无法检测播放列表变更
+ * （如直播流刷新、VOD 被替换），导致续传时可能追加到错误的分片序列。</p>
+ * <p>M1 改用 {@code .ytdl} JSON 文件，存储：</p>
  * <ul>
- *   <li>Master Playlist（#EXT-X-STREAM-INF）</li>
- *   <li>Media Playlist（#EXTINF + 分片 URL）</li>
- *   <li>相对/绝对 URL 解析</li>
- *   <li>加密分片（#EXT-X-KEY:METHOD=AES-128）—— 仅记录，暂不解密</li>
+ *   <li>{@code fragment_index}：下一个待下载分片索引</li>
+ *   <li>{@code total_fragments}：分片总数</li>
+ *   <li>{@code urls_sha256}：所有分片 URL 的 SHA-256，用于检测播放列表变更</li>
  * </ul>
+ * <p>续传时若 {@code urls_sha256} 不匹配，从头下载（保守策略，避免分片错位）。</p>
+ *
+ * <h3>P0 D1 改动：Cookie 注入</h3>
+ * <p>新增 {@link #setCookieJar(CookieJar)}，{@code downloadSegment}/{@code downloadText}
+ * 在请求前自动注入对应域名 Cookie，解决 HLS 清流因缺少会话 Cookie 返回 403 的问题。</p>
  *
  * @see <a href="https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/downloader/hls.py">HlsFD</a>
  */
@@ -53,10 +68,15 @@ public final class HlsDownloader {
     private static final int READ_TIMEOUT = 30_000;
     /** 单分片下载缓冲区。 */
     private static final int BUFFER_SIZE = 8 * 1024;
-    /** 续传元数据后缀。 */
-    private static final String META_SUFFIX = ".meta";
+    /** 续传元数据后缀（C1：原 .meta → 现 .ytdl JSON）。 */
+    private static final String META_SUFFIX = ".ytdl";
     /** 临时文件后缀。 */
     private static final String PART_SUFFIX = ".part";
+
+    /** D1：cookiejar 引用（可为 null）。 */
+    private CookieJar cookieJar;
+    /** per-format 请求头（Referer/Origin/User-Agent 等，可为 null）。 */
+    private Map<String, String> formatHeaders;
 
     private final AtomicBoolean paused = new AtomicBoolean(false);
     private final AtomicBoolean cancelled = new AtomicBoolean(false);
@@ -72,6 +92,30 @@ public final class HlsDownloader {
             this.totalSegments = total;
             this.downloadedSegments = done;
         }
+    }
+
+    /** D1：设置 cookiejar，后续分片/播放列表请求自动注入对应域名 Cookie。 */
+    public void setCookieJar(CookieJar jar) {
+        this.cookieJar = jar;
+    }
+
+    /**
+     * 设置 per-format 请求头（Referer/Origin/User-Agent 等）。
+     * 在 {@link #download(String, File, Map, DownloadProgressCallback)} 中自动调用。
+     */
+    public void setHeaders(Map<String, String> headers) {
+        this.formatHeaders = headers;
+    }
+
+    /**
+     * 下载 HLS 流（含 per-format headers + cookie，由 HlsFD 调用）。
+     *
+     * <p>设置 headers 后委托给 {@link #download(String, File, DownloadProgressCallback)}。</p>
+     */
+    public HlsResult download(String m3u8Url, File outFile, Map<String, String> headers,
+                                DownloadProgressCallback callback) throws IOException {
+        this.formatHeaders = headers;
+        return download(m3u8Url, outFile, callback);
     }
 
     /**
@@ -104,16 +148,33 @@ public final class HlsDownloader {
 
         Log.i(TAG, "解析到 " + segmentUrls.size() + " 个分片");
 
-        // 2. 准备临时文件与续传元数据
+        // 2. 准备临时文件与续传元数据（C1：.ytdl JSON）
         File partFile = new File(outFile.getAbsolutePath() + PART_SUFFIX);
         File metaFile = new File(outFile.getAbsolutePath() + META_SUFFIX);
-        int startSegment = readResumeMeta(metaFile);
+        String urlsHash = computeUrlsSha256(segmentUrls);
+        YtdlMeta meta = readYtdlMeta(metaFile);
+
+        // C1：检测播放列表变更 —— urls_sha256 不匹配则从头下载（保守策略，避免分片错位）
+        int startSegment = 0;
+        if (meta != null && urlsHash.equals(meta.urlsSha256)
+                && meta.totalFragments == segmentUrls.size() && partFile.exists()) {
+            startSegment = meta.fragmentIndex;
+            if (startSegment > segmentUrls.size()) startSegment = 0;
+            Log.i(TAG, "续传：从分片 " + startSegment + "/" + segmentUrls.size() + " 继续");
+        } else {
+            if (meta != null) {
+                Log.w(TAG, "播放列表变更或 .part 缺失，从头下载: hashMatch="
+                        + (meta != null && urlsHash.equals(meta.urlsSha256)));
+            }
+            // 清理可能残留的旧 .part 文件（避免追加到错误数据）
+            if (partFile.exists()) partFile.delete();
+        }
 
         // 3. 依次下载分片并追加
         FileOutputStream fos = null;
         try {
-            // 追加模式：若已有 .part 文件且续传位置有效
-            boolean append = startSegment > 0 && partFile.exists();
+            // 追加模式：仅当续传有效（startSegment > 0）时
+            boolean append = startSegment > 0;
             fos = new FileOutputStream(partFile, append);
 
             for (int i = startSegment; i < segmentUrls.size(); i++) {
@@ -137,7 +198,8 @@ public final class HlsDownloader {
                 }
 
                 downloadSegment(segUrl, fos);
-                writeResumeMeta(metaFile, i + 1);
+                // C1：每下载一个分片后更新 .ytdl 元数据
+                writeYtdlMeta(metaFile, i + 1, segmentUrls.size(), urlsHash);
             }
 
             // 4. 下载完成：重命名 .part → 最终文件
@@ -227,6 +289,10 @@ public final class HlsDownloader {
             conn.setReadTimeout(READ_TIMEOUT);
             conn.setRequestProperty("User-Agent", ExtractorHttp.DEFAULT_UA);
             conn.setInstanceFollowRedirects(true);
+            // 应用 per-format headers（Referer/Origin/User-Agent 覆盖默认 UA）
+            applyFormatHeaders(conn);
+            // D1：注入对应域名 Cookie（解决 HLS 清流因缺少会话 Cookie 返回 403）
+            applyCookie(conn, segUrl);
 
             int code = conn.getResponseCode();
             if (code < 200 || code >= 400) {
@@ -255,6 +321,10 @@ public final class HlsDownloader {
             conn.setReadTimeout(READ_TIMEOUT);
             conn.setRequestProperty("User-Agent", ExtractorHttp.DEFAULT_UA);
             conn.setInstanceFollowRedirects(true);
+            // 应用 per-format headers
+            applyFormatHeaders(conn);
+            // D1：注入对应域名 Cookie
+            applyCookie(conn, url);
 
             int code = conn.getResponseCode();
             if (code < 200 || code >= 400) {
@@ -272,6 +342,26 @@ public final class HlsDownloader {
             return sb.toString();
         } finally {
             if (conn != null) conn.disconnect();
+        }
+    }
+
+    /** 应用 per-format 请求头（User-Agent/Referer/Origin 等，覆盖默认 UA）。 */
+    private void applyFormatHeaders(HttpURLConnection conn) {
+        if (formatHeaders == null || formatHeaders.isEmpty()) return;
+        for (Map.Entry<String, String> e : formatHeaders.entrySet()) {
+            String k = e.getKey();
+            String v = e.getValue();
+            if (k == null || v == null) continue;
+            conn.setRequestProperty(k, v);
+        }
+    }
+
+    /** D1：从 cookiejar 查询并注入 Cookie 头（若 cookiejar 为 null 则跳过）。 */
+    private void applyCookie(HttpURLConnection conn, String url) {
+        if (cookieJar == null) return;
+        String cookieHeader = cookieJar.cookieHeaderFor(url);
+        if (cookieHeader != null && !cookieHeader.isEmpty()) {
+            conn.setRequestProperty("Cookie", cookieHeader);
         }
     }
 
@@ -313,29 +403,87 @@ public final class HlsDownloader {
         }
     }
 
-    /** 读取续传元数据（已下载分片数）。 */
-    private int readResumeMeta(File metaFile) {
-        if (!metaFile.exists()) return 0;
-        try {
-            byte[] data = new byte[(int) Math.min(metaFile.length(), 32)];
-            try (java.io.FileInputStream fis = new java.io.FileInputStream(metaFile)) {
-                int n = fis.read(data);
-                if (n > 0) {
-                    return Integer.parseInt(new String(data, 0, n, StandardCharsets.UTF_8).trim());
-                }
-            }
-        } catch (Exception e) {
-            Log.w(TAG, "读取续传元数据失败: " + e.getMessage());
+    /**
+     * C1：读取 .ytdl JSON 续传元数据。
+     *
+     * <p>格式：{@code {"fragment_index":N,"total_fragments":M,"urls_sha256":"hex"}}</p>
+     *
+     * @return 元数据对象，文件不存在或解析失败返回 null
+     */
+    private YtdlMeta readYtdlMeta(File metaFile) {
+        if (!metaFile.exists()) return null;
+        try (FileInputStream fis = new FileInputStream(metaFile)) {
+            byte[] data = new byte[(int) Math.min(metaFile.length(), 8192)];
+            int n = fis.read(data);
+            if (n <= 0) return null;
+            String json = new String(data, 0, n, StandardCharsets.UTF_8).trim();
+            JSONObject obj = new JSONObject(json);
+            return new YtdlMeta(
+                    obj.optInt("fragment_index", 0),
+                    obj.optInt("total_fragments", 0),
+                    obj.optString("urls_sha256", ""));
+        } catch (IOException | JSONException e) {
+            Log.w(TAG, "读取 .ytdl 元数据失败，将从头下载: " + e.getMessage());
+            return null;
         }
-        return 0;
     }
 
-    /** 写入续传元数据。 */
-    private void writeResumeMeta(File metaFile, int segmentIndex) {
-        try (FileOutputStream fos = new FileOutputStream(metaFile)) {
-            fos.write(String.valueOf(segmentIndex).getBytes(StandardCharsets.UTF_8));
-        } catch (IOException e) {
-            Log.w(TAG, "写入续传元数据失败: " + e.getMessage());
+    /**
+     * C1：写入 .ytdl JSON 续传元数据。
+     *
+     * <p>每下载一个分片后调用，记录下一个待下载分片索引 + 播放列表指纹，
+     * 用于断点续传时检测播放列表是否变更。</p>
+     */
+    private void writeYtdlMeta(File metaFile, int fragmentIndex, int totalFragments,
+                                 String urlsSha256) {
+        try {
+            JSONObject obj = new JSONObject();
+            obj.put("fragment_index", fragmentIndex);
+            obj.put("total_fragments", totalFragments);
+            obj.put("urls_sha256", urlsSha256);
+            try (FileOutputStream fos = new FileOutputStream(metaFile)) {
+                fos.write(obj.toString().getBytes(StandardCharsets.UTF_8));
+            }
+        } catch (IOException | JSONException e) {
+            Log.w(TAG, "写入 .ytdl 元数据失败: " + e.getMessage());
+        }
+    }
+
+    /**
+     * C1：计算分片 URL 列表的 SHA-256 指纹。
+     *
+     * <p>用于检测播放列表变更（如直播流刷新、VOD 被替换）。
+     * 续传时若指纹不匹配，从头下载。</p>
+     */
+    private static String computeUrlsSha256(List<String> urls) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            StringBuilder sb = new StringBuilder();
+            for (String u : urls) {
+                sb.append(u).append('\n');
+            }
+            byte[] hash = md.digest(sb.toString().getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(hash.length * 2);
+            for (byte b : hash) {
+                hex.append(String.format("%02x", b & 0xff));
+            }
+            return hex.toString();
+        } catch (NoSuchAlgorithmException e) {
+            // SHA-256 是 JRE 必备算法，理论上不会抛此异常
+            return "sha256-unavailable";
+        }
+    }
+
+    /** C1：.ytdl JSON 续传元数据。 */
+    private static final class YtdlMeta {
+        final int fragmentIndex;
+        final int totalFragments;
+        final String urlsSha256;
+
+        YtdlMeta(int fragmentIndex, int totalFragments, String urlsSha256) {
+            this.fragmentIndex = fragmentIndex;
+            this.totalFragments = totalFragments;
+            this.urlsSha256 = urlsSha256 != null ? urlsSha256 : "";
         }
     }
 

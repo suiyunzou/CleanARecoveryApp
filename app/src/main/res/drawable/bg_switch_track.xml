@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 设置页拨动开关轨道：ON 亮青蓝胶囊，OFF 浅灰胶囊 + 发丝描边 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_checked="true">
+        <shape android:shape="rectangle">
+            <corners android:radius="13dp" />
+            <solid android:color="#2EC2F2" />
+            <size android:width="52dp" android:height="26dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="13dp" />
+            <solid android:color="#F3F3F3" />
+            <stroke android:width="1dp" android:color="@color/border_subtle" />
+            <size android:width="52dp" android:height="26dp" />
+        </shape>
+    </item>
+</selector>

@@ -19,19 +19,19 @@ public final class AlgorithmRegistryTest {
         assertNotNull(AlgorithmRegistry.byId(AccessibleSignatureSnifferAlgorithm.ID));
         assertNotNull(AlgorithmRegistry.byId(LostDirOrphanSnifferAlgorithm.ID));
         assertNotNull(AlgorithmRegistry.byId(SystemTrashScannerAlgorithm.ID));
+        assertNotNull(AlgorithmRegistry.byId(DotTrashedFileScannerAlgorithm.ID));
         assertNotNull(AlgorithmRegistry.byId(WechatDirectoryScannerAlgorithm.ID));
         assertNotNull(AlgorithmRegistry.byId(DeepValidationAlgorithm.ID));
         assertNotNull(AlgorithmRegistry.byId(LogEvidenceImportAlgorithm.ID));
         assertNotNull(AlgorithmRegistry.byId(OfflineF2fsImageAlgorithm.ID));
         assertNotNull(AlgorithmRegistry.byId(OfflineExt4JournalAlgorithm.ID));
-        assertEquals(12, AlgorithmRegistry.catalog().size());
+        assertEquals(13, AlgorithmRegistry.catalog().size());
     }
 
     @Test
-    public void offlineAndEvidenceAlgorithmsAreNotRunnable() {
+    public void offlineAlgorithmsRequireRootSoNotRunnableOnHost() {
+        // On a non-rooted/host JVM the offline cards stay disabled.
         AlgorithmContext context = new AlgorithmContext(null, RecoveryType.IMAGE);
-        assertFalse(AlgorithmRegistry.resolvedAvailability(
-                AlgorithmRegistry.byId(LogEvidenceImportAlgorithm.ID), context).isRunnable());
         assertFalse(AlgorithmRegistry.resolvedAvailability(
                 AlgorithmRegistry.byId(OfflineF2fsImageAlgorithm.ID), context).isRunnable());
         assertFalse(AlgorithmRegistry.resolvedAvailability(
@@ -39,9 +39,26 @@ public final class AlgorithmRegistryTest {
     }
 
     @Test
+    public void logEvidenceImportIsRunnable() {
+        AlgorithmContext context = new AlgorithmContext(null, RecoveryType.IMAGE);
+        assertTrue(AlgorithmRegistry.resolvedAvailability(
+                AlgorithmRegistry.byId(LogEvidenceImportAlgorithm.ID), context).isRunnable());
+    }
+
+    @Test
     public void defaultModeIncludesConservativeAlgorithmsOnly() {
+        // File-tree walk no longer counts: gallery-visible files are never results.
         assertEquals(7, AlgorithmRegistry.runnableForMode(ScanMode.DEFAULT, RecoveryType.IMAGE).size());
         assertEquals(6, AlgorithmRegistry.runnableForMode(ScanMode.DEFAULT, RecoveryType.VIDEO).size());
+    }
+
+    @Test
+    public void fileTreeWalkNeverRunsInProductScans() {
+        // Gallery-visible files are not recovery results in any scan mode.
+        for (ScanMode mode : ScanMode.values()) {
+            assertTrue(AlgorithmRegistry.runnableForMode(mode, RecoveryType.IMAGE).stream()
+                    .noneMatch(a -> FileTreeVisibleAlgorithm.ID.equals(a.id())));
+        }
     }
 
     @Test

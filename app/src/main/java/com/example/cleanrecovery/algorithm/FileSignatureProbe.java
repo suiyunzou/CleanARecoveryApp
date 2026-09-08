@@ -33,7 +33,14 @@ public final class FileSignatureProbe {
             return null;
         }
         byte[] prefix = readPrefix(file, ScanLimits.SIGNATURE_PREFIX_BYTES);
-        return probe(prefix);
+        ProbeResult result = probe(prefix);
+        if (result != null && MIME_ZIP.equals(result.mimeDetected)) {
+            // OOXML part names (word/, xl/, ppt/) sit past the 32-byte prefix,
+            // so re-read a small window to tell docx/xlsx/pptx from a plain zip.
+            byte[] window = readPrefix(file, ZIP_REFINE_BYTES);
+            return new ProbeResult(RecoveryType.DOCUMENT, zipMime(window));
+        }
+        return result;
     }
 
     public static ProbeResult probe(byte[] prefix) {
@@ -62,7 +69,10 @@ public final class FileSignatureProbe {
             return new ProbeResult(RecoveryType.DOCUMENT, "application/pdf");
         }
         if (matchesZip(prefix)) {
-            return new ProbeResult(RecoveryType.DOCUMENT, "application/zip");
+            // zipMime inspects whatever bytes we were handed; with only the
+            // 32-byte prefix it stays generic, but a larger buffer (carving,
+            // probe(File) refinement) can resolve docx/xlsx/pptx.
+            return new ProbeResult(RecoveryType.DOCUMENT, zipMime(prefix));
         }
         if (matchesFtyp(prefix)) {
             return new ProbeResult(RecoveryType.VIDEO, "video/mp4");
@@ -82,12 +92,6 @@ public final class FileSignatureProbe {
         if (matchesAmr(prefix)) {
             return new ProbeResult(RecoveryType.AUDIO, "audio/amr");
         }
-        if (matchesDocx(prefix)) {
-            return new ProbeResult(RecoveryType.DOCUMENT, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-        }
-        if (matchesXlsx(prefix)) {
-            return new ProbeResult(RecoveryType.DOCUMENT, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-        }
         return null;
     }
 
@@ -106,14 +110,14 @@ public final class FileSignatureProbe {
         }
     }
 
-    static boolean matchesJpeg(byte[] bytes) {
+    public static boolean matchesJpeg(byte[] bytes) {
         return bytes.length >= 3
                 && (bytes[0] & 0xFF) == 0xFF
                 && (bytes[1] & 0xFF) == 0xD8
                 && (bytes[2] & 0xFF) == 0xFF;
     }
 
-    static boolean matchesPng(byte[] bytes) {
+    public static boolean matchesPng(byte[] bytes) {
         return bytes.length >= 4
                 && (bytes[0] & 0xFF) == 0x89
                 && bytes[1] == 0x50
@@ -121,7 +125,7 @@ public final class FileSignatureProbe {
                 && bytes[3] == 0x47;
     }
 
-    static boolean matchesGif(byte[] bytes) {
+    public static boolean matchesGif(byte[] bytes) {
         if (bytes.length < 6) {
             return false;
         }
@@ -129,13 +133,13 @@ public final class FileSignatureProbe {
         return "GIF87a".equals(header) || "GIF89a".equals(header);
     }
 
-    static boolean matchesWebp(byte[] bytes) {
+    public static boolean matchesWebp(byte[] bytes) {
         return bytes.length >= 12
                 && bytes[0] == 'R' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == 'F'
                 && bytes[8] == 'W' && bytes[9] == 'E' && bytes[10] == 'B' && bytes[11] == 'P';
     }
 
-    static boolean matchesPdf(byte[] bytes) {
+    public static boolean matchesPdf(byte[] bytes) {
         return bytes.length >= 5
                 && bytes[0] == '%'
                 && bytes[1] == 'P'
@@ -144,64 +148,99 @@ public final class FileSignatureProbe {
                 && bytes[4] == '-';
     }
 
-    static boolean matchesZip(byte[] bytes) {
+    public static boolean matchesZip(byte[] bytes) {
         return bytes.length >= 4
                 && bytes[0] == 'P' && bytes[1] == 'K'
                 && bytes[2] == 0x03 && bytes[3] == 0x04;
     }
 
-    static boolean matchesFtyp(byte[] bytes) {
+    public static boolean matchesFtyp(byte[] bytes) {
         return bytes.length >= 8
                 && bytes[4] == 'f' && bytes[5] == 't' && bytes[6] == 'y' && bytes[7] == 'p';
     }
 
-    static boolean matchesBmp(byte[] bytes) {
+    public static boolean matchesBmp(byte[] bytes) {
         return bytes.length >= 2
                 && bytes[0] == 'B' && bytes[1] == 'M';
     }
 
-    static boolean matchesHeif(byte[] bytes) {
+    public static boolean matchesHeif(byte[] bytes) {
         return bytes.length >= 12
                 && bytes[4] == 'f' && bytes[5] == 't' && bytes[6] == 'y' && bytes[7] == 'p'
                 && bytes[8] == 'h' && bytes[9] == 'e' && bytes[10] == 'i' && bytes[11] == 'c';
     }
 
-    static boolean matchesRiff(byte[] bytes) {
+    public static boolean matchesRiff(byte[] bytes) {
         return bytes.length >= 12
                 && bytes[0] == 'R' && bytes[1] == 'I' && bytes[2] == 'F' && bytes[3] == 'F'
                 && bytes[8] == 'A' && bytes[9] == 'V' && bytes[10] == 'I' && bytes[11] == ' ';
     }
 
-    static boolean matchesMkv(byte[] bytes) {
+    public static boolean matchesMkv(byte[] bytes) {
         return bytes.length >= 4
                 && bytes[0] == 0x1A && bytes[1] == 0x45 && bytes[2] == (byte) 0xDF && bytes[3] == (byte) 0xA3;
     }
 
-    static boolean matchesOgg(byte[] bytes) {
+    public static boolean matchesOgg(byte[] bytes) {
         return bytes.length >= 4
                 && bytes[0] == 'O' && bytes[1] == 'g' && bytes[2] == 'g' && bytes[3] == 'S';
     }
 
-    static boolean matchesFlac(byte[] bytes) {
+    public static boolean matchesFlac(byte[] bytes) {
         return bytes.length >= 4
                 && bytes[0] == 'f' && bytes[1] == 'L' && bytes[2] == 'a' && bytes[3] == 'C';
     }
 
-    static boolean matchesAmr(byte[] bytes) {
+    public static boolean matchesAmr(byte[] bytes) {
         return bytes.length >= 6
                 && bytes[0] == '#' && bytes[1] == '!' && bytes[2] == 'A' && bytes[3] == 'M'
                 && bytes[4] == 'R' && bytes[5] == '\n';
     }
 
-    static boolean matchesDocx(byte[] bytes) {
-        return bytes.length >= 4
-                && bytes[0] == 'P' && bytes[1] == 'K'
-                && bytes[2] == 0x03 && bytes[3] == 0x04;
+    public static final String MIME_ZIP = "application/zip";
+    public static final String MIME_DOCX =
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    public static final String MIME_XLSX =
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    public static final String MIME_PPTX =
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+
+    private static final int ZIP_REFINE_BYTES = 512;
+
+    /**
+     * Resolve a ZIP-signatured buffer to a specific OOXML mime when the
+     * discriminating part name is visible, otherwise generic application/zip.
+     */
+    public static String zipMime(byte[] bytes) {
+        if (containsAscii(bytes, "word/")) {
+            return MIME_DOCX;
+        }
+        if (containsAscii(bytes, "xl/")) {
+            return MIME_XLSX;
+        }
+        if (containsAscii(bytes, "ppt/")) {
+            return MIME_PPTX;
+        }
+        return MIME_ZIP;
     }
 
-    static boolean matchesXlsx(byte[] bytes) {
-        return bytes.length >= 4
-                && bytes[0] == 'P' && bytes[1] == 'K'
-                && bytes[2] == 0x03 && bytes[3] == 0x04;
+    static boolean containsAscii(byte[] haystack, String needle) {
+        if (haystack == null || needle == null) {
+            return false;
+        }
+        byte[] target = needle.getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        if (target.length == 0 || haystack.length < target.length) {
+            return false;
+        }
+        outer:
+        for (int i = 0; i + target.length <= haystack.length; i++) {
+            for (int j = 0; j < target.length; j++) {
+                if (haystack[i + j] != target[j]) {
+                    continue outer;
+                }
+            }
+            return true;
+        }
+        return false;
     }
 }

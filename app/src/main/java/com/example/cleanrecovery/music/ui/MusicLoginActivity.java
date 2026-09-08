@@ -8,7 +8,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
-import android.widget.Toast;
+import com.example.cleanrecovery.ui.widget.GlassToast;
 
 import com.example.cleanrecovery.R;
 import com.example.cleanrecovery.ui.widget.SystemUiHelper;
@@ -79,7 +79,7 @@ public final class MusicLoginActivity extends Activity {
         codeButton.setOnClickListener(v -> {
             String phone = accountInput.getText().toString().trim();
             if (TextUtils.isEmpty(phone)) {
-                Toast.makeText(this, R.string.music_login_phone_required, Toast.LENGTH_SHORT).show();
+                GlassToast.makeText(this, R.string.music_login_phone_required, GlassToast.LENGTH_SHORT).show();
                 return;
             }
             requestCode(phone);
@@ -89,11 +89,11 @@ public final class MusicLoginActivity extends Activity {
             String phone = accountInput.getText().toString().trim();
             String code = passwordInput.getText().toString().trim();
             if (TextUtils.isEmpty(phone)) {
-                Toast.makeText(this, R.string.music_login_phone_required, Toast.LENGTH_SHORT).show();
+                GlassToast.makeText(this, R.string.music_login_phone_required, GlassToast.LENGTH_SHORT).show();
                 return;
             }
             if (TextUtils.isEmpty(code)) {
-                Toast.makeText(this, R.string.music_login_code_required, Toast.LENGTH_SHORT).show();
+                GlassToast.makeText(this, R.string.music_login_code_required, GlassToast.LENGTH_SHORT).show();
                 return;
             }
             performLogin(phone, code);
@@ -111,26 +111,26 @@ public final class MusicLoginActivity extends Activity {
             try {
                 app.auth.requestLoginCode(phone);
                 runOnUiThread(() -> {
-                    Toast.makeText(this, R.string.music_login_sms_sent, Toast.LENGTH_SHORT).show();
+                    GlassToast.makeText(this, R.string.music_login_sms_sent, GlassToast.LENGTH_SHORT).show();
                     startCodeCountdown();
                 });
             } catch (RateLimiter.RateLimitException e) {
                 runOnUiThread(() -> {
                     codeButton.setEnabled(true);
-                    Toast.makeText(this, e.getMessage(), Toast.LENGTH_SHORT).show();
+                    GlassToast.makeText(this, e.getMessage(), GlassToast.LENGTH_SHORT).show();
                 });
             } catch (AuthException e) {
                 runOnUiThread(() -> {
                     codeButton.setEnabled(true);
                     String msg = authErrorMessage(e);
-                    Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+                    GlassToast.makeText(this, msg, GlassToast.LENGTH_SHORT).show();
                 });
             } catch (Exception e) {
                 runOnUiThread(() -> {
                     codeButton.setEnabled(true);
-                    Toast.makeText(this,
+                    GlassToast.makeText(this,
                             getString(R.string.music_login_code_send_failed, e.getMessage()),
-                            Toast.LENGTH_SHORT).show();
+                            GlassToast.LENGTH_SHORT).show();
                 });
             }
         });
@@ -153,21 +153,21 @@ public final class MusicLoginActivity extends Activity {
             } catch (RateLimiter.RateLimitException e) {
                 runOnUiThread(() -> {
                     submitButton.setEnabled(true);
-                    Toast.makeText(this, e.getMessage(), Toast.LENGTH_LONG).show();
+                    GlassToast.makeText(this, e.getMessage(), GlassToast.LENGTH_LONG).show();
                 });
             } catch (AuthException e) {
                 runOnUiThread(() -> {
                     submitButton.setEnabled(true);
-                    Toast.makeText(this,
+                    GlassToast.makeText(this,
                             getString(R.string.music_login_failed, authErrorMessage(e)),
-                            Toast.LENGTH_SHORT).show();
+                            GlassToast.LENGTH_SHORT).show();
                 });
             } catch (Exception e) {
                 runOnUiThread(() -> {
                     submitButton.setEnabled(true);
-                    Toast.makeText(this,
+                    GlassToast.makeText(this,
                             getString(R.string.music_login_failed, e.getMessage()),
-                            Toast.LENGTH_SHORT).show();
+                            GlassToast.LENGTH_SHORT).show();
                 });
             }
         });

@@ -82,6 +82,8 @@ public final class RecoveryResultsStore {
                 object.put("height", item.height);
                 object.put("suspectedDeleted", item.suspectedDeleted);
                 object.put("sourceKind", item.sourceKind.name());
+                object.put("recoverable", item.recoverable);
+                object.put("expiresAt", item.expiresAt);
                 array.put(object);
             }
             root.put("items", array);
@@ -137,6 +139,10 @@ public final class RecoveryResultsStore {
             return null;
         }
         String name = object.optString("name", new File(path).getName());
+        RecoverySourceKind sourceKind = parseSourceKind(object.optString("sourceKind",
+                RecoverySourceKind.VISIBLE_SHARED_FILE.name()));
+        boolean recoverable = object.optBoolean("recoverable", true);
+        long expiresAt = object.optLong("expiresAt", 0L);
         return new RecoveryItem(
                 type,
                 name,
@@ -146,7 +152,9 @@ public final class RecoveryResultsStore {
                 object.optInt("width", 0),
                 object.optInt("height", 0),
                 object.optBoolean("suspectedDeleted", false),
-                parseSourceKind(object.optString("sourceKind", RecoverySourceKind.VISIBLE_SHARED_FILE.name()))
+                sourceKind,
+                recoverable,
+                expiresAt
         );
     }
 

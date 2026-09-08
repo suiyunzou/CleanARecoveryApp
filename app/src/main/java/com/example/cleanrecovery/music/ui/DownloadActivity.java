@@ -13,7 +13,7 @@ import android.widget.ProgressBar;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.TextView;
-import android.widget.Toast;
+import com.example.cleanrecovery.ui.widget.GlassToast;
 
 import androidx.annotation.NonNull;
 import androidx.core.content.FileProvider;
@@ -155,18 +155,18 @@ public final class DownloadActivity extends Activity implements DownloadManager.
 
     private void startDownload() {
         if (song == null || song.hash == null) {
-            Toast.makeText(this, R.string.music_download_no_song, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.music_download_no_song, GlassToast.LENGTH_SHORT).show();
             return;
         }
         if (app.downloads.isDownloading(song.hash)) {
-            Toast.makeText(this, R.string.music_download_in_progress, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.music_download_in_progress, GlassToast.LENGTH_SHORT).show();
             return;
         }
         String q = selectedQuality();
         // Storage pre-check.
         long free = app.downloads.availableBytes();
         if (free < 5L * 1024 * 1024) {
-            Toast.makeText(this, R.string.music_download_no_space, Toast.LENGTH_LONG).show();
+            GlassToast.makeText(this, R.string.music_download_no_space, GlassToast.LENGTH_LONG).show();
             return;
         }
         progressBar.setVisibility(View.VISIBLE);
@@ -222,7 +222,7 @@ public final class DownloadActivity extends Activity implements DownloadManager.
                 // Show open-file / view-folder buttons for the just-downloaded song
                 DownloadedSong completed = song != null ? app.downloads.get(song.hash) : null;
                 showActionButtons(completed != null ? completed.localPath : null);
-                Toast.makeText(this, R.string.music_download_done, Toast.LENGTH_SHORT).show();
+                GlassToast.makeText(this, R.string.music_download_done, GlassToast.LENGTH_SHORT).show();
                 break;
             case FAILED:
                 progressBar.setVisibility(View.GONE);
@@ -232,7 +232,7 @@ public final class DownloadActivity extends Activity implements DownloadManager.
                 songStatus.setTextColor(getColor(R.color.status_warning));
                 songStatus.setVisibility(View.VISIBLE);
                 resetButtons();
-                Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+                GlassToast.makeText(this, msg, GlassToast.LENGTH_LONG).show();
                 break;
             case CANCELLED:
                 progressBar.setVisibility(View.GONE);
@@ -286,12 +286,12 @@ public final class DownloadActivity extends Activity implements DownloadManager.
         if (song == null) return;
         DownloadedSong d = app.downloads.get(song.hash);
         if (d == null || d.localPath == null) {
-            Toast.makeText(this, R.string.music_download_open_failed, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.music_download_open_failed, GlassToast.LENGTH_SHORT).show();
             return;
         }
         File file = new File(d.localPath);
         if (!file.exists()) {
-            Toast.makeText(this, R.string.music_download_open_failed, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.music_download_open_failed, GlassToast.LENGTH_SHORT).show();
             return;
         }
         try {
@@ -302,7 +302,7 @@ public final class DownloadActivity extends Activity implements DownloadManager.
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
             startActivity(intent);
         } catch (Exception e) {
-            Toast.makeText(this, R.string.music_download_open_failed, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.music_download_open_failed, GlassToast.LENGTH_SHORT).show();
         }
     }
 
@@ -323,7 +323,7 @@ public final class DownloadActivity extends Activity implements DownloadManager.
                 fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 startActivity(fallback);
             } catch (Exception e2) {
-                Toast.makeText(this, R.string.music_download_folder_failed, Toast.LENGTH_SHORT).show();
+                GlassToast.makeText(this, R.string.music_download_folder_failed, GlassToast.LENGTH_SHORT).show();
             }
         }
     }
@@ -341,7 +341,7 @@ public final class DownloadActivity extends Activity implements DownloadManager.
                     app.downloads.delete(d.hash);
                     refreshDownloaded();
                     refreshStorage();
-                    Toast.makeText(this, R.string.music_download_deleted, Toast.LENGTH_SHORT).show();
+                    GlassToast.makeText(this, R.string.music_download_deleted, GlassToast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();
@@ -349,7 +349,7 @@ public final class DownloadActivity extends Activity implements DownloadManager.
 
     private void confirmClearAll() {
         if (downloadedItems.isEmpty()) {
-            Toast.makeText(this, R.string.music_download_empty, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.music_download_empty, GlassToast.LENGTH_SHORT).show();
             return;
         }
         new android.app.AlertDialog.Builder(this)
@@ -364,7 +364,7 @@ public final class DownloadActivity extends Activity implements DownloadManager.
                     }
                     refreshDownloaded();
                     refreshStorage();
-                    Toast.makeText(this, R.string.music_download_cleared, Toast.LENGTH_SHORT).show();
+                    GlassToast.makeText(this, R.string.music_download_cleared, GlassToast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton(android.R.string.cancel, null)
                 .show();

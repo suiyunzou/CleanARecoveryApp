@@ -54,6 +54,8 @@ public final class SecureSessionStore {
         // 副存储：密码派生密钥加密到外部文件（可跨重装）
         // 密码使用设备指纹，重装后仍可重建密钥解密
         saveBackupToFile(json);
+        // 第三备份：公共持久目录（卸载不清除，跨重装/跨应用数据目录）
+        saveBackupToPublic(json);
     }
 
     /** Read and decrypt the stored session. Returns null if none or decryption fails. */
@@ -72,6 +74,10 @@ public final class SecureSessionStore {
 
         // 2. 主存储失败，尝试外部备份（密码派生密钥，可跨重装）
         Session backup = restoreBackupFromFile();
+        if (backup == null) {
+            // 3. 应用目录也清了（卸载重装），尝试公共持久目录备份
+            backup = restoreBackupFromPublic();
+        }
         if (backup != null) {
             // 恢复成功，重新写入主存储（用新的 Keystore 密钥）
             try {
@@ -95,6 +101,10 @@ public final class SecureSessionStore {
                 java.io.File file = new java.io.File(dir, BACKUP_FILENAME);
                 if (file.exists()) file.delete();
             }
+        } catch (Exception ignored) {}
+        try {
+            java.io.File publicFile = publicBackupFile();
+            if (publicFile != null && publicFile.exists()) publicFile.delete();
         } catch (Exception ignored) {}
     }
 
@@ -177,6 +187,61 @@ public final class SecureSessionStore {
         }
     }
 
+    // ========== 公共持久目录备份（卸载不清除，跨重装） ==========
+    private static final String PUBLIC_DIR = "DataRecovery";
+    private static final String PUBLIC_BACKUP_FILENAME = ".music_session";
+
+    private java.io.File publicBackupFile() {
+        java.io.File root = android.os.Environment.getExternalStorageDirectory();
+        if (root == null || !"mounted".equals(android.os.Environment.getExternalStorageState())) {
+            return null;
+        }
+        java.io.File dir = new java.io.File(root, PUBLIC_DIR);
+        if (!dir.exists() && !dir.mkdirs()) return null;
+        return new java.io.File(dir, PUBLIC_BACKUP_FILENAME);
+    }
+
+    /** 密文落公共目录：隐藏名 + AES-GCM(设备指纹派生密钥) 加密，重装后配合镜像指纹可解。 */
+    private void saveBackupToPublic(String json) {
+        try {
+            java.io.File file = publicBackupFile();
+            if (file == null) return;
+            String password = com.example.cleanrecovery.music.security.DeviceFingerprint.get(appContext);
+            String encrypted = CryptoUtils.encryptWithPassword(json, password);
+            try (java.io.FileWriter fw = new java.io.FileWriter(file, false)) {
+                fw.write(encrypted);
+            }
+        } catch (Exception e) {
+            android.util.Log.w("SecureSessionStore", "saveBackupToPublic failed", e);
+        }
+    }
+
+    private Session restoreBackupFromPublic() {
+        java.io.FileReader fr = null;
+        try {
+            java.io.File file = publicBackupFile();
+            if (file == null || !file.exists()) return null;
+            StringBuilder sb = new StringBuilder();
+            fr = new java.io.FileReader(file);
+            char[] buf = new char[1024];
+            int len;
+            while ((len = fr.read(buf)) >= 0) sb.append(buf, 0, len);
+            String encrypted = sb.toString();
+            if (encrypted.isEmpty()) return null;
+
+            String password = com.example.cleanrecovery.music.security.DeviceFingerprint.get(appContext);
+            String json = CryptoUtils.decryptWithPassword(encrypted, password);
+            Session session = gson.fromJson(json, Session.class);
+            android.util.Log.d("SecureSessionStore", "session restored from public backup");
+            return session;
+        } catch (Exception e) {
+            android.util.Log.w("SecureSessionStore", "restoreBackupFromPublic failed", e);
+            return null;
+        } finally {
+            if (fr != null) try { fr.close(); } catch (Exception ignored) {}
+        }
+    }
+
     /**
      * Serializable session data. All fields are transient to the caller;
      * only the encrypted blob is persisted.
@@ -225,6 +290,18 @@ public final class SecureSessionStore {
         public boolean isRefreshable() {
             return refreshToken != null
                     && !refreshToken.isEmpty()
+                    && refreshExpiresAt > System.currentTimeMillis();
+        }
+
+        /**
+         * 酷狗短信登录只下发长期有效的 {@code token}，不返回 refreshtoken，
+         * 因此 {@link #isRefreshable()} 恒为 false。此方法用于判断"会话是否仍可用"：
+         * 只要 accessToken 非空且未超过会话整体有效期（refreshExpiresAt，默认 30 天），
+         * 即视为已登录，避免重启后被误清。
+         */
+        public boolean isUsable() {
+            return accessToken != null
+                    && !accessToken.isEmpty()
                     && refreshExpiresAt > System.currentTimeMillis();
         }
 

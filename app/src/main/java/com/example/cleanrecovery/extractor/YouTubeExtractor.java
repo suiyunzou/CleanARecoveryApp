@@ -25,6 +25,7 @@ import java.util.regex.Pattern;
  *       对应 yt-dlp INNERTUBE_CLIENTS['android_vr']。</li>
  *   <li><b>android 客户端</b>（备选）：REQUIRE_JS_PLAYER=False，
  *       可能需要 PO Token 但部分视频可用。对应 INNERTUBE_CLIENTS['android']。</li>
+ *   <li><b>ios 客户端</b>（备选）：TVHTML5 已被下线，IOS 为第二备选。</li>
  *   <li><b>web 客户端</b>（回退）：从 watch 页面提取 ytInitialPlayerResponse，
  *       可能触发反爬。对应 _WEBPAGE_CLIENTS。</li>
  * </ol>
@@ -139,22 +140,17 @@ public class YouTubeExtractor implements Extractor {
     }
 
     /**
-     * tv 客户端配置（对应 yt-dlp INNERTUBE_CLIENTS['tv']）。
+     * ios 客户端配置（对应 yt-dlp INNERTUBE_CLIENTS['ios']）。
      *
-     * <p>TVHTML5 客户端，用于 Smart TV。优势：</p>
-     * <ul>
-     *   <li>无 GVS_PO_TOKEN_POLICY：不需要 PO Token（HTTPS/DASH/HLS 均不需要）</li>
-     *   <li>无 REQUIRE_JS_PLAYER：不需要签名解密</li>
-     *   <li>返回 HLS manifest URL，可被 HlsDownloader 直接处理</li>
-     *   <li>Smart TV 客户端可能不触发反机器人检测</li>
-     * </ul>
+     * <p>实链验证（2026-08 经代理）：ANDROID_VR 返回 27 个直链、ANDROID 仅剩
+     * 1 个、TVHTML5 已死（UNPLAYABLE "The page needs to be reloaded"）、
+     * IOS 返回 16 路自适应直链。故备选链为 android_vr → ios。</p>
      */
-    private static final class TvClient {
-        static final String NAME = "TVHTML5";
-        static final String VERSION = "7.20260114.12.00";
+    private static final class IosClient {
+        static final String NAME = "IOS";
+        static final String VERSION = "21.02.1";
         static final String USER_AGENT =
-                "Mozilla/5.0 (ChromiumStylePlatform) Cobalt/25.lts.30.1034943-gold " +
-                "(unlike Gecko), Unknown_TV_Unknown_0/Unknown (Unknown, Unknown)";
+                "com.google.ios.youtube/21.02.1 (iPhone16,2; U; CPU iOS 18_1 like Mac OS X;) gzip";
     }
 
     @Override
@@ -198,24 +194,41 @@ public class YouTubeExtractor implements Extractor {
         }
 
         // 3. 按优先级尝试多个客户端（对应 yt-dlp _extract_player_responses 的多客户端策略）
+        // 实测矩阵（2026-08-31，直链 Range 下载验证）：IOS 206 可下载、ANDROID(itag18)
+        // 206 可下载、ANDROID_VR 解析出 27 个直链但全部 403（已被 PO Token 强制）
         ExtractorResult result = null;
         ExtractorException lastError = null;
 
-        // 3a. 首选：android_vr 客户端（REQUIRE_JS_PLAYER=False，无需 PO Token）
+        // 3a. 首选：ios 客户端（直链实测可下载，16 路自适应）
         try {
-            result = extractViaInnertube(videoId, AndroidVrClient.NAME, AndroidVrClient.VERSION,
-                    AndroidVrClient.USER_AGENT, AndroidVrClient.DEVICE_MAKE, AndroidVrClient.DEVICE_MODEL,
-                    AndroidVrClient.ANDROID_SDK, AndroidVrClient.OS_NAME, AndroidVrClient.OS_VERSION,
+            result = extractViaInnertube(videoId, IosClient.NAME, IosClient.VERSION,
+                    IosClient.USER_AGENT, null, null, 0, null, null,
                     youtubeCookies);
-            Log.i(TAG, "android_vr 客户端提取成功");
+            Log.i(TAG, "ios 客户端提取成功");
         } catch (ExtractorException e) {
             lastError = e;
-            Log.w(TAG, "android_vr 客户端失败: " + e.getKind() + " " + e.getMessage());
+            Log.w(TAG, "ios 客户端失败: " + e.getKind() + " " + e.getMessage());
         } catch (IOException e) {
-            Log.w(TAG, "android_vr 客户端网络错误: " + e.getMessage());
+            Log.w(TAG, "ios 客户端网络错误: " + e.getMessage());
         }
 
-        // 3b. 备选：android 客户端
+        // 3b. 备选：android_vr（解析仍 OK，但直链已普遍 403，仅作格式兜底）
+        if (result == null) {
+            try {
+                result = extractViaInnertube(videoId, AndroidVrClient.NAME, AndroidVrClient.VERSION,
+                        AndroidVrClient.USER_AGENT, AndroidVrClient.DEVICE_MAKE, AndroidVrClient.DEVICE_MODEL,
+                        AndroidVrClient.ANDROID_SDK, AndroidVrClient.OS_NAME, AndroidVrClient.OS_VERSION,
+                        youtubeCookies);
+                Log.i(TAG, "android_vr 客户端提取成功");
+            } catch (ExtractorException e) {
+                if (lastError == null) lastError = e;
+                Log.w(TAG, "android_vr 客户端失败: " + e.getKind() + " " + e.getMessage());
+            } catch (IOException e) {
+                Log.w(TAG, "android_vr 网络错误: " + e.getMessage());
+            }
+        }
+
+        // 3c. 备选：android 客户端（仅剩 itag18 合并格式，低画质保底）
         if (result == null) {
             try {
                 result = extractViaInnertube(videoId, AndroidClient.NAME, AndroidClient.VERSION,
@@ -228,20 +241,6 @@ public class YouTubeExtractor implements Extractor {
                 Log.w(TAG, "android 客户端失败: " + e.getKind() + " " + e.getMessage());
             } catch (IOException e) {
                 Log.w(TAG, "android 客户端网络错误: " + e.getMessage());
-            }
-        }
-
-        // 3c. 备选：tv 客户端（TVHTML5，无 PO Token 要求，返回 HLS manifest）
-        if (result == null) {
-            try {
-                result = extractViaInnertube(videoId, TvClient.NAME, TvClient.VERSION,
-                        TvClient.USER_AGENT, null, null, 0, null, null, youtubeCookies);
-                Log.i(TAG, "tv 客户端提取成功");
-            } catch (ExtractorException e) {
-                if (lastError == null) lastError = e;
-                Log.w(TAG, "tv 客户端失败: " + e.getKind() + " " + e.getMessage());
-            } catch (IOException e) {
-                Log.w(TAG, "tv 客户端网络错误: " + e.getMessage());
             }
         }
 
@@ -263,9 +262,20 @@ public class YouTubeExtractor implements Extractor {
                 throw lastError;
             }
             throw new ExtractorException(ExtractorException.Kind.PARSE_FAILED,
-                    "所有提取方法均失败（android_vr、android、watch 页面）");
+                    "所有提取方法均失败（android_vr、ios、android、watch 页面）");
         }
         return result;
+    }
+
+    /** InnerTube 客户端名 → X-YouTube-Client-Name 数字 ID（yt-dlp 同款标识位）。 */
+    private static String clientNameToId(String clientName) {
+        if (clientName == null) return "1";
+        switch (clientName) {
+            case "ANDROID_VR": return "28";
+            case "ANDROID":    return "3";
+            case "IOS":        return "5";
+            default:           return "1";
+        }
     }
 
     /**
@@ -384,6 +394,7 @@ public class YouTubeExtractor implements Extractor {
         headers.put("X-Goog-Api-Format-Version", "2");
         headers.put("Origin", "https://www.youtube.com");
         headers.put("Referer", "https://www.youtube.com/");
+        headers.put("X-YouTube-Client-Name", clientNameToId(clientName));
         // 携带预获取的 cookies（对应 yt-dlp cookiejar，绕过反机器人检测）
         if (cookies != null && !cookies.isEmpty()) {
             headers.put("Cookie", cookies);
@@ -411,7 +422,7 @@ public class YouTubeExtractor implements Extractor {
                     "InnerTube 响应 JSON 解析失败: " + e.getMessage());
         }
 
-        return buildResultFromPlayerResponse(playerResponse, videoId);
+        return buildResultFromPlayerResponse(playerResponse, videoId, userAgent);
     }
 
     /**
@@ -457,12 +468,14 @@ public class YouTubeExtractor implements Extractor {
                     "无法从页面提取 ytInitialPlayerResponse");
         }
 
-        return buildResultFromPlayerResponse(playerResponse, videoId);
+        return buildResultFromPlayerResponse(playerResponse, videoId,
+                ExtractorHttp.DEFAULT_UA);
     }
 
-    /** 从 playerResponse JSON 构建 ExtractorResult。 */
+    /** 从 playerResponse JSON 构建 ExtractorResult（clientUa 随格式下发，供下载端直链校验）。 */
     private ExtractorResult buildResultFromPlayerResponse(JSONObject playerResponse,
-                                                           String videoId)
+                                                           String videoId,
+                                                           String clientUa)
             throws ExtractorException {
         // 检查 playabilityStatus（对应 yt-dlp _extract_player_response 中的状态检查）
         checkPlayability(playerResponse);
@@ -481,12 +494,12 @@ public class YouTubeExtractor implements Extractor {
         // 合并格式（video+audio，对应 yt-dlp streamingData.formats）
         JSONArray combinedFormats = streamingData.optJSONArray("formats");
         if (combinedFormats != null) {
-            addFormatsFromJsonArray(combinedFormats, formats, true);
+            addFormatsFromJsonArray(combinedFormats, formats, true, clientUa);
         }
         // 分离格式（DASH，对应 yt-dlp streamingData.adaptiveFormats）
         JSONArray adaptiveFormats = streamingData.optJSONArray("adaptiveFormats");
         if (adaptiveFormats != null) {
-            addFormatsFromJsonArray(adaptiveFormats, formats, false);
+            addFormatsFromJsonArray(adaptiveFormats, formats, false, clientUa);
         }
 
         // HLS manifest URL（对应 yt-dlp streamingData.hlsManifestUrl）
@@ -623,11 +636,11 @@ public class YouTubeExtractor implements Extractor {
      * 仅保留有直接 URL 的格式（跳过 signatureCipher，因为不实现 JS 签名解密）。</p>
      */
     private void addFormatsFromJsonArray(JSONArray arr, List<ExtractorResult.Format> out,
-                                          boolean isCombined) {
+                                          boolean isCombined, String clientUa) {
         for (int i = 0; i < arr.length(); i++) {
             try {
                 JSONObject fmt = arr.getJSONObject(i);
-                ExtractorResult.Format f = parseFormat(fmt, isCombined);
+                ExtractorResult.Format f = parseFormat(fmt, isCombined, clientUa);
                 if (f != null) out.add(f);
             } catch (org.json.JSONException e) {
                 Log.w(TAG, "格式解析失败: " + e.getMessage());
@@ -641,7 +654,7 @@ public class YouTubeExtractor implements Extractor {
      * <p>对应 yt-dlp process_format_stream 中的格式解析逻辑。
      * 仅使用带直接 URL 的格式；signatureCipher 格式需要 JS 解密，跳过。</p>
      */
-    private ExtractorResult.Format parseFormat(JSONObject fmt, boolean isCombined) {
+    private ExtractorResult.Format parseFormat(JSONObject fmt, boolean isCombined, String clientUa) {
         String url = fmt.optString("url", null);
 
         // signatureCipher 格式需要 JS 签名解密，不实现（对应 yt-dlp REQUIRE_JS_PLAYER=False 的行为）
@@ -658,6 +671,16 @@ public class YouTubeExtractor implements Extractor {
         String ext = mimeToExt(mimeType);
         String vcodec = extractCodec(mimeType, "video");
         String acodec = extractCodec(mimeType, "audio");
+        // 音频流的 vcodec、视频流的 acodec 必须规范成 "none"（而非 "unknown"），
+        // 否则 isAudioOnly/isVideoOnly 判定失效：纯音频混进画质列表、
+        // DASH 视频轨不触发音轨合并 → 产出无声视频
+        String lowerMime = mimeType.toLowerCase();
+        if (lowerMime.startsWith("audio/") && "none".equals(acodec) == false) {
+            vcodec = "none";
+        }
+        if (lowerMime.startsWith("video/") && "unknown".equals(acodec)) {
+            acodec = "none";
+        }
 
         int width = fmt.optInt("width", 0);
         int height = fmt.optInt("height", 0);
@@ -671,10 +694,16 @@ public class YouTubeExtractor implements Extractor {
         // 画质描述
         String desc = buildFormatDescription(itag, height, fps, vcodec, acodec, isCombined);
 
-        return new ExtractorResult.Format(
-                url, ext, height, vcodec, acodec,
-                (int) Math.min(tbr, Integer.MAX_VALUE),
-                width, height, contentLength, desc);
+        // googlevideo 直链校验下载端 UA：必须与签发该链接的 InnerTube 客户端一致，
+        // 否则 403（实测模拟器复现）。UA 由 extractViaInnertube 传入
+        return new ExtractorResult.Format.Builder()
+                .url(url).ext(ext).quality(height)
+                .vcodec(vcodec).acodec(acodec)
+                .tbr((int) Math.min(tbr, Integer.MAX_VALUE))
+                .width(width).height(height)
+                .filesize(contentLength).description(desc)
+                .httpHeader("User-Agent", clientUa != null ? clientUa : ExtractorHttp.DEFAULT_UA)
+                .build();
     }
 
     /** MIME 类型转扩展名。 */

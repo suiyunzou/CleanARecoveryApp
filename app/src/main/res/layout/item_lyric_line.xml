@@ -1,13 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
-<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- 歌词行：原文 + 翻译（概念版双语样式，翻译可隐藏）。
+     行尾不再放固定播放按钮：拖动歌词时由歌词区中轴的「时间+进度线+播放钮」浮动条承接跳转。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:gravity="center"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
     android:paddingHorizontal="@dimen/space_xl"
     android:paddingVertical="@dimen/space_md"
-    android:textColor="@color/text_secondary"
-    android:textSize="16sp"
-    android:lineSpacingExtra="2dp"
     android:clickable="true"
     android:focusable="true"
-    android:background="?android:attr/selectableItemBackground" />
+    android:background="?android:attr/selectableItemBackground">
+
+    <TextView
+        android:id="@+id/lyric_line_text"
+        android:layout_width="wrap_content"
+        android:maxWidth="280dp"
+        android:breakStrategy="balanced"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:textColor="@color/text_secondary"
+        android:textSize="16sp"
+        android:lineSpacingExtra="2dp" />
+
+    <TextView
+        android:id="@+id/lyric_line_translation"
+        android:layout_width="wrap_content"
+        android:maxWidth="280dp"
+        android:breakStrategy="balanced"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:gravity="center"
+        android:textColor="@color/text_hint"
+        android:textSize="13sp"
+        android:lineSpacingExtra="2dp"
+        android:visibility="gone" />
+</LinearLayout>

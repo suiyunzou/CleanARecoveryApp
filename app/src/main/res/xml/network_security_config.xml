@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
+    <!-- VIA 对齐：浏览器模块必须能打开普通 HTTP 站点；敏感 API 域名在下方继续显式禁用明文。 -->
+    <base-config cleartextTrafficPermitted="true" />
+
     <!-- 酷狗 API 和 CDN 域名允许明文 HTTP（部分接口和 CDN 仅支持 HTTP） -->
     <domain-config cleartextTrafficPermitted="true">
         <domain includeSubdomains="true">kugou.com</domain>

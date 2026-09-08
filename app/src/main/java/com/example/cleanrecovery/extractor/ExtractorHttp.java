@@ -1,5 +1,7 @@
 package com.example.cleanrecovery.extractor;
 
+import com.example.cleanrecovery.ytdlp.CookieJar;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -18,6 +20,12 @@ import java.util.Map;
  * Referer、Cookie 等请求头，以及重定向、超时、错误码。</p>
  *
  * <p>所有提取器应通过本类发起网络请求，避免重复代码。</p>
+ *
+ * <h3>P0 D1 改动：Cookie 注入</h3>
+ * <p>M1 新增全局 {@link CookieJar} 引用，{@link #openConnection} 在应用请求头后
+ * 自动从 cookiejar 查询对应域名 Cookie 并注入 {@code Cookie} 头。解决 WebView 嗅探
+ * 到的直链因缺少会话 Cookie 导致 403 的问题（D1 决策）。</p>
+ * <p>仅当调用方未显式提供 {@code Cookie} 头时才注入，避免覆盖显式控制。</p>
  */
 public final class ExtractorHttp {
 
@@ -30,6 +38,22 @@ public final class ExtractorHttp {
     public static final String DEFAULT_UA =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
+    /**
+     * 全局 cookiejar 引用（D1），由 {@code PersistentCookieJar.getInstance(ctx)} 设置。
+     * 所有提取器请求自动注入对应域名 Cookie，解决 WebView Cookie 不共享。
+     */
+    private static volatile CookieJar globalCookieJar;
+
+    /** 设置全局 cookiejar（由 Application 或 Activity onCreate 调用）。 */
+    public static void setGlobalCookieJar(CookieJar jar) {
+        globalCookieJar = jar;
+    }
+
+    /** 获取全局 cookiejar（可能为 null）。 */
+    public static CookieJar getGlobalCookieJar() {
+        return globalCookieJar;
+    }
 
     private ExtractorHttp() {}
 
@@ -208,6 +232,21 @@ public final class ExtractorHttp {
         conn.setInstanceFollowRedirects(true);
         for (Map.Entry<String, String> e : h.entrySet()) {
             conn.setRequestProperty(e.getKey(), e.getValue());
+        }
+
+        // D1：Cookie 注入 —— 仅当调用方未显式提供 Cookie 头时，从全局 cookiejar 查询注入
+        boolean hasCookie = false;
+        for (String k : h.keySet()) {
+            if (k != null && k.equalsIgnoreCase("Cookie")) {
+                hasCookie = true;
+                break;
+            }
+        }
+        if (!hasCookie && globalCookieJar != null) {
+            String cookieHeader = globalCookieJar.cookieHeaderFor(url);
+            if (cookieHeader != null && !cookieHeader.isEmpty()) {
+                conn.setRequestProperty("Cookie", cookieHeader);
+            }
         }
         return conn;
     }

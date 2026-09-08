@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background_app"
+    android:background="@drawable/bg_home_gradient"
     android:fitsSystemWindows="true"
     android:orientation="vertical">
 
@@ -13,189 +14,288 @@
         android:layout_weight="1">
 
         <ScrollView
-            android:id="@+id/home_panel"
+        android:id="@+id/home_panel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_home_gradient"
+        android:clipToPadding="false"
+        android:fillViewport="true">
+
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clipToPadding="false"
-            android:fillViewport="true">
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/space_lg"
+            android:paddingTop="12dp"
+            android:paddingEnd="@dimen/space_lg"
+            android:paddingBottom="24dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:orientation="vertical"
-                android:padding="@dimen/space_md">
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical|end"
+                android:orientation="horizontal">
 
                 <LinearLayout
                     android:id="@+id/permission_banner"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:background="@drawable/bg_permission_banner_ok"
-                    android:orientation="vertical"
-                    android:padding="@dimen/space_md">
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:background="@drawable/bg_permission_badge"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="@dimen/space_lg"
+                    android:paddingEnd="@dimen/space_lg">
+
+                    <ImageView
+                        android:id="@+id/permission_badge_icon"
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:contentDescription="@null"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_check_small" />
 
                     <TextView
                         android:id="@+id/permission_banner_title"
-                        android:layout_width="match_parent"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/storage_access_granted"
+                        android:paddingStart="4dp"
+                        android:text="@string/storage_permission_badge_on"
                         android:textColor="@color/status_success"
-                        android:textSize="@dimen/text_body"
+                        android:textSize="@dimen/text_micro"
                         android:textStyle="bold" />
 
                     <TextView
                         android:id="@+id/permission_banner_action"
-                        android:layout_width="match_parent"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:paddingTop="@dimen/space_xs"
                         android:text="@string/button_grant_access"
-                        android:textColor="@color/text_muted"
-                        android:textSize="@dimen/text_caption"
                         android:visibility="gone" />
                 </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/scan_all_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:background="@drawable/bg_quick_recovery_card"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="@dimen/space_md"
+                android:paddingTop="17dp"
+                android:paddingEnd="@dimen/space_md"
+                android:paddingBottom="17dp">
+
+                <ImageView
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/bg_scan_card_icon"
+                    android:contentDescription="@string/home_scan_card_title"
+                    android:padding="10.5dp"
+                    android:src="@drawable/ic_nav_scan"
+                    app:tint="@color/brand_primary" />
+
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/space_md"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="@string/home_scan_card_title"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="40dp"
+                    android:background="@drawable/bg_button_start_scan"
+                    android:gravity="center"
+                    android:minWidth="76dp"
+                    android:paddingStart="@dimen/space_lg"
+                    android:paddingEnd="@dimen/space_lg"
+                    android:text="@string/home_scan_card_btn"
+                    android:textColor="@color/text_on_primary"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:letterSpacing="0.08"
+                android:paddingStart="@dimen/space_xs"
+                android:text="@string/scan_by_type_title"
+                android:textColor="@color/text_hint"
+                android:textSize="11.5sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_section_list_panel"
+                android:orientation="vertical">
+
+                <include
+                    android:id="@+id/card_images"
+                    layout="@layout/item_category_card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <include
+                    android:id="@+id/card_videos"
+                    layout="@layout/item_category_card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <include
+                    android:id="@+id/card_audio"
+                    layout="@layout/item_category_card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <include
+                    android:id="@+id/card_documents"
+                    layout="@layout/item_category_card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="30dp"
+                android:letterSpacing="0.08"
+                android:paddingStart="@dimen/space_xs"
+                android:text="@string/recent_scans_title"
+                android:textColor="@color/text_hint"
+                android:textSize="11.5sp"
+                android:textStyle="bold" />
+
+            <LinearLayout
+                android:id="@+id/recent_scans_card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_recent_scan_card"
+                android:gravity="center_vertical"
+                android:minHeight="86dp"
+                android:orientation="horizontal"
+                android:paddingStart="@dimen/space_md"
+                android:paddingTop="17dp"
+                android:paddingEnd="@dimen/space_md"
+                android:paddingBottom="17dp">
+
+                <ImageView
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="@drawable/bg_recent_scan_icon"
+                    android:contentDescription="@string/last_scan_title"
+                    android:padding="11dp"
+                    android:src="@drawable/ic_history"
+                    app:tint="@color/text_secondary" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="@dimen/space_md"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/last_scan_when"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="@string/last_scan_none_when"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14.5sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/last_scan_found_label"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingTop="2dp"
+                        android:text="@string/last_scan_none_found"
+                        android:textColor="@color/text_hint"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:alpha="0.45"
+                    android:contentDescription="@null"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/ic_chevron_right" />
+
+                <TextView
+                    android:id="@+id/last_scan_found_count"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:id="@+id/recent_scans_empty"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:orientation="vertical"
+                    android:visibility="gone" />
+
+                <LinearLayout
+                    android:id="@+id/recent_scans_content"
+                    android:layout_width="0dp"
+                    android:layout_height="0dp"
+                    android:orientation="horizontal"
+                    android:visibility="gone" />
 
                 <TextView
                     android:id="@+id/last_scan_summary"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_sm"
-                    android:layout_marginBottom="@dimen/space_xs"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:text="@string/last_scan_empty"
-                    android:textColor="@color/text_muted"
-                    android:textSize="@dimen/text_micro" />
-
-                <GridLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_md"
-                    android:columnCount="2"
-                    android:rowCount="2">
-
-                    <include
-                        android:id="@+id/card_images"
-                        layout="@layout/item_category_card"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_columnWeight="1"
-                        android:layout_margin="@dimen/space_xs" />
-
-                    <include
-                        android:id="@+id/card_videos"
-                        layout="@layout/item_category_card"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_columnWeight="1"
-                        android:layout_margin="@dimen/space_xs" />
-
-                    <include
-                        android:id="@+id/card_audio"
-                        layout="@layout/item_category_card"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_columnWeight="1"
-                        android:layout_margin="@dimen/space_xs" />
-
-                    <include
-                        android:id="@+id/card_documents"
-                        layout="@layout/item_category_card"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_columnWeight="1"
-                        android:layout_margin="@dimen/space_xs" />
-                </GridLayout>
-
-                <Space
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:minHeight="@dimen/space_sm" />
-
-                <Button
-                    android:id="@+id/scan_all_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="@dimen/space_sm"
-                    android:background="@drawable/bg_button_primary"
-                    android:text="@string/scan_all_button"
-                    android:textAllCaps="false"
-                    android:textColor="@color/text_on_primary" />
-
-                <LinearLayout
-                    android:id="@+id/experimental_scan_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_sm"
-                    android:background="@drawable/bg_button_experimental"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center_vertical"
-                    android:minHeight="60dp"
-                    android:orientation="horizontal"
-                    android:paddingStart="@dimen/space_md"
-                    android:paddingEnd="@dimen/space_md">
-
-                    <ImageView
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:contentDescription="@string/experimental_scan_button"
-                        android:src="@drawable/ic_experimental_recovery" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical"
-                        android:paddingStart="@dimen/space_md">
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="@string/experimental_scan_button"
-                            android:textColor="@color/text_primary"
-                            android:textSize="@dimen/text_body"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:ellipsize="end"
-                            android:maxLines="1"
-                            android:paddingTop="2dp"
-                            android:text="@string/experimental_scan_hint"
-                            android:textColor="@color/text_secondary"
-                            android:textSize="@dimen/text_caption" />
-                    </LinearLayout>
-                </LinearLayout>
+                    android:visibility="gone" />
             </LinearLayout>
-        </ScrollView>
+        </LinearLayout>
+    </ScrollView>
 
         <LinearLayout
             android:id="@+id/scan_panel"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:background="@color/background_app"
             android:orientation="vertical"
-            android:background="#FF111827"
             android:visibility="gone">
 
-            <com.example.cleanrecovery.ui.widget.ParticleScanView
+            <com.example.cleanrecovery.ui.widget.ProgressScanView
                 android:id="@+id/scan_particle_view"
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="1" />
 
-            <Button
+            <TextView
                 android:id="@+id/stop_scan_button"
-                android:layout_width="240dp"
+                android:layout_width="160dp"
                 android:layout_height="44dp"
                 android:layout_gravity="center"
-                android:layout_marginTop="12dp"
                 android:layout_marginBottom="24dp"
                 android:background="@drawable/bg_button_secondary"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
                 android:text="@string/button_stop"
-                android:textAllCaps="false"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp" />
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
 
         </LinearLayout>
 
@@ -203,6 +303,7 @@
             android:id="@+id/results_panel"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:background="@color/background_app"
             android:orientation="vertical"
             android:visibility="gone">
 
@@ -214,16 +315,6 @@
                 android:orientation="horizontal"
                 android:paddingStart="@dimen/space_sm"
                 android:paddingEnd="@dimen/space_md">
-
-                <ImageButton
-                    android:id="@+id/results_back_button"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:background="@drawable/bg_icon_button"
-                    android:contentDescription="@string/button_back"
-                    android:padding="12dp"
-                    android:scaleType="centerInside"
-                    android:src="@drawable/ic_back" />
 
                 <TextView
                     android:layout_width="0dp"
@@ -505,127 +596,5 @@
         </LinearLayout>
     </FrameLayout>
 
-    <LinearLayout
-        android:id="@+id/bottom_nav"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@drawable/bg_bottom_nav"
-        android:elevation="8dp"
-        android:minHeight="@dimen/bottom_nav_height"
-        android:orientation="horizontal"
-        android:paddingTop="@dimen/space_xs"
-        android:paddingBottom="@dimen/space_xs">
-
-        <LinearLayout
-            android:id="@+id/nav_home"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="@dimen/space_xs">
-
-            <ImageView
-                android:id="@+id/nav_home_icon"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:contentDescription="@string/nav_home"
-                android:src="@drawable/ic_nav_home" />
-
-            <TextView
-                android:id="@+id/nav_home_label"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingTop="2dp"
-                android:text="@string/nav_home"
-                android:textColor="@color/brand_primary"
-                android:textSize="11sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/nav_results"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="@dimen/space_xs">
-
-            <ImageView
-                android:id="@+id/nav_results_icon"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:contentDescription="@string/nav_results"
-                android:src="@drawable/ic_nav_results" />
-
-            <TextView
-                android:id="@+id/nav_results_label"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingTop="2dp"
-                android:text="@string/nav_results"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/nav_folder"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="@dimen/space_xs">
-
-            <ImageView
-                android:id="@+id/nav_folder_icon"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:contentDescription="@string/nav_folder"
-                android:src="@drawable/ic_nav_folder" />
-
-            <TextView
-                android:id="@+id/nav_folder_label"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingTop="2dp"
-                android:text="@string/nav_folder"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:id="@+id/nav_about"
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:orientation="vertical"
-            android:padding="@dimen/space_xs">
-
-            <ImageView
-                android:id="@+id/nav_about_icon"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
-                android:contentDescription="@string/nav_about"
-                android:src="@drawable/ic_nav_about" />
-
-            <TextView
-                android:id="@+id/nav_about_label"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingTop="2dp"
-                android:text="@string/nav_about"
-                android:textColor="@color/text_secondary"
-                android:textSize="11sp" />
-        </LinearLayout>
-    </LinearLayout>
+    <include layout="@layout/include_app_bottom_nav" />
 </LinearLayout>

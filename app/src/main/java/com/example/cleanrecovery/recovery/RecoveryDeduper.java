@@ -19,6 +19,13 @@ public final class RecoveryDeduper {
             duplicateCount++;
             return true;
         }
+        // Cross-source match: a MediaStore row and a filesystem scan hit for the
+        // same backing file share its canonical path via sourceFilePath.
+        String backingPath = normalizePath(item.sourceFilePath);
+        if (!backingPath.isEmpty() && seenCanonicalPaths.contains(backingPath)) {
+            duplicateCount++;
+            return true;
+        }
         String normalized = normalizePath(path);
         if (!normalized.isEmpty() && seenCanonicalPaths.contains(normalized)) {
             duplicateCount++;
@@ -36,6 +43,10 @@ public final class RecoveryDeduper {
         String path = item.path;
         if (path != null && path.startsWith("content://")) {
             seenContentUris.add(path);
+        }
+        String backingPath = normalizePath(item.sourceFilePath);
+        if (!backingPath.isEmpty()) {
+            seenCanonicalPaths.add(backingPath);
         }
         String normalized = normalizePath(path);
         if (!normalized.isEmpty()) {

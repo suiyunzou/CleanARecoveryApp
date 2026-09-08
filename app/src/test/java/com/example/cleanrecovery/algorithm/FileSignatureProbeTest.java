@@ -26,6 +26,40 @@ public final class FileSignatureProbeTest {
         assertNull(FileSignatureProbe.probe(new byte[] {0x00, 0x11, 0x22, 0x33}));
     }
 
+    @Test
+    public void plainZipStaysGenericWhenNoOoxmlMarker() {
+        FileSignatureProbe.ProbeResult result = FileSignatureProbe.probe(zipWith(""));
+        assertNotNull(result);
+        assertEquals(RecoveryType.DOCUMENT, result.type);
+        assertEquals(FileSignatureProbe.MIME_ZIP, result.mimeDetected);
+    }
+
+    @Test
+    public void zipWithWordMarkerIsDocx() {
+        FileSignatureProbe.ProbeResult result = FileSignatureProbe.probe(zipWith("word/document.xml"));
+        assertNotNull(result);
+        assertEquals(FileSignatureProbe.MIME_DOCX, result.mimeDetected);
+    }
+
+    @Test
+    public void zipWithXlMarkerIsXlsx() {
+        FileSignatureProbe.ProbeResult result = FileSignatureProbe.probe(zipWith("xl/workbook.xml"));
+        assertNotNull(result);
+        assertEquals(FileSignatureProbe.MIME_XLSX, result.mimeDetected);
+    }
+
+    /** PK\x03\x04 header followed by an (uncompressed) zip entry name. */
+    private static byte[] zipWith(String entryName) {
+        byte[] name = entryName.getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        byte[] bytes = new byte[4 + name.length];
+        bytes[0] = 'P';
+        bytes[1] = 'K';
+        bytes[2] = 0x03;
+        bytes[3] = 0x04;
+        System.arraycopy(name, 0, bytes, 4, name.length);
+        return bytes;
+    }
+
     private static void assertType(RecoveryType expectedType, String expectedMime, int... values) {
         byte[] prefix = new byte[values.length];
         for (int i = 0; i < values.length; i++) {

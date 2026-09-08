@@ -1,0 +1,21 @@
+#!/bin/sh
+# Local-only: commit succeeds even when the network push fails.
+[ "$(git config --get shu.autoPush)" = true ] || exit 0
+[ "${SHU_SKIP_AUTO_PUSH:-}" = 1 ] && exit 0
+for state in rebase-merge rebase-apply; do
+  [ -d "$(git rev-parse --git-path "$state")" ] && exit 0
+done
+branch=$(git symbolic-ref --quiet --short HEAD) || exit 0
+remote=$(git remote get-url origin) || exit 0
+case "$remote" in
+  https://github.com/suiyunzou/CleanARecoveryApp.git|git@github.com:suiyunzou/CleanARecoveryApp.git) ;;
+  *) echo 'Auto-push skipped: origin is not the configured project.' >&2; exit 0 ;;
+esac
+echo "Auto-push: $branch -> origin/$branch" >&2
+if git -c http.connectTimeout=20 -c http.lowSpeedLimit=1024 -c http.lowSpeedTime=30 push --set-upstream origin "HEAD:refs/heads/$branch"; then
+  rm -f "$(git rev-parse --git-path auto-push-failed)"
+else
+  git rev-parse HEAD > "$(git rev-parse --git-path auto-push-failed)"
+  echo 'Commit saved locally, but auto-push failed. Resolve the network/authentication/divergence issue, then run git push. No force push was attempted.' >&2
+fi
+exit 0

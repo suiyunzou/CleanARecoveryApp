@@ -3,6 +3,7 @@ package com.example.cleanrecovery.download;
 import android.util.Log;
 
 import com.example.cleanrecovery.extractor.HlsDownloader;
+import com.example.cleanrecovery.ytdlp.CookieJar;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -12,7 +13,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -35,7 +36,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <p>本类为纯 Java 逻辑，不依赖 Android UI 组件，便于单元测试。
  * UI 层通过实现 {@link DownloadProgressCallback} 接收进度更新。</p>
  */
-public final class UniversalDownloadManager {
+public class UniversalDownloadManager {
 
     private static final String TAG = "UniversalDLManager";
 
@@ -57,8 +58,25 @@ public final class UniversalDownloadManager {
     /** 临时文件后缀。 */
     public static final String PART_SUFFIX = ".part";
 
-    private final int connectTimeout;
-    private final int readTimeout;
+    // ===== M1 新增：Cookie 注入（解决 D1：WebView Cookie 不共享）=====
+    /**
+     * 全局 cookiejar 引用，由 {@code PersistentCookieJar.getInstance(ctx)} 设置。
+     * 所有下载请求前自动从该 jar 查询并注入 {@code Cookie} 头，解决 googlevideo 直链 403。
+     */
+    private static volatile CookieJar globalCookieJar;
+
+    /** 设置全局 cookiejar（由 Application 或 Activity onCreate 调用）。 */
+    public static void setGlobalCookieJar(CookieJar jar) {
+        globalCookieJar = jar;
+    }
+
+    /** 获取全局 cookiejar（可能为 null）。 */
+    public static CookieJar getGlobalCookieJar() {
+        return globalCookieJar;
+    }
+
+    protected final int connectTimeout;
+    protected final int readTimeout;
     private final int maxRetries;
     private final long rateLimitBps;
 
@@ -106,6 +124,23 @@ public final class UniversalDownloadManager {
      */
     public void download(String fileUrl, File outFile, DownloadProgressCallback callback)
             throws IOException {
+        download(fileUrl, outFile, null, callback);
+    }
+
+    /**
+     * 下载文件到指定路径（支持断点续传 + per-format headers + cookie 注入）。
+     *
+     * <p>M1 新增：headers 参数对应 {@link com.example.cleanrecovery.extractor.ExtractorResult.Format#httpHeaders}，
+     * 由 {@code HttpFD} 传入。同时自动从 {@link #globalCookieJar} 注入对应域名 Cookie 头。</p>
+     *
+     * @param fileUrl  直链 URL
+     * @param outFile  目标文件（最终路径，不含 .part 后缀）
+     * @param headers  额外请求头（含 Referer/Origin/User-Agent 等，可为 null）
+     * @param callback 进度回调（可为 null）
+     * @throws IOException 下载失败
+     */
+    public void download(String fileUrl, File outFile, Map<String, String> headers,
+                           DownloadProgressCallback callback) throws IOException {
         if (fileUrl == null || fileUrl.isEmpty()) {
             throw new IOException("URL is empty");
         }
@@ -138,7 +173,7 @@ public final class UniversalDownloadManager {
                 notifyStatus(callback, "downloading", attempt > 1
                         ? "重试中 (" + attempt + "/" + maxRetries + ")" : "下载中");
 
-                doDownloadWithResume(fileUrl, partFile, outFile, resumeLen, callback);
+                doDownloadWithResume(fileUrl, partFile, outFile, resumeLen, headers, callback);
                 // 下载成功
                 return;
 
@@ -223,58 +258,35 @@ public final class UniversalDownloadManager {
      * 执行单次带续传的下载。
      *
      * <p>对应 yt-dlp HttpFD 的 establish_connection + download 内部函数。</p>
+     *
+     * <p><b>M1 改动</b>：</p>
+     * <ul>
+     *   <li>新增 {@code headers} 参数，对应 {@link com.example.cleanrecovery.extractor.ExtractorResult.Format#httpHeaders}，
+     *       由 {@code HttpFD} 传入，用于注入 Referer/Origin/User-Agent 等站点专属头</li>
+     *   <li>移除硬编码的 {@code googlevideo.com} Referer/Origin —— 改由 format.httpHeaders 提供，
+     *       避免对非 YouTube 站点注入错误 Referer（D1 决策）</li>
+     *   <li>自动从 {@link #globalCookieJar} 注入对应域名 Cookie 头，解决 WebView Cookie 不共享导致的 403（D1）</li>
+     *   <li>强化 C2 Content-Range 校验：当 resumeLen > 0 但响应 Content-Range 起始字节不匹配时，
+     *       重新请求完整响应并截断 .part 文件，避免错误拼接导致文件损坏</li>
+     *   <li>416 重连路径也应用 headers + Cookie（原代码漏注入）</li>
+     * </ul>
      */
     private void doDownloadWithResume(String fileUrl, File partFile, File outFile,
-                                       long resumeLen, DownloadProgressCallback callback) throws IOException {
+                                       long resumeLen, Map<String, String> headers,
+                                       DownloadProgressCallback callback) throws IOException {
         HttpURLConnection conn = null;
         try {
-            conn = (HttpURLConnection) new URL(fileUrl).openConnection();
-            conn.setConnectTimeout(connectTimeout);
-            conn.setReadTimeout(readTimeout);
-            conn.setRequestMethod("GET");
-            // 禁用自动压缩（对应 yt-dlp http.py#L44）
-            conn.setRequestProperty("Accept-Encoding", "identity");
-
-            // YouTube googlevideo.com 链接需要特定请求头避免 403/409
-            String lowerUrl = fileUrl.toLowerCase(Locale.ROOT);
-            if (lowerUrl.contains("googlevideo.com")) {
-                conn.setRequestProperty("User-Agent",
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-                                + "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-                conn.setRequestProperty("Referer", "https://www.youtube.com/");
-                conn.setRequestProperty("Origin", "https://www.youtube.com");
-                conn.setRequestProperty("Accept", "*/*");
-            }
-
-            // 发送 Range 请求（对应 yt-dlp http.py#L112）
+            conn = openConnection(fileUrl, headers, resumeLen);
             boolean hasRange = resumeLen > 0;
-            if (hasRange) {
-                conn.setRequestProperty("Range", "bytes=" + resumeLen + "-");
-            }
-
             conn.connect();
             int code = conn.getResponseCode();
 
-            // HTTP 416：Range 不可满足（对应 yt-dlp http.py#L140）
-            if (code == 416) {
-                if (resumeLen > 0) {
-                    // 可能文件已完整下载，重新无 Range 请求验证
-                    conn.disconnect();
-                    conn = (HttpURLConnection) new URL(fileUrl).openConnection();
-                    conn.setConnectTimeout(connectTimeout);
-                    conn.setReadTimeout(readTimeout);
-                    conn.setRequestProperty("Accept-Encoding", "identity");
-                    conn.connect();
-                    code = conn.getResponseCode();
-                    long contentLen = parseContentLength(conn);
-                    if (contentLen > 0 && Math.abs(contentLen - resumeLen) < 100) {
-                        // 文件已完整下载（对应 yt-dlp http.py#L155 的 ±100 字节容差）
-                        partFile.renameTo(outFile);
-                        notifyComplete(callback, outFile.getAbsolutePath());
-                        return;
-                    }
-                }
-                // 真正的 416 错误：重置从头下载
+            // 失效续传必须重新获取完整响应，不能把尾段或近似长度当作完整文件。
+            if ((code == 416 && hasRange) || (code == 206 && !validContentRange(conn, resumeLen))) {
+                conn.disconnect();
+                conn = openConnection(fileUrl, headers, 0);
+                conn.connect();
+                code = conn.getResponseCode();
                 resumeLen = 0;
                 hasRange = false;
             }
@@ -289,52 +301,24 @@ public final class UniversalDownloadManager {
                 throw new IOException("HTTP " + code);
             }
 
-            // 校验 Content-Range（对应 yt-dlp http.py#L120-L135）
-            long contentLen = parseContentLength(conn);
-            long totalLen;
-            boolean resumeValid = false;
-
-            if (hasRange) {
-                String contentRange = conn.getHeaderField("Content-Range");
-                if (contentRange != null && contentRange.startsWith("bytes " + resumeLen + "-")) {
-                    // Content-Range 起始字节匹配，续传有效
-                    resumeValid = true;
-                    // 从 Content-Range 提取总大小：bytes start-end/total
-                    int slashIdx = contentRange.indexOf('/');
-                    if (slashIdx >= 0) {
-                        try {
-                            totalLen = Long.parseLong(contentRange.substring(slashIdx + 1).trim());
-                        } catch (NumberFormatException e) {
-                            totalLen = resumeLen + contentLen;
-                        }
-                    } else {
-                        totalLen = resumeLen + contentLen;
-                    }
-                } else {
-                    // 服务器不支持续传，从头下载
-                    resumeLen = 0;
-                    totalLen = contentLen;
-                }
-            } else {
-                totalLen = contentLen;
+            if (code == 206 && !validContentRange(conn, resumeLen)) {
+                throw new IOException("Invalid Content-Range: " + conn.getHeaderField("Content-Range"));
             }
+            long contentLen = parseContentLength(conn);
+            long[] range = code == 206 ? parseContentRange(conn) : null;
+            long totalLen = range == null ? contentLen : range[2];
+            boolean resumeValid = hasRange && code == 206;
+            if (!resumeValid) resumeLen = 0;
 
             // 打开输出流：续传追加，否则覆盖（对应 yt-dlp http.py#L83 ctx.open_mode）
-            String openMode = resumeValid ? "rw" : "rw";
+            // resumeValid=true 时追加；否则截断临时文件，避免残留旧尾部。
+            String openMode = "rw";
             long fileOffset = resumeValid ? resumeLen : 0;
-            if (!resumeValid && partFile.exists()) {
-                partFile.delete();
-            }
-
-            RandomAccessFileCompat raf = new RandomAccessFileCompat(partFile, openMode);
-            raf.seek(fileOffset);
-
-            InputStream in = conn.getInputStream();
-            try {
+            try (RandomAccessFileCompat raf = new RandomAccessFileCompat(partFile, openMode);
+                 InputStream in = conn.getInputStream()) {
+                raf.setLength(fileOffset);
+                raf.seek(fileOffset);
                 streamDownload(in, raf, resumeLen, totalLen, callback);
-                raf.close();
-            } finally {
-                try { in.close(); } catch (IOException ignored) {}
             }
 
             // 下载完成：重命名 .part → 最终文件名（对应 yt-dlp try_rename）
@@ -349,6 +333,79 @@ public final class UniversalDownloadManager {
         } finally {
             if (conn != null) conn.disconnect();
         }
+    }
+
+    /** Configures the connection used for both initial requests and continuation recovery. */
+    protected HttpURLConnection openConnection(String fileUrl, Map<String, String> headers, long resumeLen)
+            throws IOException {
+        HttpURLConnection connection = (HttpURLConnection) new URL(fileUrl).openConnection();
+        connection.setConnectTimeout(connectTimeout);
+        connection.setReadTimeout(readTimeout);
+        connection.setRequestMethod("GET");
+        applyRequestHeaders(connection, fileUrl, headers);
+        if (resumeLen > 0) connection.setRequestProperty("Range", "bytes=" + resumeLen + "-");
+        return connection;
+    }
+
+    /**
+     * 应用请求头到 HttpURLConnection（M1 新增，对应 D1 Cookie 注入）。
+     *
+     * <p>注入顺序（后者覆盖前者）：</p>
+     * <ol>
+     *   <li>{@code Accept-Encoding: identity}（禁用自动压缩，对应 yt-dlp http.py#L44）</li>
+     *   <li>默认 User-Agent（Chrome 桌面 UA），仅当 headers 未提供时</li>
+     *   <li>format 专属头（{@code headers} map，含 Referer/Origin/User-Agent 等）</li>
+     *   <li>Cookie 头（从 {@link #globalCookieJar} 查询对应域名），仅当 headers 未显式提供 Cookie 时</li>
+     * </ol>
+     *
+     * <p><b>注</b>：移除了原硬编码的 {@code googlevideo.com} Referer/Origin —— 这些头
+     * 现在由 {@code ExtractorResult.Format.httpHeaders} 提供（YouTube Extractor 在 M2
+     * 填充 Referer=https://www.youtube.com/ 等），避免对非 YouTube 站点注入错误头。</p>
+     */
+    private void applyRequestHeaders(HttpURLConnection conn, String fileUrl,
+                                       Map<String, String> headers) {
+        // 1. 禁用自动压缩
+        conn.setRequestProperty("Accept-Encoding", "identity");
+
+        // 2. 默认 User-Agent（仅当 headers 未提供时）
+        boolean hasUserAgent = containsHeader(headers, "User-Agent");
+        if (!hasUserAgent) {
+            conn.setRequestProperty("User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                            + "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+        }
+
+        // 3. 应用 format 专属头（Referer/Origin/User-Agent/Accept 等）
+        if (headers != null && !headers.isEmpty()) {
+            for (Map.Entry<String, String> e : headers.entrySet()) {
+                String k = e.getKey();
+                String v = e.getValue();
+                if (k == null || v == null || "Range".equalsIgnoreCase(k)) continue;
+                conn.setRequestProperty(k, v);
+            }
+        }
+
+        // 4. Cookie 注入（D1：解决 WebView Cookie 不共享导致 googlevideo 直链 403）
+        //    仅当 format headers 未显式提供 Cookie 时，从 globalCookieJar 查询注入
+        boolean hasCookie = containsHeader(headers, "Cookie");
+        if (!hasCookie && globalCookieJar != null) {
+            String cookieHeader = globalCookieJar.cookieHeaderFor(fileUrl);
+            if (cookieHeader != null && !cookieHeader.isEmpty()) {
+                conn.setRequestProperty("Cookie", cookieHeader);
+            }
+        }
+    }
+
+    private static boolean containsHeader(Map<String, String> headers, String expectedName) {
+        if (headers == null) {
+            return false;
+        }
+        for (String name : headers.keySet()) {
+            if (name != null && name.equalsIgnoreCase(expectedName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -430,6 +487,10 @@ public final class UniversalDownloadManager {
 
             // 动态块大小（对应 yt-dlp best_block_size，http.py#L298）
             blockSize = bestBlockSize(blockSize, n, now - lastProgressTime);
+        }
+
+        if (totalLen >= 0 && downloaded != totalLen) {
+            throw new RetryableDownloadException("Incomplete response: expected " + totalLen + " bytes, received " + downloaded);
         }
 
         // 最终进度回调
@@ -530,6 +591,26 @@ public final class UniversalDownloadManager {
         }
     }
 
+    private long[] parseContentRange(HttpURLConnection conn) {
+        String value = conn.getHeaderField("Content-Range");
+        if (value == null) return null;
+        java.util.regex.Matcher match = java.util.regex.Pattern.compile("bytes (\\d+)-(\\d+)/(\\d+|\\*)").matcher(value.trim());
+        if (!match.matches()) return null;
+        try {
+            long start = Long.parseLong(match.group(1)), end = Long.parseLong(match.group(2));
+            long total = "*".equals(match.group(3)) ? -1 : Long.parseLong(match.group(3));
+            if (end < start || end == Long.MAX_VALUE || (total >= 0 && total <= end)) return null;
+            return new long[]{start, end, total};
+        } catch (NumberFormatException error) { return null; }
+    }
+
+    private boolean validContentRange(HttpURLConnection conn, long resumeLen) {
+        long[] range = parseContentRange(conn);
+        long length = parseContentLength(conn);
+        return range != null && range[2] >= 0 && range[0] == resumeLen
+                && (length < 0 || length == range[1] - range[0] + 1);
+    }
+
     private void notifyStatus(DownloadProgressCallback cb, String status, String message) {
         if (cb != null) cb.onStatusChanged(status, message);
     }
@@ -576,7 +657,7 @@ public final class UniversalDownloadManager {
      *
      * <p>支持 seek 定位 + 追加写入，用于断点续传场景。</p>
      */
-    private static final class RandomAccessFileCompat {
+    private static final class RandomAccessFileCompat implements AutoCloseable {
         private final java.io.RandomAccessFile raf;
 
         RandomAccessFileCompat(File file, String mode) throws IOException {
@@ -587,11 +668,15 @@ public final class UniversalDownloadManager {
             raf.seek(pos);
         }
 
+        void setLength(long length) throws IOException {
+            raf.setLength(length);
+        }
+
         void write(byte[] buf, int offset, int len) throws IOException {
             raf.write(buf, offset, len);
         }
 
-        void close() throws IOException {
+        @Override public void close() throws IOException {
             raf.close();
         }
     }

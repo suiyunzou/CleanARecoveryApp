@@ -14,7 +14,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
-import android.widget.Toast;
+import com.example.cleanrecovery.ui.widget.GlassToast;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -119,9 +119,9 @@ public final class RecycleBinActivity extends Activity {
                                         if (success) {
                                             reload();
                                         } else {
-                                            Toast.makeText(RecycleBinActivity.this,
+                                            GlassToast.makeText(RecycleBinActivity.this,
                                                     R.string.file_browser_delete_failed,
-                                                    Toast.LENGTH_SHORT).show();
+                                                    GlassToast.LENGTH_SHORT).show();
                                         }
                                     }
                                 });
@@ -141,16 +141,16 @@ public final class RecycleBinActivity extends Activity {
                     @Override
                     public void run() {
                         if (success) {
-                            Toast.makeText(RecycleBinActivity.this,
+                            GlassToast.makeText(RecycleBinActivity.this,
                                     String.format(Locale.US,
                                             getString(R.string.file_browser_recycle_bin_restore_ok),
                                             message),
-                                    Toast.LENGTH_LONG).show();
+                                    GlassToast.LENGTH_LONG).show();
                             reload();
                         } else {
-                            Toast.makeText(RecycleBinActivity.this,
+                            GlassToast.makeText(RecycleBinActivity.this,
                                     R.string.file_browser_recycle_bin_restore_failed,
-                                    Toast.LENGTH_SHORT).show();
+                                    GlassToast.LENGTH_SHORT).show();
                         }
                     }
                 });
@@ -172,9 +172,9 @@ public final class RecycleBinActivity extends Activity {
                                     @Override
                                     public void run() {
                                         if (success) reload();
-                                        else Toast.makeText(RecycleBinActivity.this,
+                                        else GlassToast.makeText(RecycleBinActivity.this,
                                                 R.string.file_browser_delete_failed,
-                                                Toast.LENGTH_SHORT).show();
+                                                GlassToast.LENGTH_SHORT).show();
                                     }
                                 });
                             }

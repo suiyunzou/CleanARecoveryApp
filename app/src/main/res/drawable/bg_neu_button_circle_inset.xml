@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 概念版控制键（播放页三大键）：极轻微内影——键面近乎与背景同色，
+     顶部 2dp 处一线若隐若现的暗边，柔和不抢眼（配合布局里的低 elevation 柔影） -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="oval">
+            <gradient
+                android:angle="270"
+                android:startColor="#EDEFF2"
+                android:endColor="#FBFCFD" />
+        </shape>
+    </item>
+    <item
+        android:bottom="1.2dp"
+        android:left="1.2dp"
+        android:right="1.2dp"
+        android:top="2dp">
+        <shape android:shape="oval">
+            <gradient
+                android:angle="270"
+                android:startColor="#F4F5F7"
+                android:endColor="#FDFDFE" />
+        </shape>
+    </item>
+</layer-list>

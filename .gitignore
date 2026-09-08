@@ -1,6 +1,7 @@
 # Only application sources and required build files are published.
 /*
 !/.gitignore
+!/.gitattributes
 !/README.md
 !/build.gradle
 !/settings.gradle
@@ -8,6 +9,14 @@
 !/gradlew
 !/gradlew.bat
 !/lint.xml
+!/.github/
+/.github/*
+!/.github/workflows/
+/.github/workflows/*
+!/.github/workflows/android.yml
+!/.githooks/
+/.githooks/*
+!/.githooks/post-commit
 !/gradle/
 /gradle/*
 !/gradle/wrapper/

@@ -3,6 +3,7 @@ package com.example.cleanrecovery.ui.activity;
 import com.example.cleanrecovery.R;
 import com.example.cleanrecovery.download.DownloadProgressCallback;
 import com.example.cleanrecovery.download.UniversalDownloadManager;
+import com.example.cleanrecovery.ui.browser.BrowserPrefs;
 import com.example.cleanrecovery.ui.widget.SystemUiHelper;
 
 import android.Manifest;
@@ -28,7 +29,11 @@ import android.widget.ProgressBar;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.TextView;
-import android.widget.Toast;
+import com.example.cleanrecovery.ui.widget.GlassToast;
+import android.webkit.CookieManager;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
@@ -37,14 +42,21 @@ import androidx.core.content.FileProvider;
 
 import com.example.cleanrecovery.extractor.Extractor;
 import com.example.cleanrecovery.extractor.ExtractorException;
+import com.example.cleanrecovery.extractor.ExtractorHttp;
 import com.example.cleanrecovery.extractor.ExtractorRegistry;
 import com.example.cleanrecovery.extractor.ExtractorResult;
+import com.example.cleanrecovery.extractor.DouyinExtractor;
 import com.example.cleanrecovery.extractor.GenericExtractor;
 import com.example.cleanrecovery.extractor.JsRendererExtractor;
+import com.example.cleanrecovery.ytdlp.MediaMuxerUtil;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -81,21 +93,9 @@ public final class UniversalDownloadActivity extends Activity {
     private static final String CHANNEL_ID_DOWNLOAD = "download_status";
     private static final int NOTIFICATION_ID_DOWNLOAD = 1001;
 
-    /** 画质选项：label → 高度（像素）。 */
-    private static final String[][] VIDEO_QUALITIES = {
-            {"2160p（4K 超清）", "2160"},
-            {"1440p（2K 高清）", "1440"},
-            {"1080p（全高清）", "1080"},
-            {"720p（高清）",     "720"},
-            {"480p（标清）",     "480"},
-            {"360p（流畅）",     "360"},
-    };
-    /** 纯音频选项：label → 扩展名。 */
-    private static final String[][] AUDIO_FORMATS = {
-            {"MP3（兼容性最好）", "mp3"},
-            {"M4A（原声质量）",  "m4a"},
-            {"FLAC（无损）",      "flac"},
-    };
+    /** 动态画质/音频候选（按解析结果渲染，对应 yt-dlp --list-formats；替代写死档位）。 */
+    private final List<ExtractorResult.Format> videoChoices = new ArrayList<>();
+    private final List<ExtractorResult.Format> audioChoices = new ArrayList<>();
 
     private final ExecutorService executor = Executors.newCachedThreadPool();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -132,11 +132,15 @@ public final class UniversalDownloadActivity extends Activity {
 
         // 创建下载通知通道（Android 8.0+ 需要）
         createDownloadNotificationChannel();
-        // 请求通知权限（Android 13+ 需要）
-        requestNotificationPermission();
+        // P0 A5：请求运行时权限（通知 + 媒体读取 + 全文件访问）
+        requestRuntimePermissions();
+        // P0 A5：检查并引导用户授予"所有文件访问"权限（Android 11+，写共享存储必需）
+        requestAllFilesAccessIfNeeded();
 
         // 注册 HLS 与 JS 渲染钩子（让 GenericExtractor 能处理 m3u8 与 SPA 页面）
         registerExtractorHooks();
+        // 抖音 Cookie 预热钩子：无会话 Cookie 时用隐藏 WebView 完成 JS 质询后自动重试
+        DouyinExtractor.setCookieBootstrapper(this::bootstrapDouyinCookies);
 
         ImageButton backButton = findViewById(R.id.universal_back_button);
         backButton.setOnClickListener(v -> finish());
@@ -204,8 +208,8 @@ public final class UniversalDownloadActivity extends Activity {
     private void onDownloadClicked() {
         String url = urlInput.getText().toString().trim();
         if (url.isEmpty()) {
-            Toast.makeText(this, R.string.universal_download_url_empty,
-                    Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.universal_download_url_empty,
+                    GlassToast.LENGTH_SHORT).show();
             return;
         }
         if (!url.startsWith("http://") && !url.startsWith("https://")) {
@@ -245,8 +249,8 @@ public final class UniversalDownloadActivity extends Activity {
                 videoGroup.removeAllViews();
                 audioGroup.removeAllViews();
                 buildQualityOptions(result);
-                Toast.makeText(this, R.string.universal_download_select_quality,
-                        Toast.LENGTH_SHORT).show();
+                GlassToast.makeText(this, R.string.universal_download_select_quality,
+                        GlassToast.LENGTH_SHORT).show();
             });
 
         } catch (ExtractorException e) {
@@ -254,7 +258,7 @@ public final class UniversalDownloadActivity extends Activity {
             final String msg = mapExtractorError(e);
             mainHandler.post(() -> {
                 showStatus(getString(R.string.universal_download_resolve_failed, msg), 0, false);
-                Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
+                GlassToast.makeText(this, msg, GlassToast.LENGTH_LONG).show();
             });
         } catch (IOException e) {
             Log.e(TAG, "network error", e);
@@ -267,30 +271,54 @@ public final class UniversalDownloadActivity extends Activity {
         }
     }
 
-    /** 根据提取结果动态构建画质选项。 */
+    /** 根据提取结果动态构建画质选项（对应 yt-dlp --list-formats，只列真实存在的格式）。 */
     private void buildQualityOptions(ExtractorResult result) {
-        List<ExtractorResult.Format> formats = result.getFormats();
+        videoChoices.clear();
+        audioChoices.clear();
+        videoGroup.removeAllViews();
+        audioGroup.removeAllViews();
 
-        // 视频画质选项：根据提取到的格式筛选可用画质
-        boolean hasVideo = false;
-        for (ExtractorResult.Format f : formats) {
-            if (!f.isAudioOnly()) { hasVideo = true; break; }
+        // 视频候选：非纯音频格式按高度去重（同高度取码率最高），高度降序
+        Map<Integer, ExtractorResult.Format> byHeight = new LinkedHashMap<>();
+        for (ExtractorResult.Format f : result.getFormats()) {
+            if (f.isAudioOnly()) continue;
+            int key = f.height > 0 ? f.height : f.quality;
+            ExtractorResult.Format prev = byHeight.get(key);
+            if (prev == null || f.tbr > prev.tbr) byHeight.put(key, f);
         }
+        videoChoices.addAll(byHeight.values());
+        Collections.sort(videoChoices, (a, b) -> Integer.compare(heightKey(b), heightKey(a)));
 
-        if (hasVideo) {
-            for (int i = 0; i < VIDEO_QUALITIES.length; i++) {
+        // 音频候选：码率降序
+        for (ExtractorResult.Format f : result.getFormats()) {
+            if (f.isAudioOnly()) audioChoices.add(f);
+        }
+        Collections.sort(audioChoices, (a, b) -> Integer.compare(b.tbr, a.tbr));
+
+        if (!videoChoices.isEmpty()) {
+            for (int i = 0; i < videoChoices.size(); i++) {
+                ExtractorResult.Format f = videoChoices.get(i);
                 RadioButton rb = new RadioButton(this);
                 rb.setId(10_000 + i);
-                rb.setText(VIDEO_QUALITIES[i][0]);
+                rb.setText(f.description != null && !f.description.isEmpty()
+                        ? f.description : (f.height > 0 ? f.height + "p" : "视频"));
                 rb.setTextColor(getResources().getColor(R.color.text_secondary));
                 rb.setTextSize(14);
                 rb.setPadding(0, getResources().getDimensionPixelSize(R.dimen.space_xs), 0, 0);
                 videoGroup.addView(rb);
             }
-            // 默认选中 1080p
-            videoGroup.check(videoGroup.getChildAt(3).getId());
+            // 默认选 H.264/MP4（MediaMuxer 合并与机型兼容性最稳），无则选最高
+            int defaultIdx = 0;
+            for (int i = 0; i < videoChoices.size(); i++) {
+                ExtractorResult.Format f = videoChoices.get(i);
+                if ("mp4".equals(f.ext) || (f.acodec != null && f.vcodec != null
+                        && f.vcodec.startsWith("avc1"))) {
+                    defaultIdx = i;
+                    break;
+                }
+            }
+            videoGroup.check(videoGroup.getChildAt(defaultIdx).getId());
         } else {
-            // 仅音频，隐藏视频组
             TextView label = new TextView(this);
             label.setText("该链接仅提供音频");
             label.setTextColor(getResources().getColor(R.color.text_muted));
@@ -298,22 +326,22 @@ public final class UniversalDownloadActivity extends Activity {
             videoGroup.addView(label);
         }
 
-        // 音频选项
-        boolean hasAudio = false;
-        for (ExtractorResult.Format f : formats) {
-            if (f.isAudioOnly()) { hasAudio = true; break; }
-        }
-        if (hasAudio) {
-            for (int i = 0; i < AUDIO_FORMATS.length; i++) {
+        if (!audioChoices.isEmpty()) {
+            for (int i = 0; i < audioChoices.size(); i++) {
+                ExtractorResult.Format f = audioChoices.get(i);
                 RadioButton rb = new RadioButton(this);
                 rb.setId(20_000 + i);
-                rb.setText(AUDIO_FORMATS[i][0]);
+                rb.setText(f.description != null && !f.description.isEmpty() ? f.description : "音频");
                 rb.setTextColor(getResources().getColor(R.color.text_secondary));
                 rb.setTextSize(14);
                 rb.setPadding(0, getResources().getDimensionPixelSize(R.dimen.space_xs), 0, 0);
                 audioGroup.addView(rb);
             }
         }
+    }
+
+    private static int heightKey(ExtractorResult.Format f) {
+        return f.height > 0 ? f.height : f.quality;
     }
 
     /** 第二步：用户选定画质后，下载对应格式。 */
@@ -324,28 +352,32 @@ public final class UniversalDownloadActivity extends Activity {
         int audioId = audioGroup.getCheckedRadioButtonId();
 
         if (videoId == -1 && audioId == -1) {
-            Toast.makeText(this, R.string.universal_download_select_quality,
-                    Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.universal_download_select_quality,
+                    GlassToast.LENGTH_SHORT).show();
             return;
         }
 
-        // 选择目标 Format（对应 yt-dlp format selection）
+        // 选择目标 Format（对应 yt-dlp format selection；选项即真实格式，无需就近换算）
         ExtractorResult.Format targetFormat = null;
+        ExtractorResult.Format mergeAudio = null;
         boolean audioOnly = false;
 
         if (audioId != -1) {
-            // 纯音频模式：选择最佳音频
+            // 纯音频模式：用户点选了具体音轨
             audioOnly = true;
-            targetFormat = pendingResult.getBestAudioOnlyFormat();
+            targetFormat = audioChoices.get(audioId - 20_000);
         } else {
-            // 视频模式：按选定高度选择最接近的格式
-            int targetHeight = Integer.parseInt(VIDEO_QUALITIES[videoId - 10_000][1]);
-            targetFormat = selectBestVideoFormat(pendingResult, targetHeight);
+            // 视频模式：直接使用所选画质对应的真实格式
+            targetFormat = videoChoices.get(videoId - 10_000);
+            // DASH 分离流：所选为纯视频轨 → 附带可合并的音轨（对应 yt-dlp bv*+ba）
+            if (targetFormat.isVideoOnly()) {
+                mergeAudio = pickMergeableAudio();
+            }
         }
 
         if (targetFormat == null) {
-            Toast.makeText(this, R.string.universal_download_select_quality,
-                    Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.universal_download_select_quality,
+                    GlassToast.LENGTH_SHORT).show();
             return;
         }
 
@@ -354,36 +386,34 @@ public final class UniversalDownloadActivity extends Activity {
         showStatus(getString(R.string.universal_download_downloading), 0, true);
 
         final ExtractorResult.Format finalFormat = targetFormat;
+        final ExtractorResult.Format finalAudio = mergeAudio;
         final boolean finalAudioOnly = audioOnly;
-        executor.execute(() -> downloadFormat(finalFormat, finalAudioOnly));
+        executor.execute(() -> downloadFormat(finalFormat, finalAudioOnly, finalAudio));
+    }
+
+    /** 挑选可用于 MP4 合并的音轨（MediaMuxer 的 MPEG_4 容器只稳收 AAC；按编解码器判断，不依赖 ext）。 */
+    private ExtractorResult.Format pickMergeableAudio() {
+        for (ExtractorResult.Format f : audioChoices) {
+            String ac = f.acodec == null ? "" : f.acodec.toLowerCase();
+            if ("m4a".equals(f.ext) || "aac".equals(f.ext)
+                    || ac.startsWith("mp4a") || ac.startsWith("aac")) {
+                return f;
+            }
+        }
+        return null;
     }
 
     /**
-     * 选择最接近目标高度的视频格式（对应 yt-dlp format sorting）。
+     * 下载指定格式到本地（对应 yt-dlp process_info → downloader.download）。
      *
-     * <p>策略：优先选择 ≤ 目标高度的最大格式；若无，选择最小的超过目标的格式。</p>
+     * <p>若 {@code audioStream} 非空（DASH 分离流），先下视频、再下音轨，
+     * 最后用 MediaMuxer 合并（对应 yt-dlp 的合并后处理，替代未实现的 FFmpeg JNI 链路），
+     * 避免产出无声视频文件。</p>
      */
-    private ExtractorResult.Format selectBestVideoFormat(ExtractorResult result, int targetHeight) {
-        // 优先选择合并格式（含音视频）
-        ExtractorResult.Format best = result.getBestCombinedFormat();
-        if (best != null && best.height <= targetHeight) return best;
-
-        // 从所有非纯音频格式中筛选
-        ExtractorResult.Format below = null;  // ≤ 目标的最大
-        ExtractorResult.Format above = null;  // > 目标的最小
-        for (ExtractorResult.Format f : result.getFormats()) {
-            if (f.isAudioOnly()) continue;
-            if (f.height <= targetHeight) {
-                if (below == null || f.height > below.height) below = f;
-            } else {
-                if (above == null || f.height < above.height) above = f;
-            }
-        }
-        return below != null ? below : above;
-    }
-
-    /** 下载指定格式到本地（对应 yt-dlp process_info → downloader.download）。 */
-    private void downloadFormat(ExtractorResult.Format format, boolean audioOnly) {
+    private void downloadFormat(ExtractorResult.Format format, boolean audioOnly,
+                                 ExtractorResult.Format audioStream) {
+        File videoTmp = null;
+        File audioTmp = null;
         try {
             // 生成文件名
             String baseName = pendingResult.getBaseFilename() != null
@@ -392,72 +422,56 @@ public final class UniversalDownloadActivity extends Activity {
             String fileName = UniversalDownloadManager.sanitizeFileName(baseName + "." + ext);
             File outFile = new File(getDownloadDir(), fileName);
 
+            boolean needMerge = !audioOnly && audioStream != null;
+            if (needMerge) {
+                videoTmp = new File(getDownloadDir(),
+                        UniversalDownloadManager.sanitizeFileName(baseName + "._vpart." + ext));
+                audioTmp = new File(getDownloadDir(),
+                        UniversalDownloadManager.sanitizeFileName(baseName + "._apart." + audioStream.ext));
+            }
+
             mainHandler.post(() -> {
                 showStatus(getString(R.string.universal_download_downloading), 0, true);
                 actionButtons.setVisibility(View.VISIBLE);
                 pauseButton.setText(R.string.universal_download_pause);
             });
 
-            // 使用下载管理器（集成断点续传/重试/动态块大小）
-            // downloadSmart 会自动识别 m3u8 并路由到 HLS 下载器
-            downloadManager = new UniversalDownloadManager();
             downloadInProgress = true;
-            downloadManager.downloadSmart(format.url, outFile, new DownloadProgressCallback() {
-                @Override
-                public void onProgress(long downloadedBytes, long totalBytes, long speedBps, int percent) {
-                    mainHandler.post(() -> {
-                        progressBar.setIndeterminate(false);
-                        if (percent >= 0) {
-                            progressBar.setProgress(percent);
-                            progressText.setText(percent + "%");
-                        } else {
-                            progressText.setText(formatBytes(downloadedBytes));
-                        }
-                        speedText.setVisibility(View.VISIBLE);
-                        speedText.setText(getString(R.string.universal_download_speed_format,
-                                formatSpeed(speedBps)));
-                    });
-                }
+            // downloadSmart 会自动识别 m3u8 并路由到 HLS 下载器
+            downloadFile(format.url, videoTmp != null ? videoTmp : outFile, format);
 
-                @Override
-                public void onStatusChanged(String status, String message) {
-                    mainHandler.post(() -> {
-                        if ("downloading".equals(status) && message != null && message.contains("重试")) {
-                            statusMessage.setText(message);
-                        }
-                    });
-                }
+            if (needMerge) {
+                mainHandler.post(() -> statusMessage.setText("视频完成，正在下载音轨…"));
+                downloadFile(audioStream.url, audioTmp, audioStream);
 
-                @Override
-                public void onComplete(String path) {
-                    mainHandler.post(() -> {
-                        downloadInProgress = false;
-                        actionButtons.setVisibility(View.GONE);
-                        speedText.setVisibility(View.GONE);
-                        // 状态卡片显示完整路径（应用内反馈）
-                        showStatus(getString(R.string.universal_download_done_with_path, path),
-                                100, false);
-                        // 系统通知（不干扰用户，可滑动清除）
-                        String fileName = new File(path).getName();
-                        showDownloadNotification(true, fileName, path);
-                    });
+                mainHandler.post(() -> statusMessage.setText("正在合并音轨…"));
+                try {
+                    MediaMuxerUtil.merge(videoTmp, audioTmp, outFile);
+                } catch (Exception mergeEx) {
+                    // 合并失败（编码容器不收、采样异常等）→ 退回无声视频而非整体失败/崩溃
+                    Log.w(TAG, "merge failed, fallback to video-only file", mergeEx);
+                    if (!videoTmp.renameTo(outFile)) {
+                        if (mergeEx instanceof IOException) throw (IOException) mergeEx;
+                        throw new IOException("音轨合并失败: " + mergeEx);
+                    }
+                } finally {
+                    videoTmp.delete();
+                    audioTmp.delete();
                 }
+            }
 
-                @Override
-                public void onError(String errorCode, String message) {
-                    mainHandler.post(() -> {
-                        downloadInProgress = false;
-                        actionButtons.setVisibility(View.GONE);
-                        speedText.setVisibility(View.GONE);
-                        showStatus(getString(R.string.universal_download_failed, message), 0, false);
-                        // 失败也通过系统通知提醒（避免 Toast 打断用户）
-                        String title = pendingResult != null && pendingResult.getTitle() != null
-                                ? pendingResult.getTitle() : "媒体";
-                        showDownloadNotification(false, title, message);
-                    });
-                }
+            final String donePath = outFile.getAbsolutePath();
+            final String doneName = outFile.getName();
+            mainHandler.post(() -> {
+                downloadInProgress = false;
+                actionButtons.setVisibility(View.GONE);
+                speedText.setVisibility(View.GONE);
+                // 状态卡片显示完整路径（应用内反馈）
+                showStatus(getString(R.string.universal_download_done_with_path, donePath),
+                        100, false);
+                // 系统通知（不干扰用户，可滑动清除）
+                showDownloadNotification(true, doneName, donePath);
             });
-
         } catch (IOException e) {
             Log.e(TAG, "download failed", e);
             mainHandler.post(() -> {
@@ -465,8 +479,213 @@ public final class UniversalDownloadActivity extends Activity {
                 actionButtons.setVisibility(View.GONE);
                 speedText.setVisibility(View.GONE);
                 showStatus(getString(R.string.universal_download_failed, e.getMessage()), 0, false);
+                // 失败也通过系统通知提醒（避免 GlassToast 打断用户）
+                String title = pendingResult != null && pendingResult.getTitle() != null
+                        ? pendingResult.getTitle() : "媒体";
+                showDownloadNotification(false, title,
+                        e.getMessage() != null ? e.getMessage() : "下载失败");
+            });
+            if (videoTmp != null) videoTmp.delete();
+            if (audioTmp != null) audioTmp.delete();
+        }
+    }
+
+    /** 顺序下载单个文件（阻塞式；进度/速度/重试状态上屏，失败抛 IOException 由调用方收尾）。
+     *  fmt.httpHeaders 非空时随请求下发（googlevideo 直链校验下载端 UA 等）。 */
+    private void downloadFile(String url, File target, ExtractorResult.Format fmt) throws IOException {
+        UniversalDownloadManager mgr = new UniversalDownloadManager();
+        downloadManager = mgr;
+        final java.util.concurrent.atomic.AtomicReference<String> failure =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        DownloadProgressCallback cb = new DownloadProgressCallback() {
+            @Override
+            public void onProgress(long downloadedBytes, long totalBytes, long speedBps, int percent) {
+                mainHandler.post(() -> {
+                    progressBar.setIndeterminate(false);
+                    if (percent >= 0) {
+                        progressBar.setProgress(percent);
+                        progressText.setText(percent + "%");
+                    } else {
+                        progressText.setText(formatBytes(downloadedBytes));
+                    }
+                    speedText.setVisibility(View.VISIBLE);
+                    speedText.setText(getString(R.string.universal_download_speed_format,
+                            formatSpeed(speedBps)));
+                });
+            }
+
+            @Override
+            public void onStatusChanged(String status, String message) {
+                mainHandler.post(() -> {
+                    if ("downloading".equals(status) && message != null && message.contains("重试")) {
+                        statusMessage.setText(message);
+                    }
+                });
+            }
+
+            @Override
+            public void onComplete(String path) {
+                // 完成收尾由调用方统一处理（可能还有音轨下载/合并阶段）
+            }
+
+            @Override
+            public void onError(String errorCode, String message) {
+                failure.set(message);
+            }
+        };
+        Map<String, String> headers = fmt != null ? fmt.httpHeaders : null;
+        if (headers != null && !headers.isEmpty()) {
+            // 站点专属头（如 googlevideo 校验 UA）随请求下发
+            mgr.download(url, target, headers, cb);
+        } else {
+            // downloadSmart 会自动识别 m3u8 并路由到 HLS 下载器
+            mgr.downloadSmart(url, target, cb);
+        }
+        String err = failure.get();
+        if (err != null) throw new IOException(err);
+    }
+
+    /**
+     * 抖音 Cookie 预热（{@link DouyinExtractor.CookieBootstrapper} 实现）。
+     *
+     * <p>抖音 web detail API 需要页面 JS 质询生成的会话 Cookie（ttwid/s_v_web_id/
+     * msToken，yt-dlp 官方实现同样依赖真实浏览器 Cookie）。预热分两步：</p>
+     * <ol>
+     *   <li>调 ByteDance 官方 ttwid 注册接口直接播种 ttwid（无需 WebView，毫秒级）</li>
+     *   <li>隐藏 WebView 加载目标视频页，让 acrawler JS 质询跑完生成
+     *       s_v_web_id/msToken，轮询回填全局 CookieJar</li>
+     * </ol>
+     */
+    private void bootstrapDouyinCookies(String pageUrl) throws Exception {
+        // 1. 播种 ttwid（实测该端点对纯 HTTP 开放，返回 Set-Cookie: ttwid=...）
+        String seeded = seedTtwid();
+        if (seeded != null) {
+            Log.i(TAG, "seedTtwid OK: " + seeded.substring(0, Math.min(24, seeded.length())) + "...");
+            importDouyinCookies(seeded);
+            CookieManager.getInstance().setCookie("https://www.douyin.com/", seeded);
+        } else {
+            Log.w(TAG, "seedTtwid: 未获得 ttwid（端点无 Set-Cookie 或网络异常）");
+        }
+
+        // 2. WebView 加载视频页，等 JS 质询补齐 s_v_web_id/msToken
+        java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+        final boolean[] gotCookie = {false};
+        final WebView[] holder = new WebView[1];
+        mainHandler.post(() -> {
+            WebView wv = new WebView(this);
+            holder[0] = wv;
+            WebSettings s = wv.getSettings();
+            s.setJavaScriptEnabled(true);
+            s.setDomStorageEnabled(true);
+            s.setUserAgentString(ExtractorHttp.DEFAULT_UA);
+            CookieManager cm = CookieManager.getInstance();
+            cm.setAcceptCookie(true);
+            cm.setAcceptThirdPartyCookies(wv, true);
+            wv.setWebViewClient(new WebViewClient() {
+                @Override
+                public void onPageFinished(WebView view, String url) {
+                    // 轮询至多 25 秒（50 × 500ms）：ttwid + (s_v_web_id 或 msToken)
+                    view.postDelayed(new Runnable() {
+                        int tries = 0;
+                        @Override
+                        public void run() {
+                            String header = cm.getCookie("https://www.douyin.com/");
+                            if (header != null && header.contains("ttwid=")
+                                    && (header.contains("s_v_web_id=")
+                                        || header.contains("msToken="))) {
+                                importDouyinCookies(header);
+                                gotCookie[0] = true;
+                                latch.countDown();
+                            } else if (++tries < 50) {
+                                view.postDelayed(this, 500);
+                            } else {
+                                // 兜底：哪怕只有 ttwid 也回填（部分视频 detail 只需要它）
+                                if (header != null && header.contains("ttwid=")) {
+                                    importDouyinCookies(header);
+                                    gotCookie[0] = true;
+                                }
+                                latch.countDown();
+                            }
+                        }
+                    }, 500);
+                }
+            });
+            wv.loadUrl(pageUrl);
+        });
+        try {
+            latch.await(30, java.util.concurrent.TimeUnit.SECONDS);
+        } finally {
+            mainHandler.post(() -> {
+                if (holder[0] != null) holder[0].destroy();
             });
         }
+        // 播种成功即视为预熟（CookieJar 已有 ttwid），WebView 轮询只是补充 s_v_web_id/msToken
+        if (!gotCookie[0] && seeded == null) {
+            throw new RuntimeException("预热超时：未取到 ttwid，请先在应用内浏览器打开一次 douyin.com");
+        }
+        Log.i(TAG, "bootstrapDouyinCookies done: seeded=" + (seeded != null)
+                + " webviewCookie=" + gotCookie[0]);
+    }
+
+    /** 调 ByteDance ttwid 注册接口，返回 "ttwid=xxx" 形式的 Cookie 对（失败返回 null）。 */
+    private String seedTtwid() {
+        java.net.HttpURLConnection conn = null;
+        try {
+            java.net.URL url = new java.net.URL("https://ttwid.bytedance.com/ttwid/union/register/");
+            conn = (java.net.HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setConnectTimeout(8000);
+            conn.setReadTimeout(8000);
+            conn.setDoOutput(true);
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setRequestProperty("User-Agent", ExtractorHttp.DEFAULT_UA);
+            String body = "{\"region\":\"cn\",\"aid\":1768,\"needFid\":false,"
+                    + "\"service\":\"www.ixigua.com\",\"migrate_info\":{\"ticket\":\"\",\"source\":\"node\"},"
+                    + "\"cbUrlProtocol\":\"https\",\"union\":true}";
+            java.io.OutputStream os = conn.getOutputStream();
+            os.write(body.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            os.flush();
+            os.close();
+            int code = conn.getResponseCode();
+            if (code >= 400) {
+                Log.w(TAG, "seedTtwid HTTP " + code);
+                return null;
+            }
+            Map<String, List<String>> headers = conn.getHeaderFields();
+            List<String> setCookies = headers.get("Set-Cookie");
+            if (setCookies == null) setCookies = headers.get("set-cookie");
+            if (setCookies != null) {
+                for (String sc : setCookies) {
+                    if (sc.startsWith("ttwid=")) {
+                        int semi = sc.indexOf(';');
+                        return semi > 0 ? sc.substring(0, semi) : sc;
+                    }
+                }
+            }
+            Log.w(TAG, "seedTtwid HTTP " + code + " 无 Set-Cookie，头: " + headers.keySet());
+        } catch (IOException e) {
+            Log.w(TAG, "seedTtwid failed: " + e.getMessage());
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+        return null;
+    }
+
+    /** 把 CookieManager 的 Cookie 头解析进提取器全局 CookieJar（作用于 .douyin.com）。 */
+    private void importDouyinCookies(String header) {
+        com.example.cleanrecovery.ytdlp.CookieJar jar = ExtractorHttp.getGlobalCookieJar();
+        if (jar == null || header == null || header.isEmpty()) return;
+        List<com.example.cleanrecovery.ytdlp.CookieJar.Cookie> list = new ArrayList<>();
+        for (String pair : header.split(";")) {
+            int eq = pair.indexOf('=');
+            if (eq <= 0) continue;
+            String name = pair.substring(0, eq).trim();
+            String value = pair.substring(eq + 1).trim();
+            if (name.isEmpty()) continue;
+            list.add(new com.example.cleanrecovery.ytdlp.CookieJar.Cookie(
+                    name, value, ".douyin.com", "/", true, false));
+        }
+        if (!list.isEmpty()) jar.putCookies(list);
     }
 
     /** 暂停/继续按钮点击。 */
@@ -537,8 +756,10 @@ public final class UniversalDownloadActivity extends Activity {
         return String.format("%.2f GB", bytes / (1024.0 * 1024 * 1024));
     }
 
-    /** 获取下载目录：/storage/emulated/0/DataRecovery/Downloads/。 */
+    /** 获取下载目录：P0③ 设置→下载目录 优先，回退 /storage/emulated/0/DataRecovery/Downloads/。 */
     private File getDownloadDir() {
+        File configured = new BrowserPrefs(this).downloadDirFile();
+        if (configured != null) return configured;
         File externalRoot = Environment.getExternalStorageDirectory();
         File dir;
         if (externalRoot != null && "mounted".equals(Environment.getExternalStorageState())) {
@@ -580,18 +801,91 @@ public final class UniversalDownloadActivity extends Activity {
         nm.createNotificationChannel(channel);
     }
 
-    /** 请求通知权限（Android 13+ 需要运行时申请）。 */
-    private void requestNotificationPermission() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return;
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+    /**
+     * P0 A5：请求运行时权限（通知 + 媒体读取）。
+     *
+     * <p>批量请求以下权限（仅在对应 API 级别需要时）：</p>
+     * <ul>
+     *   <li>{@link Manifest.permission#POST_NOTIFICATIONS} —— Android 13+（API 33+），
+     *       下载完成通知必需</li>
+     *   <li>{@link Manifest.permission#READ_MEDIA_VIDEO} —— Android 13+（API 33+），
+     *       扫描已下载视频/相册刷新必需</li>
+     *   <li>{@link Manifest.permission#WRITE_EXTERNAL_STORAGE} —— Android 10 及以下，
+     *       写 {@code DataRecovery/Downloads} 共享目录必需</li>
+     * </ul>
+     * <p>使用单一 requestCode 批量请求，减少弹窗次数。</p>
+     */
+    private void requestRuntimePermissions() {
+        java.util.List<String> needed = new java.util.ArrayList<>();
+        // Android 13+：通知权限
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) {
+            needed.add(Manifest.permission.POST_NOTIFICATIONS);
+        }
+        // Android 13+：媒体读取权限（用于 MediaScanner 刷新相册）
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VIDEO)
+                != PackageManager.PERMISSION_GRANTED) {
+            needed.add(Manifest.permission.READ_MEDIA_VIDEO);
+        }
+        // Android 10 及以下：写外部存储（manifest 已声明 maxSdkVersion=29，需运行时申请）
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.Q
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED) {
+            needed.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        }
+        if (!needed.isEmpty()) {
             ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1001);
+                    needed.toArray(new String[0]), 1001);
         }
     }
 
     /**
-     * 显示下载结果系统通知（替代 Toast，避免过度打扰用户）。
+     * P0 A5：检查并引导用户授予"所有文件访问"权限（MANAGE_EXTERNAL_STORAGE）。
+     *
+     * <p>Android 11+（API 30+）无法通过 {@code requestPermissions} 申请此权限，
+     * 必须跳转系统设置页让用户手动授予。本应用作为"数据恢复"工具，写共享存储
+     * （{@code /storage/emulated/0/DataRecovery/Downloads}）是核心功能，故需此权限。</p>
+     *
+     * <p><b>保守策略</b>：仅在未授予时弹 GlassToast 引导，不强制跳转（避免打断用户首次使用流程）。
+     * 用户点击下载按钮时若仍未授予，再次提示。真正写文件失败时由下载逻辑兜底处理。</p>
+     */
+    private void requestAllFilesAccessIfNeeded() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return; // Android 11 以下不需要
+        if (android.os.Environment.isExternalStorageManager()) return; // 已授予
+        // 未授予：首次进入仅 GlassToast 提示，不强制跳转（保守，避免打断 UX）
+        GlassToast.makeText(this,
+                "需要\"所有文件访问\"权限才能保存到 DataRecovery/Downloads，"
+                        + "请在设置中授予",
+                GlassToast.LENGTH_LONG).show();
+    }
+
+    /**
+     * 跳转到系统"所有文件访问"设置页（由用户在 UI 上主动触发）。
+     */
+    private void launchAllFilesAccessSettings() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                Intent intent = new Intent(
+                        android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
+                intent.setData(Uri.parse("package:" + getPackageName()));
+                startActivity(intent);
+            } catch (Exception e) {
+                // 部分设备不支持直接跳转，回退到通用所有文件访问设置
+                Intent fallback = new Intent(
+                        android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION);
+                try {
+                    startActivity(fallback);
+                } catch (Exception ex) {
+                    Log.w(TAG, "无法跳转所有文件访问设置: " + ex.getMessage());
+                }
+            }
+        }
+    }
+
+    /**
+     * 显示下载结果系统通知（替代 GlassToast，避免过度打扰用户）。
      *
      * @param success true=下载完成，false=下载失败
      * @param title   文件名或视频标题

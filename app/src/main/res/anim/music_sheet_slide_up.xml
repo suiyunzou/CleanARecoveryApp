@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 底部弹层入场：从屏幕底部外整段上滑弹出 -->
 <set xmlns:android="http://schemas.android.com/apk/res/android"
-    android:duration="180"
+    android:duration="320"
     android:interpolator="@android:anim/decelerate_interpolator">
     <translate
-        android:fromYDelta="12%"
+        android:fromYDelta="100%"
         android:toYDelta="0%" />
-    <alpha
-        android:fromAlpha="0.88"
-        android:toAlpha="1.0" />
 </set>

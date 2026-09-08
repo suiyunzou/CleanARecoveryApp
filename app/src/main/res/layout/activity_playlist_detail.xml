@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background_app"
@@ -20,22 +21,112 @@
             android:background="@drawable/bg_icon_button"
             android:contentDescription="@string/button_back"
             android:src="@drawable/ic_back" />
+    </LinearLayout>
+
+    <!-- 歌单头部：大封面 + 名称 + 来源 + 分享/下载（原型参考） -->
+    <LinearLayout
+        android:id="@+id/playlist_detail_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:paddingBottom="14dp">
+
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/playlist_detail_cover"
+            android:layout_width="88dp"
+            android:layout_height="88dp"
+            android:background="@drawable/bg_playlist_cover"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_queue_music"
+            app:shapeAppearanceOverlay="@style/ShapeCover16dp"
+            app:tint="@color/text_on_primary" />
 
         <TextView
-            android:id="@+id/playlist_detail_title"
-            android:layout_width="0dp"
+            android:id="@+id/playlist_detail_header_title"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/space_md"
-            android:layout_weight="1"
+            android:layout_marginTop="10dp"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:maxLines="1"
+            android:paddingHorizontal="@dimen/space_lg"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/playlist_detail_owner"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="@color/text_primary"
-            android:textSize="@dimen/text_title" />
+            android:textColor="@color/text_hint"
+            android:textSize="11.5sp" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:id="@+id/playlist_detail_share"
+                android:layout_width="72dp"
+                android:layout_height="wrap_content"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_player_share"
+                    app:tint="@color/text_secondary" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/music_share"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/playlist_detail_download"
+                android:layout_width="72dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="40dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_download"
+                    app:tint="@color/text_secondary" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/music_download"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+        </LinearLayout>
     </LinearLayout>
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="52dp"
         android:paddingHorizontal="@dimen/space_md">
 
         <LinearLayout
@@ -45,47 +136,59 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <Button
+            <!-- 酷狗概念版口径：蓝色小胶囊仅含播放三角，「N 首歌曲」在胶囊外（黑色粗体） -->
+            <ImageButton
                 android:id="@+id/playlist_detail_play_all"
+                android:layout_width="46dp"
+                android:layout_height="28dp"
+                android:background="@drawable/bg_play_all_pill"
+                android:contentDescription="@string/music_playlists"
+                android:src="@drawable/ic_play_solid_small"
+                app:tint="@color/text_on_primary" />
+
+            <TextView
+                android:id="@+id/playlist_detail_count"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
                 android:layout_weight="1"
-                android:backgroundTint="@color/brand_primary"
-                android:minHeight="0dp"
-                android:paddingHorizontal="@dimen/space_md"
-                android:textAllCaps="false"
-                android:textColor="@color/text_on_primary"
-                android:textSize="@dimen/text_body" />
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="0.001" />
 
             <ImageButton
                 android:id="@+id/playlist_detail_search"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
-                android:layout_marginStart="@dimen/space_sm"
-                android:background="@drawable/bg_icon_button"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/music_playlist_search"
                 android:src="@drawable/ic_search"
-                android:tint="@color/text_secondary" />
+                app:tint="@color/text_secondary" />
 
             <ImageButton
                 android:id="@+id/playlist_detail_sort"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
-                android:layout_marginStart="@dimen/space_xs"
-                android:background="@drawable/bg_icon_button"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/music_playlist_sort"
                 android:src="@drawable/ic_sort"
-                android:tint="@color/text_secondary" />
+                app:tint="@color/text_secondary" />
 
             <ImageButton
                 android:id="@+id/playlist_detail_more"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
-                android:layout_marginStart="@dimen/space_xs"
-                android:background="@drawable/bg_icon_button"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/music_more_actions"
                 android:src="@drawable/ic_more_vert"
-                android:tint="@color/text_secondary" />
+                app:tint="@color/text_secondary" />
         </LinearLayout>
 
         <LinearLayout
@@ -130,6 +233,13 @@
             android:orientation="horizontal"
             android:visibility="gone">
 
+            <CheckBox
+                android:id="@+id/playlist_detail_select_all"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_marginEnd="@dimen/space_sm"
+                android:button="@drawable/sel_check_circle" />
+
             <TextView
                 android:id="@+id/playlist_detail_selection_count"
                 android:layout_width="0dp"
@@ -140,15 +250,16 @@
                 android:textColor="@color/text_primary"
                 android:textSize="@dimen/text_body" />
 
-            <Button
+            <TextView
                 android:id="@+id/playlist_detail_selection_cancel"
                 android:layout_width="wrap_content"
                 android:layout_height="40dp"
-                android:backgroundTint="@color/brand_accent_soft"
-                android:minHeight="0dp"
-                android:text="@string/file_browser_cancel_select"
-                android:textAllCaps="false"
-                android:textColor="@color/text_primary" />
+                android:gravity="center"
+                android:minWidth="56dp"
+                android:text="@string/music_playlist_done"
+                android:textColor="@color/brand_primary"
+                android:textSize="15sp"
+                android:textStyle="bold" />
         </LinearLayout>
     </FrameLayout>
 
@@ -174,52 +285,120 @@
     <LinearLayout
         android:id="@+id/playlist_detail_batch_actions"
         android:layout_width="match_parent"
-        android:layout_height="64dp"
+        android:layout_height="72dp"
         android:background="@color/music_mini_player_bg"
         android:gravity="center"
         android:orientation="horizontal"
         android:paddingHorizontal="@dimen/space_md"
         android:visibility="gone">
 
-        <ImageButton
+        <LinearLayout
             android:id="@+id/playlist_batch_next"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="match_parent"
             android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/music_next_play"
-            android:src="@drawable/ic_skip_next"
-            android:tint="@color/text_primary" />
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
 
-        <ImageButton
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_skip_next"
+                app:tint="@color/text_primary" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/music_next_play"
+                android:textColor="@color/text_primary"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <LinearLayout
             android:id="@+id/playlist_batch_download"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="match_parent"
             android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/music_download"
-            android:src="@drawable/ic_download"
-            android:tint="@color/text_primary" />
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
 
-        <ImageButton
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_download"
+                app:tint="@color/text_primary" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/music_download"
+                android:textColor="@color/text_primary"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <LinearLayout
             android:id="@+id/playlist_batch_add"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="match_parent"
             android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/music_add_to_playlist"
-            android:src="@drawable/ic_add"
-            android:tint="@color/text_primary" />
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
 
-        <ImageButton
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_add"
+                app:tint="@color/text_primary" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/music_batch_add"
+                android:textColor="@color/text_primary"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <LinearLayout
             android:id="@+id/playlist_batch_delete"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="match_parent"
             android:layout_weight="1"
-            android:background="@android:color/transparent"
-            android:contentDescription="@string/music_remove_from_playlist"
-            android:src="@drawable/ic_delete"
-            android:tint="@color/accent_orange" />
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_delete"
+                app:tint="@color/accent_orange" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="@string/music_batch_delete"
+                android:textColor="@color/accent_orange"
+                android:textSize="11sp" />
+        </LinearLayout>
     </LinearLayout>
 
     <FrameLayout

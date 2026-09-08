@@ -1,5 +1,6 @@
 package com.example.cleanrecovery.recovery;
 
+import com.example.cleanrecovery.experiment.CandidateLabel;
 import com.example.cleanrecovery.experiment.CandidateSourceKind;
 import com.example.cleanrecovery.experiment.RecoveryCandidate;
 
@@ -27,17 +28,23 @@ public final class RecoveryCandidateMapper {
         // All non-visible sources indicate the file was found via recovery heuristics,
         // not as a normally accessible shared-storage file.
         boolean suspectedDeleted = candidate.sourceKind != CandidateSourceKind.VISIBLE_SHARED_FILE;
-        long modifiedAt = 0L;
+        // Index/evidence-only records have no backing bytes: never offer them for recovery.
+        boolean recoverable = candidate.label != CandidateLabel.METADATA_ONLY
+                && sourceKind != RecoverySourceKind.MEDIASTORE_STALE_RECORD
+                && sourceKind != RecoverySourceKind.LOG_EVIDENCE_ONLY;
         return new RecoveryItem(
                 type,
                 name,
                 path,
                 candidate.byteLength,
-                modifiedAt,
+                candidate.modifiedAt,
                 candidate.width,
                 candidate.height,
                 suspectedDeleted,
-                sourceKind
+                sourceKind,
+                recoverable,
+                candidate.expiresAt,
+                candidate.dataPath
         );
     }
 
@@ -46,10 +53,20 @@ public final class RecoveryCandidateMapper {
         if (detected != null) {
             return detected == requestedType ? detected : null;
         }
+        // MediaStore.Files rows with an unknown mime are documents/other files:
+        // only surface them under the DOCUMENT scan, never as images.
+        if (isFilesCollectionCandidate(candidate)) {
+            return requestedType == RecoveryType.DOCUMENT ? RecoveryType.DOCUMENT : null;
+        }
         if (requestedType == RecoveryType.IMAGE) {
             return RecoveryType.IMAGE;
         }
         return null;
+    }
+
+    private static boolean isFilesCollectionCandidate(RecoveryCandidate candidate) {
+        String method = candidate == null ? null : candidate.extractionMethod;
+        return method != null && method.startsWith("mediastore_query:") && method.endsWith("_files");
     }
 
     static RecoverySourceKind mapSourceKind(CandidateSourceKind candidateKind) {
@@ -61,6 +78,8 @@ public final class RecoveryCandidateMapper {
                 return RecoverySourceKind.MEDIASTORE_TRASH;
             case MEDIASTORE_PENDING:
                 return RecoverySourceKind.MEDIASTORE_PENDING;
+            case MEDIASTORE_STALE_RECORD:
+                return RecoverySourceKind.MEDIASTORE_STALE_RECORD;
             case GENERIC_THUMBNAIL:
                 return RecoverySourceKind.GENERIC_THUMBNAIL;
             case OEM_GALLERY_CACHE:
@@ -71,8 +90,12 @@ public final class RecoveryCandidateMapper {
                 return RecoverySourceKind.CARVED_FROM_KNOWN_BLOB;
             case ACCESSIBLE_SIGNATURE_MATCH:
                 return RecoverySourceKind.ACCESSIBLE_SIGNATURE_MATCH;
+            case LOG_EVIDENCE_ONLY:
+                return RecoverySourceKind.LOG_EVIDENCE_ONLY;
+            case OFFLINE_F2FS_METADATA:
+            case OFFLINE_EXT4_JOURNAL:
+                return RecoverySourceKind.OFFLINE_CARVE;
             case VISIBLE_SHARED_FILE:
-            case MEDIASTORE_STALE_RECORD:
             default:
                 return RecoverySourceKind.VISIBLE_SHARED_FILE;
         }
@@ -99,10 +122,18 @@ public final class RecoveryCandidateMapper {
     }
 
     static String displayNameFor(RecoveryCandidate candidate, String path) {
-        if (path != null && path.startsWith("content://")) {
+        if (candidate != null
+                && candidate.originalContainer != null
+                && candidate.originalContainer.startsWith("dot_trashed:")) {
             String fromContainer = nameFromOriginalContainer(candidate.originalContainer);
             if (fromContainer != null) {
                 return ensureExtension(fromContainer, candidate.mimeDetected);
+            }
+        }
+        if (path != null && path.startsWith("content://")) {
+            String fromContainer = nameFromOriginalContainer(candidate.originalContainer);
+            if (fromContainer != null) {
+                return ensureExtension(stripTrashPrefix(fromContainer), candidate.mimeDetected);
             }
             return ensureExtension("media_item", candidate.mimeDetected);
         }
@@ -166,5 +197,20 @@ public final class RecoveryCandidateMapper {
             return relative.substring(slash + 1);
         }
         return relative.isEmpty() ? null : relative;
+    }
+
+    /**
+     * MediaStore renames trashed rows to {@code .trashed-<epochMs>-<name>}; show
+     * the user-facing original name instead of the internal trash name.
+     */
+    static String stripTrashPrefix(String name) {
+        if (name != null && (name.startsWith(".trashed-") || name.startsWith(".TRASHED-"))) {
+            String rest = name.substring(".trashed-".length());
+            int dash = rest.indexOf('-');
+            if (dash >= 0 && dash + 1 < rest.length()) {
+                return rest.substring(dash + 1);
+            }
+        }
+        return name;
     }
 }

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- VIA 书签行细描边星形（基准 74：根目录书签行图标） -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="@color/text_primary"
+        android:strokeWidth="1.6"
+        android:strokeLineJoin="round"
+        android:pathData="M12,3.6 L14.6,9.1 L20.6,9.7 L16.1,13.8 L17.4,19.7 L12,16.7 L6.6,19.7 L7.9,13.8 L3.4,9.7 L9.4,9.1 Z" />
+</vector>

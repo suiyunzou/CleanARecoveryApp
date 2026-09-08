@@ -35,8 +35,8 @@ public class TikTokExtractor implements Extractor {
     private static final String NAME = "tiktok";
 
     private static final Pattern VALID_URL = Pattern.compile(
-            "https?://(?:www\\.)?tiktok\\.com/(?:@[^/]+/video/|t/)(?<id>\\w+)" +
-            "|https?://(?:vm|vt)\\.tiktok\\.com/(?<shortid>\\w+)/?");
+            "https?://(?:www\\.)?tiktok\\.com/(?:@[^/]+/video/|t/)(\\w+)" +
+            "|https?://(?:vm|vt)\\.tiktok\\.com/(\\w+)/?");
 
     /** 嵌入式 JSON 正则（SIGI_STATE 或 UNIVERSAL_DATA）。 */
     private static final Pattern SIGI_PATTERN =
@@ -67,7 +67,7 @@ public class TikTokExtractor implements Extractor {
         if (!m.find()) {
             throw new ExtractorException(ExtractorException.Kind.UNSUPPORTED, "无法识别的 TikTok URL");
         }
-        String videoId = m.group("id");
+        String videoId = m.group(1);
         if (videoId == null) {
             throw new ExtractorException(ExtractorException.Kind.UNSUPPORTED, "无法提取视频 ID");
         }

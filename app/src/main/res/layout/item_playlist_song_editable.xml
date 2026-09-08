@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="56dp"
     android:background="@drawable/bg_card"
@@ -9,24 +10,38 @@
 
     <CheckBox
         android:id="@+id/song_row_checkbox"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:buttonTint="@color/brand_primary"
+        android:layout_width="30dp"
+        android:layout_height="30dp"
+        android:layout_marginEnd="@dimen/space_sm"
+        android:button="@drawable/sel_check_circle"
         android:visibility="gone" />
 
     <FrameLayout
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:background="@drawable/bg_card">
+        android:layout_width="44dp"
+        android:layout_height="44dp">
 
-        <TextView
-            android:id="@+id/song_row_icon"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:text="♪"
-            android:textColor="@color/brand_primary"
-            android:textSize="16sp" />
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_playlist_cover">
+
+            <TextView
+                android:id="@+id/song_row_icon"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="♪"
+                android:textColor="@color/text_hint"
+                android:textSize="16sp" />
+        </FrameLayout>
+
+        <com.google.android.material.imageview.ShapeableImageView
+            android:id="@+id/song_row_cover"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:visibility="gone"
+            app:shapeAppearanceOverlay="@style/ShapeCover8dp" />
     </FrameLayout>
 
     <LinearLayout
@@ -57,12 +72,12 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/space_sm"
-                android:background="@drawable/bg_badge_existing"
+                android:background="@drawable/bg_vip_outline"
                 android:gravity="center"
                 android:paddingHorizontal="5dp"
                 android:paddingVertical="1dp"
                 android:text="VIP"
-                android:textColor="@color/badge_existing_text"
+                android:textColor="@color/vip_gold"
                 android:textSize="9sp"
                 android:textStyle="bold"
                 android:visibility="gone" />
@@ -79,14 +94,22 @@
             android:textSize="@dimen/text_caption" />
     </LinearLayout>
 
-    <TextView
-        android:id="@+id/song_row_duration"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="@dimen/space_sm"
-        android:gravity="end"
-        android:textColor="@color/text_muted"
-        android:textSize="@dimen/text_caption" />
+    <ImageButton
+        android:id="@+id/song_row_play"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:background="@drawable/bg_play_circle_outline"
+        android:contentDescription="@string/music_play"
+        android:src="@drawable/ic_play_solid"
+        app:tint="@color/text_primary" />
+
+    <ImageButton
+        android:id="@+id/song_row_more"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/music_more_actions"
+        android:src="@drawable/ic_more_horiz" />
 
     <ImageButton
         android:id="@+id/song_row_drag_handle"
@@ -96,6 +119,6 @@
         android:background="@android:color/transparent"
         android:contentDescription="@string/music_sort_custom"
         android:src="@drawable/ic_drag_handle"
-        android:tint="@color/text_secondary"
+        app:tint="@color/text_secondary"
         android:visibility="gone" />
 </LinearLayout>

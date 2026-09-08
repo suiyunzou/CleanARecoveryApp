@@ -4,6 +4,8 @@ public final class RecoveryCandidate {
     public final String candidateId;
     public final CandidateSourceKind sourceKind;
     public final String sourceUriOrPath;
+    /** Backing file path when known (MediaStore {@code _data}); enables cross-source dedup. */
+    public final String dataPath;
     public final String extractionMethod;
     public final String originalContainer;
     public final long byteLength;
@@ -15,6 +17,10 @@ public final class RecoveryCandidate {
     public final int height;
     public final boolean exactGroundTruthMatch;
     public final boolean derivativeMatch;
+    /** Last-modified epoch millis reported by the source index (0 when unknown). */
+    public final long modifiedAt;
+    /** Epoch millis when the system trash will auto-purge this item (0 when not applicable). */
+    public final long expiresAt;
     public final long extractionOffsetStart;
     public final long extractionOffsetEnd;
     public final long readBytes;
@@ -27,6 +33,7 @@ public final class RecoveryCandidate {
         candidateId = builder.candidateId;
         sourceKind = builder.sourceKind;
         sourceUriOrPath = builder.sourceUriOrPath;
+        dataPath = builder.dataPath;
         extractionMethod = builder.extractionMethod;
         originalContainer = builder.originalContainer;
         byteLength = builder.byteLength;
@@ -36,9 +43,11 @@ public final class RecoveryCandidate {
         decodeStatus = builder.decodeStatus;
         width = builder.width;
         height = builder.height;
-        exactGroundTruthMatch = builder.exactGroundTruthMatch;
-        derivativeMatch = builder.derivativeMatch;
-        extractionOffsetStart = builder.extractionOffsetStart;
+            exactGroundTruthMatch = builder.exactGroundTruthMatch;
+            derivativeMatch = builder.derivativeMatch;
+            modifiedAt = builder.modifiedAt;
+            expiresAt = builder.expiresAt;
+            extractionOffsetStart = builder.extractionOffsetStart;
         extractionOffsetEnd = builder.extractionOffsetEnd;
         readBytes = builder.readBytes;
         elapsedMs = builder.elapsedMs;
@@ -51,6 +60,7 @@ public final class RecoveryCandidate {
         private String candidateId = "";
         private CandidateSourceKind sourceKind = CandidateSourceKind.VISIBLE_SHARED_FILE;
         private String sourceUriOrPath = "";
+        private String dataPath = "";
         private String extractionMethod = "";
         private String originalContainer = "";
         private long byteLength;
@@ -62,6 +72,8 @@ public final class RecoveryCandidate {
         private int height;
         private boolean exactGroundTruthMatch;
         private boolean derivativeMatch;
+        private long modifiedAt;
+        private long expiresAt;
         private long extractionOffsetStart = -1L;
         private long extractionOffsetEnd = -1L;
         private long readBytes;
@@ -82,6 +94,11 @@ public final class RecoveryCandidate {
 
         public Builder sourceUriOrPath(String value) {
             sourceUriOrPath = value;
+            return this;
+        }
+
+        public Builder dataPath(String value) {
+            dataPath = value;
             return this;
         }
 
@@ -137,6 +154,16 @@ public final class RecoveryCandidate {
 
         public Builder derivativeMatch(boolean value) {
             derivativeMatch = value;
+            return this;
+        }
+
+        public Builder modifiedAt(long value) {
+            modifiedAt = value;
+            return this;
+        }
+
+        public Builder expiresAt(long value) {
+            expiresAt = value;
             return this;
         }
 

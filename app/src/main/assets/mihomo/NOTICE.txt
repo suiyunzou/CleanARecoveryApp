@@ -1,0 +1,14 @@
+Embedded component: Mihomo Meta v1.19.29
+Copyright: MetaCubeX/mihomo contributors
+License: GNU General Public License version 3
+Exact corresponding source:
+https://github.com/MetaCubeX/mihomo/tree/v1.19.29
+
+Bundled release assets:
+- arm64-v8a: mihomo-android-arm64-v8-v1.19.29.gz
+  SHA-256 ca44b51940fca5243f5099cf8c728bdfa86472af88a946265cf8f074fb2f0fe1
+- x86_64: mihomo-android-amd64-v1.19.29.gz
+  SHA-256 48cb7b1546a46a80e1de826109342a06da31bf06e951bbdc12b95e478be2a709
+
+The executable is launched as a separate local process and communicates through
+its loopback mixed HTTP/SOCKS port. The unmodified license text is in LICENSE.

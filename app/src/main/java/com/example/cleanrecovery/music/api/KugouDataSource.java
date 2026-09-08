@@ -12,15 +12,24 @@ import com.google.gson.JsonParser;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyFactory;
 import java.security.MessageDigest;
+import java.security.PublicKey;
+import java.security.SecureRandom;
+import java.security.spec.RSAPublicKeySpec;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+
+import javax.crypto.Cipher;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 /** Real Kugou metadata data source using lightweight public mobile endpoints. */
 public class KugouDataSource implements IMusicDataSource {
@@ -42,6 +51,20 @@ public class KugouDataSource implements IMusicDataSource {
     private static final String PLAYLIST_TRACKS_FALLBACK_PATH = "/pubsongs/v2/get_other_list_file_nofilt";
     private static final String PLAYLIST_TRACKS_ADD_PATH = "/cloudlist.service/v6/add_song";
     private static final String PLAYLIST_TRACKS_DELETE_PATH = "/v4/delete_songs";
+    // 改名端点：http://cloudlist.service.kugou.com/v1/modify_list（直连 + http）
+    private static final String PLAYLIST_RENAME_PATH = "/v1/modify_list";
+    // 删歌单端点：与改名同族加密协议，body 扁平 {"total_ver","listid","type"}
+    private static final String PLAYLIST_DELETE_PATH = "/v1/delete_list";
+    // 概念版云歌单移动端加密协议参数（官方 PlayListEditInputFragment 抓包还原）：
+    // clientver 固定 10597（key 公式与 UA 都依赖它，与网关侧 LITE_CLIENTVER 无关）
+    private static final String CLOUDLIST_MOBILE_HOST = "http://cloudlist.service.kugou.com";
+    private static final String MOBILE_CLIENTVER = "10597";
+    // p 参数的 RSA-1024 内置公钥（模数，指数 65537），包裹随机密钥种子做密钥协商
+    private static final String CLOUDLIST_RSA_MODULUS =
+            "c40a2d0da76511f3bb1cc2bbd3afbd8bea83b4d6b05b6c13eb8920c53f1af767"
+                    + "9b32ba0d0edb843240ef1b836efed3ee240734c14c1399fd6594d16af22f5252"
+                    + "5d14d72e0155c6dcc8638d4f7bb94f3a0b1f4c29f991972f2a160a25eb0a9e72"
+                    + "4336be7f69bbd319ffab1c6dd8470b021dc434f3faba89f4a2a01b33bdbdd08b";
     // Endpoint 4: Concept (lite) privileged play URL via /v5/url.
     // 概念版通过 appid=3116 + clientver=11440 + 特定 page_id/pid 参数区分，
     // 不是通过 Cookie。参考 KuGouMusicApi module/song_url.js。
@@ -58,6 +81,10 @@ public class KugouDataSource implements IMusicDataSource {
 
     /** Auth context for VIP song URL resolution. Set by MusicApp after login. */
     private volatile AuthContext auth;
+    private volatile RemotePlaylist favoritePlaylistCache;
+    private volatile long favoritePlaylistCacheAt;
+    /** 最近一次 resolvePlayUrl 失败的可读原因（成功后清空）；UI 用它给出针对性提示。 */
+    public volatile String lastResolveFailReason;
 
     public static class AuthContext {
         public final String token;
@@ -75,6 +102,38 @@ public class KugouDataSource implements IMusicDataSource {
     /** Set the auth context so VIP songs can be resolved with the user's token. */
     public void setAuthContext(AuthContext ctx) {
         this.auth = ctx;
+        favoritePlaylistCache = null;
+        favoritePlaylistCacheAt = 0;
+    }
+
+    /**
+     * 酷狗云「我喜欢」歌单：爱心按钮的云端同步目标（按歌单名匹配）。
+     * listid 对同一用户稳定，缓存 10 分钟，避免每次点爱心都拉全量歌单；
+     * 云端还没有「我喜欢」时自动创建一个。
+     */
+    public RemotePlaylist getFavoriteCloudPlaylist() throws Exception {
+        ensureAuth();
+        if (favoritePlaylistCache != null
+                && System.currentTimeMillis() - favoritePlaylistCacheAt < 600_000L) {
+            return favoritePlaylistCache;
+        }
+        RemotePlaylist favorite = findPlaylistByName(getAllUserPlaylists(30), "我喜欢");
+        if (favorite == null) {
+            createUserPlaylist("我喜欢", false);
+            favorite = findPlaylistByName(getAllUserPlaylists(30), "我喜欢");
+        }
+        if (favorite != null) {
+            favoritePlaylistCache = favorite;
+            favoritePlaylistCacheAt = System.currentTimeMillis();
+        }
+        return favorite;
+    }
+
+    private static RemotePlaylist findPlaylistByName(List<RemotePlaylist> playlists, String name) {
+        for (RemotePlaylist playlist : playlists) {
+            if (name.equals(playlist.name)) return playlist;
+        }
+        return null;
     }
 
     @Override
@@ -226,6 +285,181 @@ public class KugouDataSource implements IMusicDataSource {
     }
 
     @Override
+    public void renameUserPlaylist(RemotePlaylist playlist, String newName) throws Exception {
+        ensureAuth();
+        // 酷狗约定：仅自建歌单可改名，默认歌单（我喜欢/默认收藏）服务端会拒绝
+        String listId = firstNonEmpty(playlist.listId, playlist.id, playlist.globalCollectionId);
+        if (isEmpty(listId)) throw new IllegalArgumentException("Playlist id required");
+        if (isEmpty(newName)) throw new IllegalArgumentException("Playlist name required");
+
+        // 移动端 v1/modify_list 协议：body 用数字 listid；total_ver 必须等于账户当前
+        // 版本（get_all_list 的 data.total_ver，乐观锁，不一致即 error_code 20010）
+        TreeMap<String, Object> body = new TreeMap<>();
+        body.put("total_ver", fetchAccountTotalVer());
+        body.put("listid", parseLong(listId));
+        body.put("type", 0);
+        body.put("name", newName);
+        body.put("sort", 0);
+        body.put("tags", "");
+        body.put("intro", "");
+        JsonObject resp = cloudListEncryptedPost(PLAYLIST_RENAME_PATH, GSON.toJson(body));
+        logD("KugouDataSource", "modify_list resp=" + resp);
+        int status = num(resp, "status");
+        int errorCode = num(resp, "error_code", "err_code");
+        if (status != 1 || errorCode != 0) {
+            String reason = str(resp, "info", "error", "error_msg", "msg");
+            throw new RuntimeException("modify_list status=" + status
+                    + " error_code=" + errorCode
+                    + (reason.isEmpty() ? "" : " " + reason));
+        }
+    }
+
+    @Override
+    public void deleteUserPlaylist(RemotePlaylist playlist) throws Exception {
+        ensureAuth();
+        String listId = playlist == null ? ""
+                : firstNonEmpty(playlist.listId, playlist.id, playlist.globalCollectionId);
+        if (isEmpty(listId)) throw new IllegalArgumentException("Playlist id required");
+
+        // 与改名同构：扁平 body + 账户级 total_ver 乐观锁
+        TreeMap<String, Object> body = new TreeMap<>();
+        body.put("total_ver", fetchAccountTotalVer());
+        body.put("listid", parseLong(listId));
+        body.put("type", 0);
+        JsonObject resp = cloudListEncryptedPost(PLAYLIST_DELETE_PATH, GSON.toJson(body));
+        logD("KugouDataSource", "delete_list resp=" + resp);
+        int status = num(resp, "status");
+        int errorCode = num(resp, "error_code", "err_code");
+        if (status != 1 || errorCode != 0) {
+            String reason = str(resp, "info", "error", "error_msg", "msg");
+            throw new RuntimeException("delete_list status=" + status
+                    + " error_code=" + errorCode
+                    + (reason.isEmpty() ? "" : " " + reason));
+        }
+    }
+
+    /** 账户级歌单版本：任何云歌单修改都会 +1，提交时必须与 get_all_list 当前值一致。 */
+    private int fetchAccountTotalVer() throws Exception {
+        ensureAuth();
+        TreeMap<String, Object> body = new TreeMap<>();
+        body.put("userid", auth.userid);
+        body.put("token", auth.token);
+        body.put("total_ver", 979);
+        body.put("type", 2);
+        body.put("page", 1);
+        body.put("pagesize", 1);
+        TreeMap<String, String> params = new TreeMap<>();
+        params.put("plat", "1");
+        params.put("userid", auth.userid);
+        params.put("token", auth.token);
+        JsonObject resp = signedPost(USER_PLAYLIST_PATH, params, body,
+                new String[][]{{"x-router", "cloudlist.service.kugou.com"}});
+        JsonObject data = object(resp, "data");
+        return data != null && data.has("total_ver") && !data.get("total_ver").isJsonNull()
+                ? data.get("total_ver").getAsInt() : 0;
+    }
+
+    /**
+     * 概念版云歌单移动端加密协议直连（与官方客户端完全同构）：
+     * <ul>
+     *   <li>随机 6 位种子 K；MD5(K) 的前/后 16 个 hex 字符的 ASCII 文本即
+     *       AES-128-CBC 的 key/iv，body 为该 AES 加密的 JSON</li>
+     *   <li>p = RSA-PKCS1({"aes":K,"uid":userid,"token":token}) 大写 hex，
+     *       服务端用内置私钥解出 K 再解 body（token 不随 query 明文传输）</li>
+     *   <li>key = MD5(appid + LITE_SALT + 10597 + clienttime)，与网关签名不同源</li>
+     *   <li>响应体用同一 K 加密，解密后为 JSON</li>
+     * </ul>
+     */
+    private JsonObject cloudListEncryptedPost(String path, String bodyJson) throws Exception {
+        ensureAuth();
+        String kseed = randomKeySeed();
+        byte[] encrypted = kugouAes(kseed, Cipher.ENCRYPT_MODE,
+                bodyJson.getBytes(StandardCharsets.UTF_8));
+        String clienttime = String.valueOf(System.currentTimeMillis() / 1000);
+        String key = md5(LITE_APPID + LITE_SALT + MOBILE_CLIENTVER + clienttime);
+        String dfid = isEmpty(auth.dfid) ? "-" : auth.dfid;
+        StringBuilder url = new StringBuilder(CLOUDLIST_MOBILE_HOST).append(path)
+                .append("?clienttime=").append(clienttime)
+                .append("&mid=").append(encode(auth.mid))
+                .append("&key=").append(key)
+                .append("&dfid=").append(encode(dfid))
+                .append("&clientver=").append(MOBILE_CLIENTVER)
+                .append("&appid=").append(LITE_APPID)
+                .append("&p=").append(rsaWrapKeySeed(kseed));
+
+        HttpURLConnection conn = (HttpURLConnection) new URL(url.toString()).openConnection();
+        conn.setRequestMethod("POST");
+        conn.setConnectTimeout(10_000);
+        conn.setReadTimeout(15_000);
+        conn.setRequestProperty("User-Agent", liteUserAgent(MOBILE_CLIENTVER, "CloudMusic"));
+        // KG-THash 官方为逐请求变化值，服务端不校验具体取值（抓包比对确认）
+        conn.setRequestProperty("KG-THash", "5ee3d8");
+        conn.setRequestProperty("KG-Rec", "1");
+        conn.setRequestProperty("KG-RC", "1");
+        conn.setRequestProperty("Content-Type", "application/json;charset=utf-8");
+        conn.setDoOutput(true);
+        try (OutputStream os = conn.getOutputStream()) {
+            os.write(encrypted);
+        }
+        int code = conn.getResponseCode();
+        java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+        java.io.InputStream stream = code >= 200 && code < 300
+                ? conn.getInputStream() : conn.getErrorStream();
+        if (stream != null) {
+            byte[] tmp = new byte[4096];
+            int n;
+            while ((n = stream.read(tmp)) > 0) buf.write(tmp, 0, n);
+        }
+        conn.disconnect();
+        if (code != 200) throw new RuntimeException("HTTP " + code);
+        byte[] raw = buf.toByteArray();
+        byte[] plain;
+        try {
+            plain = kugouAes(kseed, Cipher.DECRYPT_MODE, raw);
+        } catch (Exception e) {
+            plain = raw; // 部分错误路径直接回明文 JSON
+        }
+        String text = new String(plain, StandardCharsets.UTF_8).trim();
+        return JsonParser.parseString(text).getAsJsonObject();
+    }
+
+    /** K 种子 → MD5 前/后 16 hex 字符（ASCII）作 AES-128-CBC key/iv，PKCS5 填充。 */
+    private static byte[] kugouAes(String kseed, int opmode, byte[] data) throws Exception {
+        String md5hex = md5(kseed);
+        SecretKeySpec key = new SecretKeySpec(
+                md5hex.substring(0, 16).getBytes(StandardCharsets.US_ASCII), "AES");
+        IvParameterSpec iv = new IvParameterSpec(
+                md5hex.substring(16).getBytes(StandardCharsets.US_ASCII));
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        cipher.init(opmode, key, iv);
+        return cipher.doFinal(data);
+    }
+
+    /** p 参数：官方内置 1024 位公钥包裹 {"aes":K,"uid":..,"token":..}。 */
+    private String rsaWrapKeySeed(String kseed) throws Exception {
+        String keyJson = "{\"aes\":\"" + kseed + "\",\"uid\":" + auth.userid
+                + ",\"token\":\"" + auth.token + "\"}";
+        KeyFactory factory = KeyFactory.getInstance("RSA");
+        PublicKey pub = factory.generatePublic(new RSAPublicKeySpec(
+                new BigInteger(CLOUDLIST_RSA_MODULUS, 16), BigInteger.valueOf(65537)));
+        Cipher rsa = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+        rsa.init(Cipher.ENCRYPT_MODE, pub);
+        byte[] wrapped = rsa.doFinal(keyJson.getBytes(StandardCharsets.UTF_8));
+        StringBuilder hex = new StringBuilder(wrapped.length * 2);
+        for (byte b : wrapped) hex.append(String.format("%02X", b));
+        return hex.toString();
+    }
+
+    /** 官方抓包样本均为 6 位 [A-Za-z0-9] 随机种子（如 PRvdGD）。 */
+    private static String randomKeySeed() {
+        String alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        SecureRandom random = new SecureRandom();
+        StringBuilder sb = new StringBuilder(6);
+        for (int i = 0; i < 6; i++) sb.append(alphabet.charAt(random.nextInt(alphabet.length())));
+        return sb.toString();
+    }
+
+    @Override
     public void addSongsToUserPlaylist(RemotePlaylist playlist, List<SongInfo> songs) throws Exception {
         ensureAuth();
         String listId = playlist == null ? "" : firstNonEmpty(playlist.listId, playlist.id, playlist.globalCollectionId);
@@ -262,7 +496,17 @@ public class KugouDataSource implements IMusicDataSource {
         params.put("last_area", "gztx");
         params.put("userid", auth.userid);
         params.put("token", auth.token);
-        signedPost(PLAYLIST_TRACKS_ADD_PATH, params, body, null);
+        // 校验业务结果：kugou 约定 status=1 成功；失败时 error_code/info 携带原因。
+        // 不校验会把失败当成功——歌没进云歌单却提示"已加入"
+        JsonObject resp = signedPost(PLAYLIST_TRACKS_ADD_PATH, params, body, null);
+        int status = num(resp, "status");
+        int errorCode = num(resp, "error_code", "err_code");
+        if (status != 1 || errorCode != 0) {
+            String reason = str(resp, "info", "error", "error_msg", "msg");
+            throw new RuntimeException("add_song status=" + status
+                    + " error_code=" + errorCode
+                    + (reason.isEmpty() ? "" : " " + reason));
+        }
     }
 
     @Override
@@ -310,7 +554,10 @@ public class KugouDataSource implements IMusicDataSource {
      */
     @Override
     public String resolvePlayUrl(SongInfo song) throws Exception {
-        if (song == null || isEmpty(song.hash)) return null;
+        if (song == null || isEmpty(song.hash)) {
+            lastResolveFailReason = "歌曲缺少播放信息（hash 为空）";
+            return null;
+        }
 
         // When logged in, use the concept endpoint first for both free and VIP
         // songs. Cloud playlist entries often do not expose the same fields as
@@ -318,7 +565,10 @@ public class KugouDataSource implements IMusicDataSource {
         if (auth != null && !isEmpty(auth.token)) {
             try {
                 String url = tryConceptPlayUrl(song);
-                if (!isEmpty(url)) return url;
+                if (!isEmpty(url)) {
+                    lastResolveFailReason = null;
+                    return url;
+                }
             } catch (Exception e) {
                 logW("KugouDataSource", "concept play url failed: " + e.getMessage());
             }
@@ -326,16 +576,29 @@ public class KugouDataSource implements IMusicDataSource {
 
         // Endpoint 1: Legacy getSongInfo.php
         String url = tryLegacyPlayInfo(song.hash);
-        if (!isEmpty(url)) return url;
+        if (!isEmpty(url)) {
+            lastResolveFailReason = null;
+            return url;
+        }
 
         // Endpoint 2: trackercdn v2 with key
         url = tryTrackerCdn(song.hash);
-        if (!isEmpty(url)) return url;
+        if (!isEmpty(url)) {
+            lastResolveFailReason = null;
+            return url;
+        }
 
         // Endpoint 3: Web API (HTTPS)
         url = tryWebPlayUrl(song);
-        if (!isEmpty(url)) return url;
+        if (!isEmpty(url)) {
+            lastResolveFailReason = null;
+            return url;
+        }
 
+        // 全部接口无果：给出可读原因（VIP 无权益 / 版权 / 网络），供 UI 明确提示
+        if (isEmpty(lastResolveFailReason)) {
+            lastResolveFailReason = "无可用音源（版权限制或网络异常）";
+        }
         return null;
     }
 
@@ -352,11 +615,10 @@ public class KugouDataSource implements IMusicDataSource {
      *
      * <p>实现策略（按优先级回退）：</p>
      * <ol>
-     *   <li><b>优先获取 LRC 格式</b>：调用 {@code lyrics.kugou.com/download?fmt=lrc}
-     *       获取明文 LRC 歌词。LRC 为标准行同步格式，仅 Base64 传输编码，未加密。</li>
-     *   <li><b>KRC 回退</b>：当 LRC 获取失败或内容为空时，调用 {@code fmt=krc}
+     *   <li><b>优先获取 KRC 格式</b>：调用 {@code fmt=krc}
      *       获取 KRC 二进制数据，通过 {@link KrcDecoder} 进行 XOR + zlib 解码。
-     *       KRC 为酷狗逐字歌词格式，毫秒级精度。</li>
+     *       保留毫秒级逐字时间与译文。</li>
+     *   <li><b>LRC 回退</b>：KRC 不可用时调用 {@code fmt=lrc}，保留行同步歌词。</li>
      *   <li><b>返回空歌词</b>：当两种格式均不可用时返回 {@link Lyrics#empty()}。</li>
      * </ol>
      *
@@ -376,32 +638,59 @@ public class KugouDataSource implements IMusicDataSource {
             return Lyrics.empty();
         }
 
-        // Step 2: 优先下载 LRC 格式（明文，未加密）
-        Lyrics lrc = downloadLrc(candidate);
-        if (lrc != null && !lrc.isEmpty()) {
-            return lrc;
-        }
-
-        // Step 3: LRC 不可用时回退到 KRC 格式（加密，需解码）
+        // KRC retains word timing and translations; LRC is a line-only fallback.
         Lyrics krc = downloadAndDecodeKrc(candidate);
         if (krc != null && !krc.isEmpty()) {
-            android.util.Log.d("KugouDataSource",
-                    "LRC unavailable, fell back to KRC for hash=" + song.hash);
             return krc;
         }
+        Lyrics lrc = downloadLrc(candidate);
+        return lrc == null ? Lyrics.empty() : lrc;
+    }
 
-        return Lyrics.empty();
+    /** Real climax start in milliseconds. Missing metadata is -1, never an estimated point. */
+    public long getClimaxStartMs(SongInfo song) throws Exception {
+        if (song == null || isEmpty(song.hash)) return -1;
+        JsonObject entry = new JsonObject();
+        entry.addProperty("hash", song.hash);
+        JsonArray request = new JsonArray();
+        request.add(entry);
+        return parseClimaxStartMs(get("https://expendablekmrcdn.kugou.com/v1/audio_climax/audio?data="
+                + encode(request.toString())));
+    }
+
+    static long parseClimaxStartMs(JsonObject response) {
+        if (num(response, "status") != 1) return -1;
+        JsonArray data = array(response, "data");
+        if (data == null || data.size() == 0) return -1;
+        try {
+            long start = data.get(0).getAsJsonObject().get("start_time").getAsLong();
+            return start >= 0 ? start : -1;
+        } catch (RuntimeException e) {
+            return -1;
+        }
     }
 
     /**
      * 搜索歌词候选，返回排名第一的候选（服务器已按匹配度排序）。
      *
+     * <p>本地文件（如"已下载"）的 artist 常是歌单名而非真实歌手，会把关键词搜挂；
+     * "歌名+歌手"无候选时回退仅按歌名再搜一次。</p>
+     *
      * @param song 歌曲信息
      * @return 歌词候选，无匹配返回 null
      */
     private LyricCandidate searchLyricCandidate(SongInfo song) throws Exception {
+        LyricCandidate candidate =
+                searchLyricCandidateBy(buildLyricKeyword(song), song);
+        if (candidate == null && !isEmpty(song.artist) && !song.artist.equals(song.title)) {
+            candidate = searchLyricCandidateBy(song.title, song);
+        }
+        return candidate;
+    }
+
+    private LyricCandidate searchLyricCandidateBy(String keyword, SongInfo song) throws Exception {
         String searchUrl = LYRIC_SEARCH_URL
-                + "?ver=1&man=yes&client=pc&keyword=" + encode(buildLyricKeyword(song))
+                + "?ver=1&man=yes&client=pc&keyword=" + encode(keyword)
                 + "&duration=" + Math.max(0, song.duration * 1000)
                 + "&hash=" + encode(song.hash.toLowerCase());
         JsonObject resp = get(searchUrl);
@@ -444,7 +733,7 @@ public class KugouDataSource implements IMusicDataSource {
             if (isEmpty(content)) return null;
 
             // content 为 Base64 编码的 UTF-8 LRC 明文
-            byte[] bytes = java.util.Base64.getDecoder().decode(content);
+            byte[] bytes = com.example.cleanrecovery.util.Base64Compat.decode(content);
             String lrc = new String(bytes, StandardCharsets.UTF_8);
             return Lyrics.parse(lrc);
         } catch (Exception e) {
@@ -461,9 +750,7 @@ public class KugouDataSource implements IMusicDataSource {
      * 字段为 Base64 编码的 KRC 二进制数据。KRC 格式采用固定密钥 XOR + zlib 压缩，
      * 通过 {@link KrcDecoder} 解码后得到 UTF-8 明文逐字歌词。</p>
      *
-     * <p>解码后的 KRC 明文含逐字时间戳，但格式与 LRC 不完全兼容。
-     * 当前实现提取行级时间戳转换为 LRC 兼容格式，保留基本同步功能。
-     * 逐字精度信息在 Lyrics 数据结构中暂未使用，由 LyricsView 自行处理。</p>
+     * <p>直接解析 KRC 明文，保留逐字时间戳及 language 译文元数据。</p>
      *
      * @param candidate 歌词候选
      * @return 解析后的歌词对象，获取或解码失败返回 null
@@ -482,9 +769,7 @@ public class KugouDataSource implements IMusicDataSource {
             String krcText = KrcDecoder.decodeFromBase64(content);
             if (isEmpty(krcText)) return null;
 
-            // 将 KRC 逐字格式转换为 LRC 兼容格式
-            String lrcCompatible = KrcToLrcConverter.convert(krcText);
-            return Lyrics.parse(lrcCompatible);
+            return KrcParser.parse(krcText);
         } catch (Exception e) {
             android.util.Log.w("KugouDataSource",
                     "KRC download/decode failed: " + e.getMessage());
@@ -735,6 +1020,8 @@ public class KugouDataSource implements IMusicDataSource {
                         : "status=" + status + " err_code=" + errCode;
                 logW("KugouDataSource",
                         "concept /v5/url status=" + status + " err_code=" + errCode + " msg=" + errMsg);
+                // 透出可读原因：20028=需要VIP权益；版权/地区类错误同样原样保留
+                lastResolveFailReason = errMsg;
                 return null;
             }
 
@@ -790,6 +1077,13 @@ public class KugouDataSource implements IMusicDataSource {
 
     private JsonObject signedRequest(String method, String path, TreeMap<String, String> params,
                                      String bodyJson, String[][] headers) throws Exception {
+        String url = GATEWAY_URL + path + "?" + buildQuery(buildSignedParams(params, bodyJson));
+        return executeSigned(url, method, bodyJson, buildSignedParams(params, bodyJson), headers);
+    }
+
+    /** 组装公共参数并计算签名（gateway 与直连云服务共用）。 */
+    private TreeMap<String, String> buildSignedParams(TreeMap<String, String> params,
+                                                      String bodyJson) {
         TreeMap<String, String> allParams = new TreeMap<>();
         String dfid = auth != null && !isEmpty(auth.dfid) ? auth.dfid : "-";
         String mid = auth != null && !isEmpty(auth.mid) ? auth.mid : "";
@@ -806,16 +1100,32 @@ public class KugouDataSource implements IMusicDataSource {
         if (!isEmpty(userid) && !"0".equals(userid)) allParams.put("userid", userid);
         if (params != null) allParams.putAll(params);
         allParams.put("signature", signatureAndroidParams(allParams, bodyJson));
+        return allParams;
+    }
 
-        String url = GATEWAY_URL + path + "?" + buildQuery(allParams);
+    /**
+     * 概念版 UA：Android&lt;系统版本&gt;-1070-&lt;clientver&gt;-46-0-&lt;业务标签&gt;-wifi。
+     * 与官方 UA 同构；系统版本取真机实际值——写死具体版本在别的真机上
+     * 会与设备现实矛盾，属于可被风控识别的不自洽信号。
+     */
+    private static String liteUserAgent(String clientver, String moduleTag) {
+        String os = android.os.Build.VERSION.RELEASE;
+        if (os == null || os.isEmpty()) os = "15";
+        return "Android" + os + "-1070-" + clientver + "-46-0-" + moduleTag + "-wifi";
+    }
+
+    private JsonObject executeSigned(String url, String method, String bodyJson,
+                                     TreeMap<String, String> allParams,
+                                     String[][] headers) throws Exception {
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
         conn.setRequestMethod(method);
         conn.setConnectTimeout(10_000);
         conn.setReadTimeout(15_000);
-        conn.setRequestProperty("User-Agent", "Android15-1070-11083-46-0-DiscoveryDRADProtocol-wifi");
+        conn.setRequestProperty("User-Agent",
+                liteUserAgent(String.valueOf(LITE_CLIENTVER), "DiscoveryDRADProtocol"));
         conn.setRequestProperty("Accept", "application/json,text/plain,*/*");
-        conn.setRequestProperty("dfid", dfid);
-        conn.setRequestProperty("mid", mid);
+        conn.setRequestProperty("dfid", allParams.get("dfid"));
+        conn.setRequestProperty("mid", allParams.get("mid"));
         conn.setRequestProperty("clienttime", allParams.get("clienttime"));
         conn.setRequestProperty("kg-rc", "1");
         conn.setRequestProperty("kg-thash", "5d816a0");

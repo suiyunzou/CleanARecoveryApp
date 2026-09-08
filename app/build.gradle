@@ -10,8 +10,8 @@ android {
         applicationId "com.example.cleanrecovery.musicapp"
         minSdk 23
         targetSdk 35
-        versionCode 1
-        versionName "0.1.0"
+        versionCode providers.gradleProperty("releaseVersionCode").getOrElse("3").toInteger()
+        versionName providers.gradleProperty("releaseVersionName").getOrElse("0.1.2")
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -20,10 +20,36 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
+    // 无独立正式密钥时，release 使用 debug keystore，便于真机侧载安装。
+    signingConfigs {
+        release {
+            storeFile file(System.getenv("RELEASE_KEYSTORE_PATH") ?: "${System.properties['user.home']}/.android/debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
     testOptions {
         unitTests {
             // 让 android.util.Log 等 Android 框架方法在单元测试中返回默认值而非抛异常
             returnDefaultValues = true
+        }
+    }
+
+    // Mihomo 以内置 Android 可执行内核运行。必须解压 jniLibs，ProcessBuilder
+    // 才能从 applicationInfo.nativeLibraryDir 启动对应 ABI 的 libmihomo.so。
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging true
+            keepDebugSymbols += ["**/libmihomo.so"]
         }
     }
 }
@@ -32,8 +58,27 @@ dependencies {
     implementation "androidx.core:core:1.13.1"
     implementation "androidx.appcompat:appcompat:1.6.1"
     implementation "androidx.recyclerview:recyclerview:1.3.2"
+    // 媒体通知:MediaSessionCompat + MediaStyle。国内各家 ROM(小米 HyperOS、
+    // vivo OriginOS、OPPO ColorOS、华为 EMUI/HarmonyOS)都以「MediaStyle 通知 +
+    // 活动 MediaSession」为媒体卡片识别契约,自定义 RemoteViews 会被折叠。
+    implementation "androidx.media:media:1.7.0"
     implementation "com.google.android.material:material:1.11.0"
     implementation "com.google.code.gson:gson:2.10.1"
+    // androidx.webkit: 提供 ProxyController.setProxyOverride，用于把 WebView 流量路由到本地 SS 代理。
+    // 仅此一处新增依赖，不升级既有 androidx/material/gson 版本。
+    implementation "androidx.webkit:webkit:1.10.0"
+    implementation "androidx.browser:browser:1.8.0"
+    implementation "com.journeyapps:zxing-android-embedded:4.3.0"
+    // 抖音模式（在线观影）：media3 ExoPlayer 网络流播放（m3u8/防盗链头/DASH 音视频合并）
+    implementation "androidx.media3:media3-exoplayer:1.4.1"
+    implementation "androidx.media3:media3-exoplayer-hls:1.4.1"
+    implementation "androidx.media3:media3-ui:1.4.1"
+    implementation "androidx.media3:media3-datasource:1.4.1"
+    // 垂直滑动分页（抖音模式 feed）
+    implementation "androidx.viewpager2:viewpager2:1.1.0"
+    // Via renders AI replies as native Markdown, including GFM tables.
+    implementation "io.noties.markwon:core:4.6.2"
+    implementation "io.noties.markwon:ext-tables:4.6.2"
     testImplementation "junit:junit:4.13.2"
     testImplementation "org.json:json:20240303"
     androidTestImplementation "androidx.test.ext:junit:1.1.5"
@@ -41,20 +86,31 @@ dependencies {
     androidTestImplementation "androidx.test:rules:1.5.0"
 }
 
+// Live third-party services have region, login and latency constraints. Keep them
+// available locally, but exclude only these external checks from the CI gate.
+tasks.withType(Test).configureEach {
+    if (providers.gradleProperty("externalServiceTests").getOrElse("true") == "false") {
+        filter {
+            excludeTestsMatching "com.example.cleanrecovery.extractor.LiveExtractorJvmTest"
+            excludeTestsMatching "com.example.cleanrecovery.music.api.LoggedInIntegrationTest.testResolveDownloadUrlResponseTime"
+        }
+    }
+}
+
 /**
  * 真实数据测试任务：在电脑端 JVM 直接运行酷狗 API 真实数据测试。
  *
  * <p>使用方式：{@code gradlew.bat runRealDataTest}</p>
  *
- * <p>本任务编译主源代码后，使用 JavaExec 直接运行 RealDataTestMain，
+ * <p>本任务编译测试工具源代码后，使用 JavaExec 直接运行 RealDataTestMain，
  * 绕过 Android 框架依赖（RealDataTestMain 不依赖 android.util.Log）。</p>
  */
-task runRealDataTest(type: JavaExec, dependsOn: 'compileDebugJavaWithJavac') {
+task runRealDataTest(type: JavaExec, dependsOn: 'compileDebugUnitTestJavaWithJavac') {
     group = 'verification'
     description = '在电脑端 JVM 直接运行酷狗 API 真实数据测试'
 
-    // 主源代码编译输出目录
-    def classesDir = file('build/intermediates/javac/debug/compileDebugJavaWithJavac/classes')
+    def mainClassesDir = file('build/intermediates/javac/debug/compileDebugJavaWithJavac/classes')
+    def testClassesDir = file('build/intermediates/javac/debugUnitTest/compileDebugUnitTestJavaWithJavac/classes')
 
     // classpath 在执行阶段解析（doFirst 中），避免配置阶段访问 debugRuntimeClasspath
     doFirst {
@@ -65,7 +121,7 @@ task runRealDataTest(type: JavaExec, dependsOn: 'compileDebugJavaWithJavac') {
                     || f.name.startsWith('annotation-jvm')
                     || f.name.startsWith('core-common')
         }
-        classpath = files([classesDir] + runtimeFiles)
+        classpath = files([testClassesDir, mainClassesDir] + runtimeFiles)
     }
 
     mainClass = 'com.example.cleanrecovery.music.api.RealDataTestMain'
@@ -77,11 +133,12 @@ task runRealDataTest(type: JavaExec, dependsOn: 'compileDebugJavaWithJavac') {
     errorOutput = System.err
 }
 
-task runRemotePlaylistRealDataTest(type: JavaExec, dependsOn: 'compileDebugJavaWithJavac') {
+task runRemotePlaylistRealDataTest(type: JavaExec, dependsOn: 'compileDebugUnitTestJavaWithJavac') {
     group = 'verification'
     description = '在电脑端 JVM 直接验证酷狗用户云歌单读取（latest_token.txt 存在时执行）'
 
-    def classesDir = file('build/intermediates/javac/debug/compileDebugJavaWithJavac/classes')
+    def mainClassesDir = file('build/intermediates/javac/debug/compileDebugJavaWithJavac/classes')
+    def testClassesDir = file('build/intermediates/javac/debugUnitTest/compileDebugUnitTestJavaWithJavac/classes')
 
     doFirst {
         def runtimeFiles = configurations.debugRuntimeClasspath.files.findAll { f ->
@@ -91,7 +148,7 @@ task runRemotePlaylistRealDataTest(type: JavaExec, dependsOn: 'compileDebugJavaW
                     || f.name.startsWith('annotation-jvm')
                     || f.name.startsWith('core-common')
         }
-        classpath = files([classesDir] + runtimeFiles)
+        classpath = files([testClassesDir, mainClassesDir] + runtimeFiles)
     }
 
     mainClass = 'com.example.cleanrecovery.music.api.RemotePlaylistRealDataTestMain'

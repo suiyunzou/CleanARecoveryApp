@@ -1,0 +1,153 @@
+name: Android Release
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      code: ${{ steps.version.outputs.code }}
+      name: ${{ steps.version.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - name: Assign increasing version
+        id: version
+        shell: bash
+        run: |
+          code=$((100000 + GITHUB_RUN_NUMBER))
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "name=0.1.2.$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+      - name: Prepare signing key
+        env:
+          KEYSTORE_BASE64: ${{ github.event_name != 'pull_request' && secrets.ANDROID_KEYSTORE_BASE64 || '' }}
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.android"
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
+          elif [ "$GITHUB_REF" = refs/heads/main ] && [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+            echo 'Missing release signing secret; refusing to publish a different certificate.' >&2
+            exit 1
+          else
+            keytool -genkeypair -keystore "$HOME/.android/debug.keystore" -storepass android \
+              -alias androiddebugkey -keypass android -dname 'CN=Android Debug,O=Android,C=US' \
+              -keyalg RSA -keysize 2048 -validity 10000
+          fi
+      - name: Build and run unit tests
+        env:
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+        run: >-
+          bash gradlew :app:assembleRelease :app:testReleaseUnitTest --console=plain --no-daemon --max-workers=2
+          '-Dorg.gradle.jvmargs=-Xmx2048m -XX:+UseSerialGC -Dfile.encoding=UTF-8'
+          -PexternalServiceTests=false
+          -PreleaseVersionCode="$VERSION_CODE" -PreleaseVersionName="$VERSION_NAME"
+      - name: Verify and prepare APK
+        env:
+          VERSION_CODE: ${{ steps.version.outputs.code }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tools=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          apk=app/build/outputs/apk/release/app-release.apk
+          "$tools/apksigner" verify --print-certs "$apk" | tee "$RUNNER_TEMP/signature.txt"
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+            grep -qi '13ee018cfba46568d7082ee8fccea3192b3eac4339b6f2703fa90d500cc2164b' "$RUNNER_TEMP/signature.txt"
+          fi
+          "$tools/aapt" dump badging "$apk" > "$RUNNER_TEMP/badging.txt"
+          head -1 "$RUNNER_TEMP/badging.txt" | grep "versionCode='$VERSION_CODE'"
+          mkdir -p release
+          cp "$apk" "release/CleanARecovery-$VERSION_CODE.apk"
+          (cd release && sha256sum *.apk > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ github.run_id }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tests-${{ github.run_id }}
+          path: app/build/test-results/testReleaseUnitTest/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Remove signing key
+        if: always()
+        run: rm -f "$HOME/.android/debug.keystore"
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-${{ github.run_id }}
+          path: release
+      - name: Publish completed assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION_CODE: ${{ needs.build.outputs.code }}
+          VERSION_NAME: ${{ needs.build.outputs.name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v$VERSION_NAME"
+          if gh api "repos/$GH_REPO/releases/latest" > latest.json 2>/dev/null; then
+            latest_code=$(python3 -c 'import json,re; print(max([int(m.group(1)) for a in json.load(open("latest.json"))["assets"] if (m:=re.fullmatch(r"CleanARecovery-([0-9]+)\.apk",a["name"]))] or [0]))')
+            if [ "$latest_code" -gt "$VERSION_CODE" ]; then
+              echo 'A newer version is already public; this older run will not replace Latest.'
+              exit 0
+            fi
+          fi
+          # Retries never replace an already public installation package.
+          if gh release view "$tag" --json isDraft --jq '.isDraft' > existing.txt 2>/dev/null; then
+            if grep -qx false existing.txt; then
+              echo 'This run has already published its release.'
+              exit 0
+            fi
+          else
+            printf '浏览体验与功能更新。\n\n下载下方 APK 安装，已有用户可在应用设置中检查更新。\n\n版本号：%s\n源码提交：%s\n' "$VERSION_CODE" "$GITHUB_SHA" > notes.txt
+            gh release create "$tag" --target "$GITHUB_SHA" --title "枢 $VERSION_NAME" --notes-file notes.txt --draft
+          fi
+          gh release upload "$tag" release/* --clobber
+          gh api "repos/$GH_REPO/releases/tags/$tag" > metadata.json
+          python3 - <<'PY'
+          import json, os, re
+          obj = json.load(open('metadata.json'))
+          name = 'CleanARecovery-' + os.environ['VERSION_CODE'] + '.apk'
+          asset = next(a for a in obj['assets'] if a['name'] == name)
+          assert asset['state'] == 'uploaded' and re.fullmatch(r'sha256:[0-9a-fA-F]{64}', asset.get('digest') or '')
+          assert 0 < asset['size'] <= 300 * 1024 * 1024
+          obj['draft'] = False
+          with open('update.json', 'w', encoding='utf-8') as f:
+              json.dump(obj, f, ensure_ascii=False)
+          PY
+          gh release upload "$tag" update.json --clobber
+          gh release edit "$tag" --draft=false --latest
