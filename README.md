@@ -1,44 +1,47 @@
-# 清寻恢复 (Qingxun Recovery)
+# 枢（Shu）
 
-Non-root Android file recovery helper (**清寻恢复**). The app recursively scans shared storage for still-accessible files and cache or residue artifacts left by other apps, then copies selected items into public `DataRecovery` folders. Methods are transparent and user-controlled; it does not claim deleted-sector recovery.
+Android 多功能应用，包含文件扫描与恢复、文件浏览、音乐播放、视频下载、网页浏览和本地代理等功能。项目采用 Java 与 Gradle，应用模块为 `app`。
 
-## Non-goal
+## 构建
 
-This app does not perform root-level raw disk recovery or deleted-sector analysis.
-
-## Prerequisites
-
-- JDK 17
-- Android SDK with compile SDK 35
-- PowerShell on Windows
-
-## Setup
-
-Set `ANDROID_HOME` to your Android SDK, or create a local `local.properties` file:
+准备 JDK 17 和 Android SDK。SDK 平台版本以 `app/build.gradle` 的 `compileSdk` 为准，在本地 `local.properties` 中配置 SDK 路径（该文件不提交）：
 
 ```properties
-sdk.dir=C:/path/to/Android/sdk
+sdk.dir=D:/Android/SDK
 ```
 
-`local.properties`, `_android_sdk`, `dist`, and build outputs are intentionally ignored by git.
-
-## Build, lint, and test
+Windows PowerShell：
 
 ```powershell
-$env:ANDROID_HOME = 'C:\path\to\Android\sdk'
-.\gradlew.bat :app:assembleDebug
-.\gradlew.bat :app:lintDebug
-.\gradlew.bat :app:testDebugUnitTest
+.\gradlew.bat :app:assembleRelease --console=plain
 ```
 
-## Product behavior
+Linux / macOS：
 
-- Non-root, copy-only: the app never deletes or modifies source files.
-- Grant broad storage access, then scan images, videos, audio, or documents.
-- **Image scans** run a three-phase pipeline with shared deduplication:
-  1. **File tree** — recursive walk of shared storage for accessible files.
-  2. **MediaStore index/trash** (API 29+, images only) — trash, pending, and index entries; not sector recovery.
-  3. **Cache profiles + carving** — known OEM/generic cache paths; JPEG blob carving inside matched containers.
-- Video, audio, and document scans use the file tree phase only today.
-- Filter results by existing files or suspected deleted/cache artifacts. The deleted badge is honest: only MediaStore trash items are marked suspected deleted.
-- Multi-select recovery copies into public `DataRecovery` folders (`content://` URIs and carved blob ranges supported).
+```sh
+sh gradlew :app:assembleRelease --console=plain
+```
+
+APK 位于 `app/build/outputs/apk/release/`。具体文件名及签名方式以所选分支的构建配置为准；Release 构建类型不代表已使用正式发布证书。发布新版本时需保持应用 ID 和签名一致，并增加 `versionCode`。
+
+如本机 JVM 出现 G1 启动或内存错误，可附加以下构建参数：
+
+```text
+--no-daemon --max-workers=2 -Dorg.gradle.jvmargs="-Xmx2048m -XX:+UseSerialGC -Dfile.encoding=UTF-8"
+```
+
+## 源码结构
+
+- `app/src/main/`：应用代码、界面资源、清单与运行时依赖资源。
+- `app/src/test/`：本地单元测试。
+- `app/src/androidTest/`：设备测试与测试夹具。
+- `app/build.gradle`：应用构建配置。
+- `gradle/wrapper/`：Gradle Wrapper。
+
+## 使用说明
+
+文件扫描与恢复受系统权限、存储加密及文件是否仍存在影响，无法保证找回已彻底删除的数据。网络、音乐和代理功能需要相应服务可用，部分操作需要用户授予权限。
+
+## 仓库范围
+
+仓库仅维护应用源码、必要资源、测试、构建文件和本 README。开发笔记、参考工程、个人工具配置、测试输出及 APK 保留在本地，不纳入 Git 跟踪。
