@@ -8,6 +8,11 @@
 !/gradlew
 !/gradlew.bat
 !/lint.xml
+!/.github/
+/.github/*
+!/.github/workflows/
+/.github/workflows/*
+!/.github/workflows/android.yml
 !/gradle/
 /gradle/*
 !/gradle/wrapper/

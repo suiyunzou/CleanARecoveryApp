@@ -39,7 +39,15 @@ public final class GitHubUpdates {
         return selected;
     }
     public static Release check()throws Exception{
-        HttpURLConnection c=open("https://api.github.com/repos/"+REPOSITORY+"/releases/latest");
+        // Public release asset avoids the shared anonymous REST API rate limit.
+        try {
+            return checkAt(RELEASES+"/latest/download/update.json");
+        } catch (IOException manifestUnavailable) {
+            return checkAt("https://api.github.com/repos/"+REPOSITORY+"/releases/latest");
+        }
+    }
+    private static Release checkAt(String address)throws Exception{
+        HttpURLConnection c=open(address);
         try{int status=c.getResponseCode();if(status==404)throw new IOException("尚未发布可用的公开版本");if(status==403||status==429)throw new IOException("GitHub 请求受限，请稍后再试");if(status!=200)throw new IOException("检查失败（HTTP "+status+"）");
             try(InputStream in=c.getInputStream()){Release r=parse(new String(read(in,1024*1024),java.nio.charset.StandardCharsets.UTF_8));if(r==null)throw new IOException("该版本尚未提供兼容的更新安装包");return r;}
         }finally{c.disconnect();}
