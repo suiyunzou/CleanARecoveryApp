@@ -1,6 +1,7 @@
 # Only application sources and required build files are published.
 /*
 !/.gitignore
+!/.gitattributes
 !/README.md
 !/build.gradle
 !/settings.gradle
