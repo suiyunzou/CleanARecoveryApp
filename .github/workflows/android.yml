@@ -137,15 +137,23 @@ jobs:
             gh release create "$tag" --target "$GITHUB_SHA" --title "枢 $VERSION_NAME" --notes-file notes.txt --draft
           fi
           gh release upload "$tag" release/* --clobber
-          gh api "repos/$GH_REPO/releases/tags/$tag" > metadata.json
+          # A draft has no public tag yet; its tag endpoint returns 404.
+          gh api "repos/$GH_REPO/releases?per_page=100" > releases.json
+          release_id=$(python3 -c 'import json,os; print(next(r["id"] for r in json.load(open("releases.json")) if r["tag_name"]=="v"+os.environ["VERSION_NAME"]))')
+          gh api "repos/$GH_REPO/releases/$release_id" > metadata.json
           python3 - <<'PY'
-          import json, os, re
+          import json, os, re, urllib.parse
           obj = json.load(open('metadata.json'))
           name = 'CleanARecovery-' + os.environ['VERSION_CODE'] + '.apk'
           asset = next(a for a in obj['assets'] if a['name'] == name)
           assert asset['state'] == 'uploaded' and re.fullmatch(r'sha256:[0-9a-fA-F]{64}', asset.get('digest') or '')
           assert 0 < asset['size'] <= 300 * 1024 * 1024
           obj['draft'] = False
+          base = 'https://github.com/' + os.environ['GH_REPO'] + '/releases'
+          tag_path = urllib.parse.quote(obj['tag_name'], safe='')
+          obj['html_url'] = base + '/tag/' + tag_path
+          for item in obj['assets']:
+              item['browser_download_url'] = base + '/download/' + tag_path + '/' + urllib.parse.quote(item['name'], safe='')
           with open('update.json', 'w', encoding='utf-8') as f:
               json.dump(obj, f, ensure_ascii=False)
           PY
