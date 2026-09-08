@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_about_title">About 枢</string>
+    <string name="app_about_back">Back</string>
+    <string name="app_about_features">Features</string>
+    <string name="app_about_updates">Version updates</string>
+    <string name="app_about_no_browser">No browser is available to open the releases page.</string>
+    <string name="app_about_features_body">Music\nSearch and play music, and manage your playlists.\n\nBrowsing\nBrowse websites and watch online videos in the built-in browser.\n\nDownloads\nSave videos and music from supported websites, and manage downloads.\n\nFile recovery\nScan accessible files, preview results and copy selected items to your save folder. Recovery depends on whether files remain readable.</string>
+</resources>

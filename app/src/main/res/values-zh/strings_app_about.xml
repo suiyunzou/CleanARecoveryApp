@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_about_title">关于枢</string>
+    <string name="app_about_back">返回</string>
+    <string name="app_about_features">功能介绍</string>
+    <string name="app_about_updates">版本更新</string>
+    <string name="app_about_no_browser">未找到可用的浏览器，无法打开版本发布页面。</string>
+    <string name="app_about_features_body">音乐聆听\n搜索、播放音乐，管理自己的歌单。\n\n网页浏览\n使用内置浏览器访问网页、在线观看视频。\n\n全网下载\n保存支持网站的视频和音乐，管理下载任务。\n\n文件恢复\n扫描可访问的文件，预览后将所选内容复制到保存目录。恢复结果取决于文件是否仍可读取。</string>
+</resources>

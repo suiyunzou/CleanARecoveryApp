@@ -406,56 +406,31 @@
             android:orientation="vertical">
 
             <LinearLayout
+                android:id="@+id/settings_about_row"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@drawable/bg_row_hairline_bottom"
+                android:background="?android:attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
                 android:gravity="center_vertical"
                 android:minHeight="54dp"
                 android:orientation="horizontal"
-                android:paddingStart="@dimen/space_lg"
-                android:paddingEnd="@dimen/space_lg"
-                android:paddingTop="14dp"
-                android:paddingBottom="14dp">
-
+                android:paddingHorizontal="@dimen/space_lg"
+                android:paddingVertical="14dp">
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="@string/settings_version_label"
+                    android:text="@string/app_about_title"
                     android:textColor="@color/text_primary"
                     android:textSize="14.5sp" />
-
                 <TextView
                     android:id="@+id/about_version"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="@color/text_hint"
+                    android:layout_marginEnd="10dp"
+                    android:textColor="@color/text_secondary"
                     android:textSize="13sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/settings_share_row"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_row_hairline_bottom"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center_vertical"
-                android:minHeight="54dp"
-                android:orientation="horizontal"
-                android:paddingStart="@dimen/space_lg"
-                android:paddingEnd="@dimen/space_lg"
-                android:paddingTop="14dp"
-                android:paddingBottom="14dp">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/settings_share_row"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14.5sp" />
-
                 <ImageView
                     android:layout_width="14dp"
                     android:layout_height="14dp"
@@ -464,79 +439,6 @@
                     android:importantForAccessibility="no"
                     android:src="@drawable/ic_chevron_right" />
             </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/settings_privacy_row"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_row_hairline_bottom"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center_vertical"
-                android:minHeight="54dp"
-                android:orientation="horizontal"
-                android:paddingStart="@dimen/space_lg"
-                android:paddingEnd="@dimen/space_lg"
-                android:paddingTop="14dp"
-                android:paddingBottom="14dp">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/settings_privacy_row"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14.5sp" />
-
-                <ImageView
-                    android:layout_width="14dp"
-                    android:layout_height="14dp"
-                    android:alpha="0.45"
-                    android:contentDescription="@null"
-                    android:importantForAccessibility="no"
-                    android:src="@drawable/ic_chevron_right" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/settings_license_row"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:clickable="true"
-                android:focusable="true"
-                android:gravity="center_vertical"
-                android:minHeight="54dp"
-                android:orientation="horizontal"
-                android:paddingStart="@dimen/space_lg"
-                android:paddingEnd="@dimen/space_lg"
-                android:paddingTop="14dp"
-                android:paddingBottom="14dp">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/settings_license"
-                    android:textColor="@color/text_primary"
-                    android:textSize="14.5sp" />
-
-                <ImageView
-                    android:layout_width="14dp"
-                    android:layout_height="14dp"
-                    android:alpha="0.45"
-                    android:contentDescription="@null"
-                    android:importantForAccessibility="no"
-                    android:src="@drawable/ic_chevron_right" />
-            </LinearLayout>
-            <TextView
-                android:id="@+id/settings_update_row"
-                android:layout_width="match_parent"
-                android:layout_height="54dp"
-                android:gravity="center_vertical"
-                android:paddingHorizontal="@dimen/space_lg"
-                android:background="?android:attr/selectableItemBackground"
-                android:text="检查更新"
-                android:textSize="14.5sp"
-                android:textColor="@color/text_primary" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>
