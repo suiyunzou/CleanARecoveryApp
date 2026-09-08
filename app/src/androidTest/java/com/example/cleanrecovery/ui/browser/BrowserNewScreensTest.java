@@ -31,4 +31,30 @@ public class BrowserNewScreensTest {
         try{Thread.sleep(3000);instrument.runOnMainSync(()->{String content=text(updates.getWindow().getDecorView());assertTrue(content.contains("自动检查更新"));assertTrue(content.contains("每天最多一次"));assertTrue(content.contains("GitHub"));});capture("app-github-updates");}finally{instrument.runOnMainSync(updates::finish);instrument.waitForIdleSync();}
     }
     private String text(View view){StringBuilder result=new StringBuilder();if(view instanceof TextView)result.append(((TextView)view).getText()).append('\n');if(view instanceof ViewGroup)for(int i=0;i<((ViewGroup)view).getChildCount();i++)result.append(text(((ViewGroup)view).getChildAt(i)));return result.toString();}
+    @Test public void githubDownloadEntryOpensLatestOrSelectedRelease()throws Exception{
+        java.util.concurrent.atomic.AtomicReference<Intent> opened=new java.util.concurrent.atomic.AtomicReference<>();
+        android.app.Instrumentation.ActivityMonitor monitor=new android.app.Instrumentation.ActivityMonitor(){
+            @Override public android.app.Instrumentation.ActivityResult onStartActivity(Intent intent){
+                if(Intent.ACTION_VIEW.equals(intent.getAction())&&intent.getDataString()!=null&&intent.getDataString().startsWith(com.example.cleanrecovery.update.GitHubUpdates.RELEASES)){
+                    opened.set(intent);return new android.app.Instrumentation.ActivityResult(Activity.RESULT_CANCELED,null);
+                }return null;
+            }
+        };
+        instrument.addMonitor(monitor);Activity updates=open(AppUpdateActivity.class);
+        try{
+            java.lang.reflect.Field selected=AppUpdateActivity.class.getDeclaredField("release");selected.setAccessible(true);
+            String url=com.example.cleanrecovery.update.GitHubUpdates.RELEASES;
+            String json="{\"tag_name\":\"v9.0\",\"assets\":[{\"name\":\"CleanARecovery-999999.apk\",\"state\":\"uploaded\",\"size\":10,\"digest\":\"sha256:"+"ab".repeat(32)+"\",\"browser_download_url\":\""+url+"/download/v9.0/CleanARecovery-999999.apk\"}]}";
+            com.example.cleanrecovery.update.GitHubUpdates.Release parsed=com.example.cleanrecovery.update.GitHubUpdates.parse(json);
+            instrument.runOnMainSync(()->{try{selected.set(updates,null);}catch(Exception e){throw new AssertionError(e);}clickGithub(updates.getWindow().getDecorView());});
+            assertNotNull(opened.get());assertEquals(url+"/latest",opened.get().getDataString());opened.set(null);
+            instrument.runOnMainSync(()->{try{selected.set(updates,parsed);}catch(Exception e){throw new AssertionError(e);}clickGithub(updates.getWindow().getDecorView());});
+            assertNotNull(opened.get());assertEquals(url+"/tag/v9.0",opened.get().getDataString());
+        }finally{instrument.runOnMainSync(updates::finish);instrument.removeMonitor(monitor);instrument.waitForIdleSync();}
+    }
+    private boolean clickGithub(View view){
+        if(view instanceof android.widget.Button&&"前往 GitHub 下载".contentEquals(((TextView)view).getText())){view.performClick();return true;}
+        if(view instanceof ViewGroup)for(int i=0;i<((ViewGroup)view).getChildCount();i++)if(clickGithub(((ViewGroup)view).getChildAt(i)))return true;
+        return false;
+    }
 }

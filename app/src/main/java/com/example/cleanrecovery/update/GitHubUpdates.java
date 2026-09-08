@@ -17,6 +17,7 @@ public final class GitHubUpdates {
     public static final class Release {
         public final long code,size; public final String name,notes,url,sha256;
         Release(long code,long size,String name,String notes,String url,String sha){this.code=code;this.size=size;this.name=name;this.notes=notes;this.url=url;this.sha256=sha;}
+        public String pageUrl(){return url.substring(0,url.lastIndexOf('/')).replace(RELEASES+"/download/",RELEASES+"/tag/");}
     }
     public interface Progress { void accept(int percent); }
     private GitHubUpdates() {}

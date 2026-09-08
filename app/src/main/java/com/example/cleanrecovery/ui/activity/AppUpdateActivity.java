@@ -29,10 +29,18 @@ public final class AppUpdateActivity extends Activity {
         status=text("更新来源：GitHub Releases",15);status.setPadding(0,dp(24),0,dp(20));
         ScrollView scroll=new ScrollView(this);scroll.addView(status);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         check=button("检查更新",root);check.setOnClickListener(v->check());
-        download=button("下载更新",root);download.setVisibility(View.GONE);download.setOnClickListener(v->download());
+        download=button("应用内下载更新",root);download.setVisibility(View.GONE);download.setOnClickListener(v->download());
         install=button("安装更新",root);install.setVisibility(View.GONE);install.setOnClickListener(v->install());
-        Button page=button("查看 GitHub 发布页面",root);page.setOnClickListener(v->{try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(GitHubUpdates.RELEASES)));}catch(Exception e){status.setText("无法打开浏览器");}});
+        Button page=button("前往 GitHub 下载",root);page.setOnClickListener(v->openReleasePage());
         setContentView(root);check();
+    }
+    private void openReleasePage(){
+        Uri uri=Uri.parse(release==null?GitHubUpdates.RELEASES+"/latest":release.pageUrl());
+        try{startActivity(new Intent(Intent.ACTION_VIEW,uri));}
+        catch(android.content.ActivityNotFoundException unavailable){
+            try{startActivity(new Intent(this,BrowserActivity.class).setAction(Intent.ACTION_VIEW).setData(uri));}
+            catch(Exception e){status.setText("暂时无法打开 GitHub，请稍后重试。");}
+        }
     }
     private void check(){if(busy)return;busy=true;check.setEnabled(false);download.setVisibility(View.GONE);status.setText("正在检查更新…");
         worker.execute(()->{try{GitHubUpdates.Release latest=GitHubUpdates.check();long current=GitHubUpdates.installedCode(this);runOnUiThread(()->{if(isFinishing()||isDestroyed())return;busy=false;check.setEnabled(true);release=latest;if(latest.code>current){status.setText("发现新版 "+latest.name+"\n安装包 "+String.format(java.util.Locale.ROOT,"%.1f MB",latest.size/1000000.0)+"\n\n"+latest.notes);download.setVisibility(View.VISIBLE);}else status.setText("当前已是最新版本");});}catch(Exception e){failed("检查失败："+e.getMessage());}});
