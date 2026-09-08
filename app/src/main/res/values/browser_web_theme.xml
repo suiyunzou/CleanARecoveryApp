@@ -1,0 +1,10 @@
+<resources>
+    <style name="ViaWebLight"><item name="android:isLightTheme">true</item></style>
+    <style name="ViaWebDark"><item name="android:isLightTheme">false</item></style>
+    <style name="ViaDarkPanel" parent="android:style/Theme.Material.Dialog.Alert">
+        <item name="android:colorAccent">#6F8DE1</item>
+        <item name="android:colorBackground">#1C1C1E</item>
+        <item name="android:textColorPrimary">#CCCCCC</item>
+        <item name="android:textColorSecondary">#999999</item>
+    </style>
+</resources>

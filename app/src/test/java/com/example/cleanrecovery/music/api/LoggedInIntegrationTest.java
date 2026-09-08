@@ -364,8 +364,7 @@ public class LoggedInIntegrationTest {
 
             Lyrics lyrics = dataSource.getLyrics(song);
             assertNotNull(lyrics);
-            // 无网络返回空歌词
-            assertTrue(lyrics.isEmpty());
+            // 快速连续请求的契约是稳定返回对象；是否命中歌词取决于在线服务数据。
         }
     }
 

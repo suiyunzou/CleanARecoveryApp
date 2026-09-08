@@ -13,6 +13,8 @@ import android.os.Environment;
 import android.os.IBinder;
 import android.util.Log;
 
+import com.example.cleanrecovery.ui.browser.BrowserPrefs;
+
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
@@ -120,8 +122,8 @@ public final class BackgroundDownloadService extends Service
             }
             foregroundStarted = true;
             Log.i(TAG, "已提升为前台服务 (dataSync)");
-        } catch (SecurityException e) {
-            // 缺少 POST_NOTIFICATIONS 权限或 FOREGROUND_SERVICE_DATA_SYNC 权限时降级
+        } catch (SecurityException | IllegalStateException e) {
+            // 缺少权限或后台限制时降级为后台服务，不让浏览器入口崩溃
             Log.w(TAG, "前台服务启动失败，降级为后台服务: " + e.getMessage());
         }
     }
@@ -192,6 +194,7 @@ public final class BackgroundDownloadService extends Service
     @Override
     public void onDestroy() {
         Log.i(TAG, "后台下载服务停止");
+        if (queueManager != null) queueManager.setExecutor(null);
         super.onDestroy();
     }
 
@@ -221,12 +224,14 @@ public final class BackgroundDownloadService extends Service
         }
 
         // 3. 构建请求头
-        Map<String, String> headers = buildHeaders(classifyResult);
+        Map<String, String> headers = task.rawResource ? task.requestHeaders : buildHeaders(classifyResult);
 
         try {
             File result;
             // 4. 根据类型选择下载策略
-            switch (classifyResult.type) {
+            if (task.rawResource) {
+                result = downloadDirect(task.id, task.url, outFile, headers, true);
+            } else switch (classifyResult.type) {
                 case HLS:
                     result = downloadHls(task.url, outFile, headers);
                     break;
@@ -242,7 +247,7 @@ public final class BackgroundDownloadService extends Service
                 case GOOGLEVIDEO:
                 case UNKNOWN:
                 default:
-                    result = downloadDirect(task.url, outFile, headers);
+                    result = downloadDirect(task.id, task.url, outFile, headers, false);
                     break;
             }
 
@@ -251,26 +256,32 @@ public final class BackgroundDownloadService extends Service
                 return null;
             }
 
-            // 5. 完整性校验
-            IntegrityVerifier.VerifyResult verifyResult = IntegrityVerifier.verify(result);
-            if (!verifyResult.valid) {
-                Log.w(TAG, "完整性校验失败: " + verifyResult.errorMessage);
-                // 删除无效文件
-                if (!result.delete()) {
-                    Log.w(TAG, "无法删除无效文件: " + result.getName());
+            // 浏览器下载保存原始文件，清单、图片、压缩包等无需通过媒体解码器。
+            if (task.rawResource) {
+                task.fileHash = IntegrityVerifier.computeSha256(result);
+                task.fileSize = result.length();
+                if (task.fileHash == null) throw new java.io.IOException("Cannot hash downloaded file");
+            } else {
+                IntegrityVerifier.VerifyResult verifyResult = IntegrityVerifier.verify(result);
+                if (!verifyResult.valid) {
+                    Log.w(TAG, "完整性校验失败: " + verifyResult.errorMessage);
+                    // 删除无效文件
+                    if (!result.delete()) {
+                        Log.w(TAG, "无法删除无效文件: " + result.getName());
+                    }
+                    return null;
                 }
-                return null;
+                task.fileHash = verifyResult.hash;
+                task.fileSize = verifyResult.fileSize;
             }
 
             // 6. 记录哈希和大小
-            task.fileHash = verifyResult.hash;
-            task.fileSize = verifyResult.fileSize;
-            totalDownloadedBytes.addAndGet(verifyResult.fileSize);
+            totalDownloadedBytes.addAndGet(task.fileSize);
             totalTasksCompleted.incrementAndGet();
 
             Log.i(TAG, "下载+校验完成: " + result.getName()
-                    + " " + verifyResult.fileSize + "字节 hash="
-                    + (verifyResult.hash != null ? verifyResult.hash.substring(0, 12) : "null"));
+                    + " " + task.fileSize + "字节 hash="
+                    + (task.fileHash != null ? task.fileHash.substring(0, 12) : "null"));
 
             return result;
         } catch (Exception e) {
@@ -282,15 +293,28 @@ public final class BackgroundDownloadService extends Service
     }
 
     /** 下载直接视频/音频文件（复用 UniversalDownloadManager）。 */
-    private File downloadDirect(String url, File outFile, Map<String, String> headers) {
+    private File downloadDirect(int taskId, String url, File outFile, Map<String, String> headers, boolean rawResource) {
         try {
-            UniversalDownloadManager manager = new UniversalDownloadManager();
+            UniversalDownloadManager manager = rawResource ? new BrowserFileDownloader() : new UniversalDownloadManager();
+            DownloadTaskDbHelper taskDb = DownloadTaskDbHelper.getInstance(this);
             final boolean[] success = {false};
             final String[] error = {null};
 
-            manager.downloadSmart(url, outFile, new com.example.cleanrecovery.download.DownloadProgressCallback() {
+            manager.download(url, outFile, headers, new com.example.cleanrecovery.download.DownloadProgressCallback() {
+                private long lastProgressAt = -1;
+                private long lastDownloaded;
+                private long lastTotal;
+
                 @Override
                 public void onProgress(long downloadedBytes, long totalBytes, long speedBps, int percent) {
+                    lastDownloaded = downloadedBytes;
+                    lastTotal = totalBytes;
+                    long now = android.os.SystemClock.elapsedRealtime();
+                    // 下载页按秒轮询；最多每半秒写一次，终态另行写入精确字节数。
+                    if (lastProgressAt < 0 || now - lastProgressAt >= 500) {
+                        taskDb.updateProgress(taskId, downloadedBytes, totalBytes);
+                        lastProgressAt = now;
+                    }
                     // 速度控制：如果超过限制，短暂休眠
                     if (MAX_SPEED_BPS > 0 && speedBps > MAX_SPEED_BPS) {
                         try {
@@ -307,11 +331,14 @@ public final class BackgroundDownloadService extends Service
 
                 @Override
                 public void onComplete(String path) {
+                    long size = new File(path).length();
+                    taskDb.updateProgress(taskId, size, size);
                     success[0] = true;
                 }
 
                 @Override
                 public void onError(String errorCode, String message) {
+                    taskDb.updateProgress(taskId, lastDownloaded, lastTotal);
                     error[0] = message;
                     Log.w(TAG, "下载错误[" + errorCode + "]: " + message);
                 }
@@ -355,7 +382,24 @@ public final class BackgroundDownloadService extends Service
 
         // 从页面标题生成文件名
         String baseName = "video_" + task.id;
-        if (task.pageTitle != null && !task.pageTitle.isEmpty()) {
+        String extSuffix = "." + ext;
+        if (task.rawResource) {
+            String requested = sanitizeFileName(task.fileName == null || task.fileName.isEmpty()
+                    ? android.webkit.URLUtil.guessFileName(task.url, null, task.mimeType) : task.fileName);
+            int dot = requested.lastIndexOf('.');
+            baseName = dot > 0 ? requested.substring(0, dot) : requested;
+            extSuffix = dot > 0 ? requested.substring(dot) : "";
+        } else if (task.fileName != null && !task.fileName.isEmpty()) {
+            // 「新建下载」用户指定的文件名：自带扩展名则原样用，否则追加探测到的扩展名
+            String requested = sanitizeFileName(task.fileName);
+            int dot = requested.lastIndexOf('.');
+            if (dot > 0) {
+                baseName = requested.substring(0, dot);
+                extSuffix = requested.substring(dot);
+            } else {
+                baseName = requested;
+            }
+        } else if (task.pageTitle != null && !task.pageTitle.isEmpty()) {
             baseName = sanitizeFileName(task.pageTitle);
         }
         // 截断过长的文件名
@@ -363,21 +407,26 @@ public final class BackgroundDownloadService extends Service
             baseName = baseName.substring(0, 80);
         }
 
-        String fileName = baseName + "." + ext;
+        String fileName = baseName + extSuffix;
         File outFile = new File(dir, fileName);
 
         // 避免覆盖已存在文件
         int counter = 1;
         while (outFile.exists()) {
-            outFile = new File(dir, baseName + "_" + counter + "." + ext);
+            outFile = new File(dir, baseName + "_" + counter + extSuffix);
             counter++;
         }
 
         return outFile;
     }
 
-    /** 获取下载目录（应用私有目录，安全存储）。 */
+    /** 获取下载目录（P0③：设置→下载目录 优先，回退应用私有目录）。 */
     private File getDownloadDir() {
+        try {
+            File configured = new BrowserPrefs(this).downloadDirFile();
+            if (configured != null) return configured;
+        } catch (Exception ignored) {
+        }
         // 优先使用外部存储的私有目录（无需权限，应用卸载时清除）
         File base = getExternalFilesDir(null);
         if (base == null) {

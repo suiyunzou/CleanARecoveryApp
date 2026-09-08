@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * <p>本类为纯 Java 逻辑，不依赖 Android UI 组件，便于单元测试。
  * UI 层通过实现 {@link DownloadProgressCallback} 接收进度更新。</p>
  */
-public final class UniversalDownloadManager {
+public class UniversalDownloadManager {
 
     private static final String TAG = "UniversalDLManager";
 
@@ -75,8 +75,8 @@ public final class UniversalDownloadManager {
         return globalCookieJar;
     }
 
-    private final int connectTimeout;
-    private final int readTimeout;
+    protected final int connectTimeout;
+    protected final int readTimeout;
     private final int maxRetries;
     private final long rateLimitBps;
 
@@ -267,7 +267,7 @@ public final class UniversalDownloadManager {
      *       避免对非 YouTube 站点注入错误 Referer（D1 决策）</li>
      *   <li>自动从 {@link #globalCookieJar} 注入对应域名 Cookie 头，解决 WebView Cookie 不共享导致的 403（D1）</li>
      *   <li>强化 C2 Content-Range 校验：当 resumeLen > 0 但响应 Content-Range 起始字节不匹配时，
-     *       删除 .part 文件从头下载，避免追加到错误位置导致文件损坏</li>
+     *       重新请求完整响应并截断 .part 文件，避免错误拼接导致文件损坏</li>
      *   <li>416 重连路径也应用 headers + Cookie（原代码漏注入）</li>
      * </ul>
      */
@@ -276,43 +276,17 @@ public final class UniversalDownloadManager {
                                        DownloadProgressCallback callback) throws IOException {
         HttpURLConnection conn = null;
         try {
-            conn = (HttpURLConnection) new URL(fileUrl).openConnection();
-            conn.setConnectTimeout(connectTimeout);
-            conn.setReadTimeout(readTimeout);
-            conn.setRequestMethod("GET");
-            // 应用请求头：Accept-Encoding + format 专属头 + Cookie 注入（D1）
-            applyRequestHeaders(conn, fileUrl, headers);
-
-            // 发送 Range 请求（对应 yt-dlp http.py#L112）
+            conn = openConnection(fileUrl, headers, resumeLen);
             boolean hasRange = resumeLen > 0;
-            if (hasRange) {
-                conn.setRequestProperty("Range", "bytes=" + resumeLen + "-");
-            }
-
             conn.connect();
             int code = conn.getResponseCode();
 
-            // HTTP 416：Range 不可满足（对应 yt-dlp http.py#L140）
-            if (code == 416) {
-                if (resumeLen > 0) {
-                    // 可能文件已完整下载，重新无 Range 请求验证
-                    conn.disconnect();
-                    conn = (HttpURLConnection) new URL(fileUrl).openConnection();
-                    conn.setConnectTimeout(connectTimeout);
-                    conn.setReadTimeout(readTimeout);
-                    // 416 重连也需注入 headers + Cookie（原代码漏注入，D1 修复）
-                    applyRequestHeaders(conn, fileUrl, headers);
-                    conn.connect();
-                    code = conn.getResponseCode();
-                    long contentLen = parseContentLength(conn);
-                    if (contentLen > 0 && Math.abs(contentLen - resumeLen) < 100) {
-                        // 文件已完整下载（对应 yt-dlp http.py#L155 的 ±100 字节容差）
-                        partFile.renameTo(outFile);
-                        notifyComplete(callback, outFile.getAbsolutePath());
-                        return;
-                    }
-                }
-                // 真正的 416 错误：重置从头下载
+            // 失效续传必须重新获取完整响应，不能把尾段或近似长度当作完整文件。
+            if ((code == 416 && hasRange) || (code == 206 && !validContentRange(conn, resumeLen))) {
+                conn.disconnect();
+                conn = openConnection(fileUrl, headers, 0);
+                conn.connect();
+                code = conn.getResponseCode();
                 resumeLen = 0;
                 hasRange = false;
             }
@@ -327,60 +301,24 @@ public final class UniversalDownloadManager {
                 throw new IOException("HTTP " + code);
             }
 
-            // 校验 Content-Range（对应 yt-dlp http.py#L120-L135，C2 强化）
-            long contentLen = parseContentLength(conn);
-            long totalLen;
-            boolean resumeValid = false;
-
-            if (hasRange) {
-                String contentRange = conn.getHeaderField("Content-Range");
-                if (contentRange != null && contentRange.startsWith("bytes " + resumeLen + "-")) {
-                    // Content-Range 起始字节匹配，续传有效
-                    resumeValid = true;
-                    // 从 Content-Range 提取总大小：bytes start-end/total
-                    int slashIdx = contentRange.indexOf('/');
-                    if (slashIdx >= 0) {
-                        try {
-                            totalLen = Long.parseLong(contentRange.substring(slashIdx + 1).trim());
-                        } catch (NumberFormatException e) {
-                            totalLen = resumeLen + contentLen;
-                        }
-                    } else {
-                        totalLen = resumeLen + contentLen;
-                    }
-                } else {
-                    // C2 强化：Content-Range 不匹配（服务器忽略 Range 或返回错误范围）
-                    // 必须删除 .part 文件从头下载，否则会追加到错误位置导致文件损坏
-                    Log.w(TAG, "Content-Range 不匹配，删除 .part 从头下载: resumeLen=" + resumeLen
-                            + " contentRange=" + contentRange);
-                    resumeLen = 0;
-                    totalLen = contentLen;
-                    // resumeValid 保持 false，下方会删除 .part 文件
-                }
-            } else {
-                totalLen = contentLen;
+            if (code == 206 && !validContentRange(conn, resumeLen)) {
+                throw new IOException("Invalid Content-Range: " + conn.getHeaderField("Content-Range"));
             }
+            long contentLen = parseContentLength(conn);
+            long[] range = code == 206 ? parseContentRange(conn) : null;
+            long totalLen = range == null ? contentLen : range[2];
+            boolean resumeValid = hasRange && code == 206;
+            if (!resumeValid) resumeLen = 0;
 
             // 打开输出流：续传追加，否则覆盖（对应 yt-dlp http.py#L83 ctx.open_mode）
-            // resumeValid=true 时追加（offset=resumeLen）；resumeValid=false 时覆盖（offset=0，需先删 .part）
+            // resumeValid=true 时追加；否则截断临时文件，避免残留旧尾部。
             String openMode = "rw";
             long fileOffset = resumeValid ? resumeLen : 0;
-            if (!resumeValid && partFile.exists()) {
-                // C2 强化：续传无效时务必删除旧 .part，避免追加到残留数据
-                if (!partFile.delete()) {
-                    Log.w(TAG, "删除 .part 失败: " + partFile.getAbsolutePath());
-                }
-            }
-
-            RandomAccessFileCompat raf = new RandomAccessFileCompat(partFile, openMode);
-            raf.seek(fileOffset);
-
-            InputStream in = conn.getInputStream();
-            try {
+            try (RandomAccessFileCompat raf = new RandomAccessFileCompat(partFile, openMode);
+                 InputStream in = conn.getInputStream()) {
+                raf.setLength(fileOffset);
+                raf.seek(fileOffset);
                 streamDownload(in, raf, resumeLen, totalLen, callback);
-                raf.close();
-            } finally {
-                try { in.close(); } catch (IOException ignored) {}
             }
 
             // 下载完成：重命名 .part → 最终文件名（对应 yt-dlp try_rename）
@@ -395,6 +333,18 @@ public final class UniversalDownloadManager {
         } finally {
             if (conn != null) conn.disconnect();
         }
+    }
+
+    /** Configures the connection used for both initial requests and continuation recovery. */
+    protected HttpURLConnection openConnection(String fileUrl, Map<String, String> headers, long resumeLen)
+            throws IOException {
+        HttpURLConnection connection = (HttpURLConnection) new URL(fileUrl).openConnection();
+        connection.setConnectTimeout(connectTimeout);
+        connection.setReadTimeout(readTimeout);
+        connection.setRequestMethod("GET");
+        applyRequestHeaders(connection, fileUrl, headers);
+        if (resumeLen > 0) connection.setRequestProperty("Range", "bytes=" + resumeLen + "-");
+        return connection;
     }
 
     /**
@@ -430,7 +380,7 @@ public final class UniversalDownloadManager {
             for (Map.Entry<String, String> e : headers.entrySet()) {
                 String k = e.getKey();
                 String v = e.getValue();
-                if (k == null || v == null) continue;
+                if (k == null || v == null || "Range".equalsIgnoreCase(k)) continue;
                 conn.setRequestProperty(k, v);
             }
         }
@@ -539,6 +489,10 @@ public final class UniversalDownloadManager {
             blockSize = bestBlockSize(blockSize, n, now - lastProgressTime);
         }
 
+        if (totalLen >= 0 && downloaded != totalLen) {
+            throw new RetryableDownloadException("Incomplete response: expected " + totalLen + " bytes, received " + downloaded);
+        }
+
         // 最终进度回调
         if (callback != null) {
             long elapsed = System.currentTimeMillis() - startTime;
@@ -637,6 +591,26 @@ public final class UniversalDownloadManager {
         }
     }
 
+    private long[] parseContentRange(HttpURLConnection conn) {
+        String value = conn.getHeaderField("Content-Range");
+        if (value == null) return null;
+        java.util.regex.Matcher match = java.util.regex.Pattern.compile("bytes (\\d+)-(\\d+)/(\\d+|\\*)").matcher(value.trim());
+        if (!match.matches()) return null;
+        try {
+            long start = Long.parseLong(match.group(1)), end = Long.parseLong(match.group(2));
+            long total = "*".equals(match.group(3)) ? -1 : Long.parseLong(match.group(3));
+            if (end < start || end == Long.MAX_VALUE || (total >= 0 && total <= end)) return null;
+            return new long[]{start, end, total};
+        } catch (NumberFormatException error) { return null; }
+    }
+
+    private boolean validContentRange(HttpURLConnection conn, long resumeLen) {
+        long[] range = parseContentRange(conn);
+        long length = parseContentLength(conn);
+        return range != null && range[2] >= 0 && range[0] == resumeLen
+                && (length < 0 || length == range[1] - range[0] + 1);
+    }
+
     private void notifyStatus(DownloadProgressCallback cb, String status, String message) {
         if (cb != null) cb.onStatusChanged(status, message);
     }
@@ -683,7 +657,7 @@ public final class UniversalDownloadManager {
      *
      * <p>支持 seek 定位 + 追加写入，用于断点续传场景。</p>
      */
-    private static final class RandomAccessFileCompat {
+    private static final class RandomAccessFileCompat implements AutoCloseable {
         private final java.io.RandomAccessFile raf;
 
         RandomAccessFileCompat(File file, String mode) throws IOException {
@@ -694,11 +668,15 @@ public final class UniversalDownloadManager {
             raf.seek(pos);
         }
 
+        void setLength(long length) throws IOException {
+            raf.setLength(length);
+        }
+
         void write(byte[] buf, int offset, int len) throws IOException {
             raf.write(buf, offset, len);
         }
 
-        void close() throws IOException {
+        @Override public void close() throws IOException {
             raf.close();
         }
     }

@@ -12,6 +12,7 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <!-- P0 A1: 后台下载服务使用 dataSync 类型前台服务，避免下载中被系统杀死 -->
@@ -20,9 +21,13 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
+        android:name=".CleanRecoveryApplication"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:extractNativeLibs="true"
@@ -42,6 +47,13 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+        <activity
+            android:name=".ui.activity.AppUpdateActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.activity.BrowserQrScannerActivity"
+            android:screenOrientation="portrait"
+            android:exported="false" />
         <activity
             android:name=".ui.activity.OnboardingActivity"
             android:exported="false" />
@@ -87,7 +99,7 @@
             android:name="com.example.cleanrecovery.ui.activity.BrowserActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:exported="true"
-            android:launchMode="singleTask">
+            android:launchMode="singleTop">
             <!-- VIA 对齐：允许在线观影浏览器作为默认浏览器/外部链接接收端。 -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -129,13 +141,28 @@
         </service>
         <activity android:name="com.example.cleanrecovery.ui.activity.BookmarksActivity" android:exported="false" />
         <activity android:name="com.example.cleanrecovery.ui.activity.HistoryActivity" android:exported="false" />
+        <activity android:name="com.example.cleanrecovery.ui.activity.BookmarkEditorActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+        <activity android:name="com.example.cleanrecovery.ui.activity.BrowserSnifferActivity" android:exported="false" />
         <activity android:name="com.example.cleanrecovery.ui.activity.BrowserDownloadsActivity" android:exported="false" />
         <activity android:name="com.example.cleanrecovery.ui.activity.BrowserOfflinePagesActivity" android:exported="false" />
-        <activity android:name="com.example.cleanrecovery.ui.activity.BrowserSettingsActivity" android:exported="false" />
+        <activity android:name="com.example.cleanrecovery.ui.activity.BrowserSettingsActivity" android:exported="true" />
+        <activity android:name="com.example.cleanrecovery.ui.activity.AdRulesPreviewActivity" android:exported="false" />
         <activity android:name="com.example.cleanrecovery.ui.activity.BrowserSiteSettingsActivity" android:exported="false" />
-        <activity android:name="com.example.cleanrecovery.ui.activity.BrowserSearchSettingsActivity" android:exported="false" />
-        <activity android:name="com.example.cleanrecovery.ui.activity.BrowserHomeCustomizeActivity" android:exported="false" />
-        <activity android:name="com.example.cleanrecovery.ui.activity.TabsActivity" android:exported="false" />
+        <activity android:name="com.example.cleanrecovery.ui.activity.BrowserSearchSettingsActivity" android:exported="true" />
+        <activity android:name="com.example.cleanrecovery.ui.activity.BrowserHomeCustomizeActivity" android:exported="true" />
+        <service
+            android:name="com.example.cleanrecovery.ui.browser.BrowserCustomTabsService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.support.customtabs.action.CustomTabsService" />
+            </intent-filter>
+        </service>
+        <!-- 抖音模式：垂直滑动视频流 -->
+        <activity
+            android:name="com.example.cleanrecovery.ui.feed.VideoFeedActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:screenOrientation="portrait" />
         <service
             android:name="com.example.cleanrecovery.background.BackgroundDownloadService"
             android:exported="false"

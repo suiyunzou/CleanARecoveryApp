@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 歌单封面底色：浅灰渐变圆角 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient android:angle="270"
+        android:startColor="#F0F3F2"
+        android:endColor="#DFE7E5" />
+    <corners android:radius="16dp" />
+</shape>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FlClash 选中/激活卡片：品牌色描边高亮 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/surface_card" />
+    <corners android:radius="@dimen/radius_card" />
+    <stroke
+        android:width="2dp"
+        android:color="@color/brand_primary" />
+</shape>

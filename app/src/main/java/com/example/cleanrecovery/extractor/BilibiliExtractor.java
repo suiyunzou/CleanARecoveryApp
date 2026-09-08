@@ -29,8 +29,11 @@ import java.util.regex.Pattern;
  *   <li>{@code https://b23.tv/xxxxxxx}（短链，自动跟随重定向）</li>
  * </ul>
  *
- * <p>注意：WBI 签名需要从 nav API 获取密钥。本实现采用 fnval=16（DASH）的
- * 简化路径，绕过 WBI 签名要求（playurl 接口对未签名请求返回基础 DASH 流）。</p>
+ * <p>cid/title 优先走 {@code x/web-interface/view} API（免签名、免页面解析），
+ * 失败回退页面 {@code __INITIAL_STATE__}。playurl 请求经 {@link WbiSigner}
+ * 做 WBI 签名（移植 yt-dlp bilibili.py，未签名请求在高画质/部分视频上会被拒）。
+ * 注意：未登录状态下服务端实际只下发 480P/360P（try_look 预览档），
+ * {@code accept_quality} 列表是虚的，需登录后才能拿 1080P+。</p>
  *
  * @see <a href="https://github.com/yt-dlp/yt-dlp/blob/master/yt_dlp/extractor/bilibili.py">BiliBiliIE</a>
  */
@@ -94,37 +97,54 @@ public class BilibiliExtractor implements Extractor {
         prefix = prefix.toUpperCase();
         String bvid = prefix.equals("BV") ? prefix + videoId : convertAvToBvid(videoId);
 
-        // 3. 解析页面获取 cid 和 title
         Map<String, String> headers = ExtractorHttp.defaultHeaders();
         headers.put("Referer", "https://www.bilibili.com/");
-        String webpage = ExtractorHttp.downloadWebpage(url, headers);
 
-        JSONObject initialState = extractInitialState(webpage);
-        if (initialState == null) {
-            throw new ExtractorException(ExtractorException.Kind.PARSE_FAILED,
-                    "无法解析页面数据，可能需要登录或视频已被删除");
+        // 3. 获取 cid/title：优先走 view API（免签名、免页面解析，yt-dlp 同款路径），
+        //    view 失败（地区限制等）再回退页面 __INITIAL_STATE__
+        String title = bvid;
+        JSONObject videoData = null;
+        try {
+            JSONObject viewResp = new JSONObject(ExtractorHttp.downloadJson(
+                    "https://api.bilibili.com/x/web-interface/view?bvid=" + bvid, headers));
+            int vcode = viewResp.optInt("code", -1);
+            if (vcode == 0) {
+                videoData = viewResp.optJSONObject("data");
+            } else if (vcode == -404) {
+                throw new ExtractorException(ExtractorException.Kind.NOT_FOUND,
+                        "视频不存在或已被删除，或受地区限制");
+            }
+            // 其余错误码不中断，走页面回退
+        } catch (org.json.JSONException ignored) {
+            // 页面回退
         }
-
-        // 检查错误码
-        int errCode = initialState.optJSONObject("error") != null
-                ? initialState.optJSONObject("error").optInt("trueCode", 0) : 0;
-        if (errCode == -403) {
-            throw new ExtractorException(ExtractorException.Kind.LOGIN_REQUIRED, "需要登录才能观看");
+        if (videoData != null) {
+            title = videoData.optString("title", title);
+            bvid = videoData.optString("bvid", bvid);
+        } else {
+            String webpage = ExtractorHttp.downloadWebpage(url, headers);
+            JSONObject initialState = extractInitialState(webpage);
+            if (initialState == null) {
+                throw new ExtractorException(ExtractorException.Kind.PARSE_FAILED,
+                        "无法解析页面数据，可能需要登录或视频已被删除");
+            }
+            int errCode = initialState.optJSONObject("error") != null
+                    ? initialState.optJSONObject("error").optInt("trueCode", 0) : 0;
+            if (errCode == -403) {
+                throw new ExtractorException(ExtractorException.Kind.LOGIN_REQUIRED, "需要登录才能观看");
+            }
+            if (errCode == -404) {
+                throw new ExtractorException(ExtractorException.Kind.NOT_FOUND,
+                        "视频不存在或已被删除，或受地区限制");
+            }
+            videoData = initialState.optJSONObject("videoData");
+            if (videoData == null) videoData = initialState.optJSONObject("videoInfo");
+            if (videoData == null) {
+                throw new ExtractorException(ExtractorException.Kind.PARSE_FAILED, "无法获取视频数据");
+            }
+            title = videoData.optString("title", title);
+            bvid = videoData.optString("bvid", bvid);
         }
-        if (errCode == -404) {
-            throw new ExtractorException(ExtractorException.Kind.NOT_FOUND,
-                    "视频不存在或已被删除，或受地区限制");
-        }
-
-        JSONObject videoData = initialState.optJSONObject("videoData");
-        if (videoData == null) videoData = initialState.optJSONObject("videoInfo");
-        if (videoData == null) {
-            throw new ExtractorException(ExtractorException.Kind.PARSE_FAILED, "无法获取视频数据");
-        }
-
-        String title = videoData.optString("title", bvid);
-        bvid = videoData.optString("bvid", bvid);
-        long aid = videoData.optLong("aid", 0);
 
         // 获取 cid（支持分 P）
         int page = parsePageParam(url);
@@ -146,9 +166,21 @@ public class BilibiliExtractor implements Extractor {
             throw new ExtractorException(ExtractorException.Kind.PARSE_FAILED, "无法获取 cid");
         }
 
-        // 4. 调用 playurl API 获取 DASH 流（fnval=4048 启用 DASH+4K+HDR+杜比）
-        String playUrl = "https://api.bilibili.com/x/player/wbi/playurl" +
-                "?bvid=" + bvid + "&cid=" + cid + "&fnval=4048&fourk=1&try_look=1";
+        // 4. WBI 签名的 playurl 请求（yt-dlp _sign_wbi 移植；fnval=4048 启用 DASH+4K+HDR+杜比）
+        Map<String, String> playParams = new HashMap<>();
+        playParams.put("bvid", bvid);
+        playParams.put("cid", String.valueOf(cid));
+        playParams.put("fnval", "4048");
+        playParams.put("fourk", "1");
+        playParams.put("try_look", "1");
+        String playUrl;
+        try {
+            playUrl = WbiSigner.signUrl("https://api.bilibili.com/x/player/wbi/playurl", playParams);
+        } catch (IOException e) {
+            // WBI 密钥获取失败时退回未签名请求（低画质保底）
+            playUrl = "https://api.bilibili.com/x/player/wbi/playurl?bvid=" + bvid
+                    + "&cid=" + cid + "&fnval=4048&fourk=1&try_look=1";
+        }
         String playJson = ExtractorHttp.downloadJson(playUrl, headers);
         JSONObject playResp;
         try {
@@ -370,6 +402,9 @@ public class BilibiliExtractor implements Extractor {
     private static String mimeToExt(String mime, String fallback) {
         if (mime == null) return fallback;
         String lower = mime.toLowerCase();
+        // audio/mp4 是 AAC 音轨（B站 DASH 音频），必须存为 m4a；若落到下面的通用
+        // mp4 分支会把纯音频标成 .mp4，导致合并选轨与保存扩展名都出错
+        if (lower.startsWith("audio/mp4") || lower.contains("mp4a") || lower.contains("aac")) return "m4a";
         if (lower.contains("mp4")) return "mp4";
         if (lower.contains("webm")) return "webm";
         if (lower.contains("flac")) return "flac";

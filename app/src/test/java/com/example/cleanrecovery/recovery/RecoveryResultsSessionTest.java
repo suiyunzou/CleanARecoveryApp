@@ -25,7 +25,7 @@ public final class RecoveryResultsSessionTest {
         );
         item.selected = true;
         state.addAll(Collections.singletonList(item));
-        state.setFilter(RecoveryState.FilterMode.EXISTING);
+        state.setFilter(RecoveryState.FilterMode.RECOVERABLE);
 
         RecoveryResultsSession.saveFrom(state, RecoveryType.IMAGE, false, true, 42, 1);
 
@@ -34,7 +34,7 @@ public final class RecoveryResultsSessionTest {
 
         assertTrue(RecoveryResultsSession.hasResults());
         assertEquals(1, restored.getAllCount());
-        assertEquals(RecoveryState.FilterMode.EXISTING, restored.getFilter());
+        assertEquals(RecoveryState.FilterMode.RECOVERABLE, restored.getFilter());
         assertEquals(RecoveryType.IMAGE, RecoveryResultsSession.getScanType());
         assertTrue(RecoveryResultsSession.isExperimentalMode());
         assertEquals(42, RecoveryResultsSession.getScannedCount());

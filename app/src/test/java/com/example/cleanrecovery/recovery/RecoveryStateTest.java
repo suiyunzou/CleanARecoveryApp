@@ -24,39 +24,56 @@ public final class RecoveryStateTest {
         );
     }
 
-    private RecoveryItem deletedItem() {
+    private RecoveryItem indexOnlyItem() {
         return new RecoveryItem(
                 RecoveryType.IMAGE,
                 "cache.jpg",
-                "/storage/cache/photo.jpg",
+                "content://media/external/images/media/1",
                 100L,
                 0L,
                 100,
                 100,
-                true
+                true,
+                RecoverySourceKind.MEDIASTORE_STALE_RECORD,
+                false,
+                0L
         );
     }
 
     @Test
-    public void filterExistingShowsOnlyNonDeletedItems() {
+    public void filterRecoverableShowsOnlyItemsWithData() {
         RecoveryState state = new RecoveryState();
-        state.addAll(Arrays.asList(existingItem(), deletedItem()));
+        state.addAll(Arrays.asList(existingItem(), indexOnlyItem()));
 
-        state.setFilter(RecoveryState.FilterMode.EXISTING);
+        state.setFilter(RecoveryState.FilterMode.RECOVERABLE);
 
         assertEquals(1, state.getVisibleCount());
-        assertFalse(state.getVisibleItems().get(0).suspectedDeleted);
+        assertTrue(state.getVisibleItems().get(0).recoverable);
     }
 
     @Test
-    public void filterDeletedShowsOnlySuspectedDeletedItems() {
+    public void filterIndexOnlyShowsOnlyItemsWithoutData() {
         RecoveryState state = new RecoveryState();
-        state.addAll(Arrays.asList(existingItem(), deletedItem()));
+        state.addAll(Arrays.asList(existingItem(), indexOnlyItem()));
 
-        state.setFilter(RecoveryState.FilterMode.DELETED);
+        state.setFilter(RecoveryState.FilterMode.INDEX_ONLY);
 
         assertEquals(1, state.getVisibleCount());
-        assertTrue(state.getVisibleItems().get(0).suspectedDeleted);
+        assertFalse(state.getVisibleItems().get(0).recoverable);
+    }
+
+    @Test
+    public void removeAllDropsProcessedItems() {
+        RecoveryState state = new RecoveryState();
+        RecoveryItem first = existingItem();
+        RecoveryItem second = indexOnlyItem();
+        state.addAll(Arrays.asList(first, second));
+
+        int removed = state.removeAll(Collections.singletonList(second));
+
+        assertEquals(1, removed);
+        assertEquals(1, state.getAllCount());
+        assertFalse(state.getAllItems().contains(second));
     }
 
     @Test

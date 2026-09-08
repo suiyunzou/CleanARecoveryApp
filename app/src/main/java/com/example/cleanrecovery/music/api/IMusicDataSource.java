@@ -23,6 +23,12 @@ public interface IMusicDataSource {
     /** Create a logged-in user's Kugou cloud playlist. */
     void createUserPlaylist(String name, boolean privatePlaylist) throws Exception;
 
+    /** Rename a logged-in user's Kugou cloud playlist (default playlists rejected server-side). */
+    void renameUserPlaylist(RemotePlaylist playlist, String newName) throws Exception;
+
+    /** Delete a logged-in user's Kugou cloud playlist (default playlists rejected server-side). */
+    void deleteUserPlaylist(RemotePlaylist playlist) throws Exception;
+
     /** Get songs from a logged-in user's Kugou cloud playlist. */
     List<SongInfo> getUserPlaylistSongs(RemotePlaylist playlist, int page, int pageSize) throws Exception;
 

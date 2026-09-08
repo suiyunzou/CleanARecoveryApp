@@ -10,8 +10,10 @@ public final class RecoveryState {
 
     public enum FilterMode {
         ALL,
-        EXISTING,
-        DELETED
+        /** Data verified on device — restore or copy will work. */
+        RECOVERABLE,
+        /** Index/metadata only — the bytes are gone from the device. */
+        INDEX_ONLY
     }
 
     private final ArrayList<RecoveryItem> allItems = new ArrayList<>();
@@ -105,10 +107,20 @@ public final class RecoveryState {
         return count;
     }
 
-    public int countSuspectedDeleted() {
+    public int countRecoverable() {
         int count = 0;
         for (RecoveryItem item : allItems) {
-            if (item.suspectedDeleted) {
+            if (item.recoverable) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    public int countIndexOnly() {
+        int count = 0;
+        for (RecoveryItem item : allItems) {
+            if (!item.recoverable) {
                 count++;
             }
         }
@@ -145,8 +157,27 @@ public final class RecoveryState {
 
     public void setAllSelected(boolean selected) {
         for (RecoveryItem item : visibleItems) {
-            item.selected = selected;
+            if (item.recoverable) {
+                item.selected = selected;
+            }
         }
+    }
+
+    /**
+     * Drop items that were restored (or otherwise processed) so they no longer
+     * appear in results. Returns how many were removed.
+     */
+    public int removeAll(Collection<RecoveryItem> targets) {
+        if (targets == null || targets.isEmpty()) {
+            return 0;
+        }
+        java.util.HashSet<RecoveryItem> targetSet = new java.util.HashSet<>(targets);
+        int before = allItems.size();
+        // RecoveryItem uses identity equality — items here are the same objects
+        // the caller holds.
+        allItems.removeAll(targetSet);
+        rebuildVisibleItems();
+        return before - allItems.size();
     }
 
     public int getDuplicateSkipCount() {
@@ -161,11 +192,11 @@ public final class RecoveryState {
     }
 
     private boolean matchesStatusFilter(RecoveryItem item, FilterMode filter) {
-        if (filter == FilterMode.EXISTING) {
-            return !item.suspectedDeleted;
+        if (filter == FilterMode.RECOVERABLE) {
+            return item.recoverable;
         }
-        if (filter == FilterMode.DELETED) {
-            return item.suspectedDeleted;
+        if (filter == FilterMode.INDEX_ONLY) {
+            return !item.recoverable;
         }
         return true;
     }

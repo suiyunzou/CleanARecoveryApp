@@ -12,8 +12,8 @@ import java.util.Map;
 /**
  * Pure-Java state machine for VIA-compatible resource sniffing.
  *
- * <p>Instances retain independent state for every browser tab. A tab's candidates belong to the
- * WebView that most recently started a page, and are exposed only after that WebView commits.
+ * <p>Instances retain independent state for each page in a browser tab. Only the active page's
+ * candidates are exposed, after that WebView commits; restoring a page preserves its captures.
  */
 public final class ViaSnifferStateMachine {
     private static final String INJECTED_BLOCKER_CSS = "via_inject_blocker.css";
@@ -88,22 +88,18 @@ public final class ViaSnifferStateMachine {
         }
     }
 
-    private static final class TabState {
-        int activeWebViewId = -1;
-        int committedWebViewId = -1;
+    private static final class PageState {
+        boolean committed;
         final List<Candidate> candidates = new ArrayList<>();
         boolean hasMediaLikeCandidate;
-        boolean unsupportedSite;
+        final boolean unsupportedSite;
 
-        void startPage(int webViewId, boolean unsupported) {
-            candidates.clear();
-            hasMediaLikeCandidate = false;
-            activeWebViewId = webViewId;
+        PageState(boolean unsupported) {
             unsupportedSite = unsupported;
         }
 
         boolean hasCurrentRequests() {
-            return committedWebViewId == activeWebViewId && !candidates.isEmpty();
+            return committed && !candidates.isEmpty();
         }
 
         boolean shouldShowButton() {
@@ -111,11 +107,41 @@ public final class ViaSnifferStateMachine {
         }
     }
 
+    private static final class TabState {
+        int activeWebViewId = -1;
+        final Map<Integer, PageState> pages = new HashMap<>();
+
+        PageState activePage() {
+            return pages.get(activeWebViewId);
+        }
+
+        boolean shouldShowButton() {
+            PageState page = activePage();
+            return page != null && page.shouldShowButton();
+        }
+    }
+
     private final Map<Integer, TabState> tabs = new HashMap<>();
 
-    /** Mirrors WebViewClient.onPageStarted. This clears only the addressed tab. */
+    /** A new document resets only its WebView's captures and makes that page active. */
     public synchronized void onPageStarted(int tabId, int webViewId, String pageUrl) {
-        state(tabId).startPage(webViewId, isUnsupportedSite(pageUrl));
+        TabState state = state(tabId);
+        state.pages.put(webViewId, new PageState(isUnsupportedSite(pageUrl)));
+        state.activeWebViewId = webViewId;
+    }
+
+    /** Restores a retained page without clearing its captured requests or commit state. */
+    public synchronized void activatePage(int tabId, int webViewId) {
+        state(tabId).activeWebViewId = webViewId;
+    }
+
+    /** A discarded page must release its captured URLs; late requests cannot recreate it. */
+    public synchronized void removePage(int tabId, int webViewId) {
+        TabState state = tabs.get(tabId);
+        if (state == null) return;
+        state.pages.remove(webViewId);
+        if (state.activeWebViewId == webViewId) state.activeWebViewId = -1;
+        if (state.pages.isEmpty()) tabs.remove(tabId);
     }
 
     /**
@@ -124,8 +150,10 @@ public final class ViaSnifferStateMachine {
      * @return whether the sniffer button should be visible after this commit
      */
     public synchronized boolean onPageCommitVisible(int tabId, int webViewId) {
-        TabState state = state(tabId);
-        state.committedWebViewId = webViewId;
+        TabState state = tabs.get(tabId);
+        if (state == null) return false;
+        PageState page = state.pages.get(webViewId);
+        if (page != null) page.committed = true;
         return state.shouldShowButton();
     }
 
@@ -141,10 +169,11 @@ public final class ViaSnifferStateMachine {
             String url,
             boolean blockedResponse,
             Map<String, String> requestHeaders) {
-        TabState state = state(tabId);
-        if (url == null
+        TabState state = tabs.get(tabId);
+        PageState page = state == null ? null : state.activePage();
+        if (page == null || url == null
                 || isUnsupportedSite(url)
-                || url.endsWith(INJECTED_BLOCKER_CSS)
+                || url.split("[?#]", 2)[0].endsWith("/" + INJECTED_BLOCKER_CSS)
                 || webViewId != state.activeWebViewId) {
             return result(false, state);
         }
@@ -155,29 +184,30 @@ public final class ViaSnifferStateMachine {
         boolean mediaLike = initialRange || ViaMediaHashMembership.contains(extension);
 
         // VIA does not retain media candidates while the active page is unsupported.
-        if (mediaLike && state.unsupportedSite) {
+        if (mediaLike && page.unsupportedSite) {
             return result(false, state);
         }
 
-        state.candidates.add(new Candidate(
+        page.candidates.add(new Candidate(
                 url,
                 extension,
                 System.currentTimeMillis(),
                 blockedResponse,
                 mediaLike));
         if (mediaLike) {
-            state.hasMediaLikeCandidate = true;
+            page.hasMediaLikeCandidate = true;
         }
         return result(true, state);
     }
 
     /** Returns a defensive snapshot of all current requests for a tab. */
     public synchronized List<Candidate> candidates(int tabId) {
-        TabState state = state(tabId);
-        if (!state.hasCurrentRequests()) {
+        TabState state = tabs.get(tabId);
+        PageState page = state == null ? null : state.activePage();
+        if (page == null || !page.hasCurrentRequests()) {
             return Collections.emptyList();
         }
-        return Collections.unmodifiableList(new ArrayList<>(state.candidates));
+        return Collections.unmodifiableList(new ArrayList<>(page.candidates));
     }
 
     /** Returns the VIA sniffer UI export: current candidates classified as media only. */
@@ -193,14 +223,22 @@ public final class ViaSnifferStateMachine {
     }
 
     public synchronized boolean shouldShowButton(int tabId) {
-        return state(tabId).shouldShowButton();
+        TabState state = tabs.get(tabId);
+        return state != null && state.shouldShowButton();
     }
 
-    /** Clears captured requests without changing the active/committed WebView identity. */
+    /** A destroyed tab must not retain captured private URLs. */
+    public synchronized void removeTab(int tabId) {
+        tabs.remove(tabId);
+    }
+
+    /** Clears the active page's captures without changing its identity or commit state. */
     public synchronized void clear(int tabId) {
-        TabState state = state(tabId);
-        state.candidates.clear();
-        state.hasMediaLikeCandidate = false;
+        TabState state = tabs.get(tabId);
+        PageState page = state == null ? null : state.activePage();
+        if (page == null) return;
+        page.candidates.clear();
+        page.hasMediaLikeCandidate = false;
     }
 
     public static String extractExtension(String url) {
@@ -275,7 +313,7 @@ public final class ViaSnifferStateMachine {
     }
 
     private CaptureResult result(boolean recorded, TabState state) {
-        return new CaptureResult(recorded, state.shouldShowButton());
+        return new CaptureResult(recorded, state != null && state.shouldShowButton());
     }
 
     private TabState state(int tabId) {

@@ -1,10 +1,12 @@
 package com.example.cleanrecovery.algorithm;
 
+import com.example.cleanrecovery.algorithm.carve.CarvedHit;
+import com.example.cleanrecovery.algorithm.carve.SignatureCarver;
 import com.example.cleanrecovery.experiment.CandidateLabel;
 import com.example.cleanrecovery.experiment.CandidateSourceKind;
 import com.example.cleanrecovery.experiment.RecoveryCandidate;
 import com.example.cleanrecovery.experiment.ResultGrade;
-import com.example.cleanrecovery.experiment.jpeg.JpegBlobCarver;
+import com.example.cleanrecovery.recovery.RecoveryType;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -16,14 +18,15 @@ import java.util.Set;
 
 /**
  * Carves embedded files out of a raw partition byte stream (read via root
- * {@code dd}). Reads overlapping windows so JPEGs straddling a window boundary
- * are still found, slices each hit into the app-private staging directory, and
- * emits a candidate that points at the staged file — {@code RecoveryCopier}
- * then copies it normally, so no special copy path is needed.
+ * {@code dd}). Reads overlapping windows so payloads straddling a window
+ * boundary are still found, slices each hit into the app-private staging
+ * directory, and emits a candidate that points at the staged file —
+ * {@code RecoveryCopier} then copies it normally.
  *
- * <p>This is signature carving over raw bytes, not a filesystem parser. The
- * caller supplies the {@link CandidateSourceKind} and extraction-method label
- * that honestly describe the partition the bytes came from.
+ * <p>This is signature carving over raw bytes (delegated to
+ * {@link SignatureCarver}), not a filesystem parser. The caller supplies the
+ * {@link CandidateSourceKind} and extraction-method label that honestly
+ * describe the partition the bytes came from.
  */
 public final class RawPartitionCarver {
     static final int WINDOW_BYTES = 8 * 1024 * 1024;
@@ -32,17 +35,27 @@ public final class RawPartitionCarver {
     static final long DEFAULT_MAX_BYTES = 4L * 1024L * 1024L * 1024L;
     static final int DEFAULT_MAX_CANDIDATES = 5_000;
 
-    private final JpegBlobCarver carver = new JpegBlobCarver();
+    private final SignatureCarver carver = new SignatureCarver();
     private final long maxBytes;
     private final int maxCandidates;
+    private final RecoveryType typeFilter;
 
     public RawPartitionCarver() {
-        this(DEFAULT_MAX_BYTES, DEFAULT_MAX_CANDIDATES);
+        this(DEFAULT_MAX_BYTES, DEFAULT_MAX_CANDIDATES, null);
+    }
+
+    public RawPartitionCarver(RecoveryType typeFilter) {
+        this(DEFAULT_MAX_BYTES, DEFAULT_MAX_CANDIDATES, typeFilter);
     }
 
     RawPartitionCarver(long maxBytes, int maxCandidates) {
+        this(maxBytes, maxCandidates, null);
+    }
+
+    RawPartitionCarver(long maxBytes, int maxCandidates, RecoveryType typeFilter) {
         this.maxBytes = maxBytes;
         this.maxCandidates = maxCandidates;
+        this.typeFilter = typeFilter;
     }
 
     /**
@@ -76,7 +89,7 @@ public final class RawPartitionCarver {
             totalRead += (filled - carry);
 
             byte[] view = filled == window.length ? window : trimmed(window, filled);
-            emitted += carveWindow(view, basePosition, stagingDir, sourceKind,
+            emitted += carveWindow(view, basePosition, "", stagingDir, sourceKind,
                     extractionMethod, seenHashes, callback, emitted);
 
             callback.onProgress((int) (totalRead / WINDOW_BYTES),
@@ -85,7 +98,7 @@ public final class RawPartitionCarver {
             if (filled < window.length) {
                 break; // reached EOF
             }
-            // Retain a tail overlap so a JPEG spanning the boundary is recoverable.
+            // Retain a tail overlap so a payload spanning the boundary is recoverable.
             carry = Math.min(OVERLAP_BYTES, filled);
             System.arraycopy(window, filled - carry, window, 0, carry);
             basePosition += (filled - carry);
@@ -93,9 +106,49 @@ public final class RawPartitionCarver {
         return emitted;
     }
 
+    /**
+     * Carve a single in-memory buffer (used by plaintext residual scans and tests).
+     */
+    public int carveBytes(
+            byte[] data,
+            long basePosition,
+            File stagingDir,
+            CandidateSourceKind sourceKind,
+            String extractionMethod,
+            AlgorithmCallback callback
+    ) throws IOException {
+        return carveBytes(data, basePosition, "", stagingDir, sourceKind, extractionMethod, callback);
+    }
+
+    /**
+     * Carve a single in-memory buffer with a per-source tag so staged file names
+     * never collide between different sources (otherwise the deduper would
+     * discard every hit after the first, and staged files would overwrite each
+     * other — both when carving whole files whose payload starts at offset 0).
+     */
+    public int carveBytes(
+            byte[] data,
+            long basePosition,
+            String sourceTag,
+            File stagingDir,
+            CandidateSourceKind sourceKind,
+            String extractionMethod,
+            AlgorithmCallback callback
+    ) throws IOException {
+        if (data == null || stagingDir == null) {
+            return 0;
+        }
+        if (!stagingDir.exists() && !stagingDir.mkdirs()) {
+            throw new IOException("cannot_create_staging_dir");
+        }
+        return carveWindow(data, basePosition, sourceTag, stagingDir, sourceKind, extractionMethod,
+                new HashSet<String>(), callback, 0);
+    }
+
     private int carveWindow(
             byte[] view,
             long basePosition,
+            String sourceTag,
             File stagingDir,
             CandidateSourceKind sourceKind,
             String extractionMethod,
@@ -103,11 +156,7 @@ public final class RawPartitionCarver {
             AlgorithmCallback callback,
             int emittedSoFar
     ) throws IOException {
-        List<RecoveryCandidate> carved = carver.carveBytes("partition", view, new JpegBlobCarver.Progress() {
-            @Override
-            public void onCandidateFound(RecoveryCandidate candidate) {
-            }
-
+        List<CarvedHit> carved = carver.carveWindow(view, typeFilter, new SignatureCarver.Progress() {
             @Override
             public boolean isCancelled() {
                 return callback.isCancelled();
@@ -115,33 +164,33 @@ public final class RawPartitionCarver {
         });
 
         int emitted = 0;
-        for (RecoveryCandidate carvedCandidate : carved) {
+        for (CarvedHit hit : carved) {
             if (callback.isCancelled() || emittedSoFar + emitted >= maxCandidates) {
                 break;
             }
-            int start = (int) carvedCandidate.extractionOffsetStart;
-            int end = (int) carvedCandidate.extractionOffsetEnd;
-            if (start < 0 || end <= start || end > view.length) {
+            if (hit.start < 0 || hit.end <= hit.start || hit.end > view.length) {
                 continue;
             }
-            if (!seenHashes.add(carvedCandidate.sha256)) {
+            if (hit.sha256 != null && !hit.sha256.isEmpty() && !seenHashes.add(hit.sha256)) {
                 continue; // dedupe across overlapping windows
             }
-            int length = end - start;
-            File staged = new File(stagingDir, "offline_" + (basePosition + start) + ".jpg");
+            int length = hit.length();
+            String tagPrefix = sourceTag == null || sourceTag.isEmpty() ? "" : sourceTag + "_";
+            File staged = new File(stagingDir,
+                    "offline_" + tagPrefix + (basePosition + hit.start) + "." + hit.extension);
             try (FileOutputStream out = new FileOutputStream(staged)) {
-                out.write(view, start, length);
+                out.write(view, hit.start, length);
             }
             callback.onCandidate(new RecoveryCandidate.Builder()
                     .candidateId(staged.getAbsolutePath())
                     .sourceKind(sourceKind)
                     .sourceUriOrPath(staged.getAbsolutePath())
                     .extractionMethod(extractionMethod)
-                    .originalContainer("partition@" + (basePosition + start))
+                    .originalContainer("partition@" + (basePosition + hit.start))
                     .byteLength(length)
-                    .sha256(carvedCandidate.sha256)
-                    .mimeDetected("image/jpeg")
-                    .decodeStatus(carvedCandidate.decodeStatus)
+                    .sha256(hit.sha256)
+                    .mimeDetected(hit.mime)
+                    .decodeStatus(hit.decodeStatus)
                     .label(CandidateLabel.BLOB_EXTRACTED)
                     .grade(ResultGrade.PARTIAL_BYTES)
                     .build());

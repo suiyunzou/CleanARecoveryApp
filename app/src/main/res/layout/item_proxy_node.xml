@@ -1,36 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 代理节点列表项：单选 + 名称 + cipher@server:port -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- 代理节点卡片（双列网格，FlClash 风格）：
+     名称 + 协议 + 延迟徽标；选中态由适配器切换 bg_proxy_card_active 描边 -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginVertical="4dp"
+    android:layout_margin="6dp"
     android:background="@drawable/bg_card"
-    android:gravity="center_vertical"
-    android:minHeight="72dp"
-    android:orientation="horizontal"
-    android:paddingHorizontal="@dimen/space_md"
-    android:paddingVertical="@dimen/space_sm">
-
-    <RadioButton
-        android:id="@+id/proxy_item_radio"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:buttonTint="@color/via_accent"
-        android:clickable="false"
-        android:focusable="false" />
+    android:foreground="@drawable/bg_touch_ripple">
 
     <LinearLayout
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:padding="@dimen/space_md">
 
         <TextView
             android:id="@+id/proxy_item_name"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:ellipsize="end"
-            android:singleLine="true"
+            android:lineSpacingExtra="2dp"
+            android:maxLines="2"
             android:textColor="@color/text_primary"
             android:textSize="@dimen/text_body"
             android:textStyle="bold" />
@@ -39,20 +29,20 @@
             android:id="@+id/proxy_item_detail"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
             android:ellipsize="end"
             android:singleLine="true"
             android:textColor="@color/text_muted"
             android:textSize="@dimen/text_caption" />
-    </LinearLayout>
 
-    <TextView
-        android:id="@+id/proxy_item_protocol"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:background="@drawable/bg_input_field"
-        android:paddingHorizontal="@dimen/space_sm"
-        android:paddingVertical="3dp"
-        android:textColor="@color/via_accent"
-        android:textSize="10sp"
-        android:textStyle="bold" />
-</LinearLayout>
+        <TextView
+            android:id="@+id/proxy_item_latency"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/proxy_latency_untested"
+            android:textColor="@color/proxy_latency_idle"
+            android:textSize="@dimen/text_caption"
+            android:textStyle="bold" />
+    </LinearLayout>
+</FrameLayout>

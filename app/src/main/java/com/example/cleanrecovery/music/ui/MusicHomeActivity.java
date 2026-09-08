@@ -10,11 +10,10 @@ import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageButton;
-import android.widget.ImageView;
+import android.widget.ImageButton;import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import android.widget.Toast;
+import com.example.cleanrecovery.ui.widget.GlassToast;
 
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -42,10 +41,14 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
     private LinearLayout playlistContainer;
     private LinearLayout remotePlaylistContainer;
     private View miniPlayer;
-    private TextView miniTitle, miniIcon;
-    private ImageView miniCover;
+    private TextView miniTitle, miniIcon, miniArtist;
+    private ImageView miniCover, miniPlayIcon;
     private ImageButton miniPrev, miniNext;
     private View miniCenter;
+    private View miniVinyl;
+    private View miniTonearm;
+    private View miniSourcePill;
+    private final MiniTurntable turntable = new MiniTurntable();
     // 保存当前推荐歌曲列表，用于点击时构建播放队列
     private List<SongInfo> recommendationSongs = new java.util.ArrayList<>();
 
@@ -61,7 +64,7 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
         bindViews();
         loadRecommendations();
         loadPlaylists();
-        loadRemotePlaylists();
+        // 云歌单加载由 onResume 触发，避免 onCreate+onResume 连发两次网络请求
     }
 
     @Override
@@ -91,6 +94,7 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
         findViewById(R.id.music_back_button).setOnClickListener(v -> finish());
         findViewById(R.id.music_search_bar).setOnClickListener(v ->
                 startActivity(new Intent(this, MusicSearchActivity.class)));
+        bindSectionChips();
 
         loginButton.setOnClickListener(v ->
                 startActivity(new Intent(this, MusicLoginActivity.class)));
@@ -116,29 +120,36 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
 
     private void loadPlaylists() {
         playlistContainer.removeAllViews();
+        // 本地歌单页只保留「已下载的歌曲」（用户口径：我喜欢/稍后听不经此入口展示）
         addPlaylistRow(PlaylistDetailActivity.EXTRA_DOWNLOADED_PLAYLIST,
                 getString(R.string.music_download_downloaded),
                 getString(R.string.music_playlist_song_count, downloadedPlayableCount()));
-        addPlaylistRow("Listen Later",
-                getString(R.string.music_playlist_listen_later),
-                getString(R.string.music_playlist_song_count, app.playlists.songCount("Listen Later")));
     }
 
+    private boolean remoteLoadedOnce;
+
     private void loadRemotePlaylists() {
-        remotePlaylistContainer.removeAllViews();
         if (!app.auth.isLoggedIn()) {
+            remoteLoadedOnce = false;
+            remotePlaylistContainer.removeAllViews();
             addRemoteStatusRow(getString(R.string.music_remote_login_prompt),
                     getString(R.string.music_login), v ->
                             startActivity(new Intent(this, MusicLoginActivity.class)));
             return;
         }
 
-        addRemoteStatusRow(getString(R.string.music_remote_loading), null, null);
+        // 首次加载显示"加载中"；之后刷新不清空旧列表（无闪烁，新建歌单响应不再显得卡顿），
+        // 拉到数据后一次性重建
+        if (!remoteLoadedOnce) {
+            remotePlaylistContainer.removeAllViews();
+            addRemoteStatusRow(getString(R.string.music_remote_loading), null, null);
+        }
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 app.refreshDataSourceAuth();
                 List<RemotePlaylist> playlists = app.dataSource.getAllUserPlaylists(30);
                 new Handler(Looper.getMainLooper()).post(() -> {
+                    remoteLoadedOnce = true;
                     remotePlaylistContainer.removeAllViews();
                     addCreateRemotePlaylistRow();
                     if (playlists.isEmpty()) {
@@ -151,8 +162,10 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
                 });
             } catch (Exception e) {
                 new Handler(Looper.getMainLooper()).post(() -> {
-                    remotePlaylistContainer.removeAllViews();
-                    addRemoteStatusRow(getString(R.string.music_remote_load_failed), null, null);
+                    if (!remoteLoadedOnce) {
+                        remotePlaylistContainer.removeAllViews();
+                        addRemoteStatusRow(getString(R.string.music_remote_load_failed), null, null);
+                    }
                 });
             }
         });
@@ -262,6 +275,8 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
     private void promptCreateRemotePlaylist() {
         android.widget.EditText input = new android.widget.EditText(this);
         input.setHint(R.string.music_create_playlist_hint);
+        input.setSingleLine(true);
+        input.setMaxLines(1);
         new android.app.AlertDialog.Builder(this)
                 .setTitle(R.string.music_create_playlist_title)
                 .setView(input)
@@ -276,18 +291,18 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
     }
 
     private void createRemotePlaylist(String name) {
-        Toast.makeText(this, R.string.music_remote_create_loading, Toast.LENGTH_SHORT).show();
+        GlassToast.makeText(this, R.string.music_remote_create_loading, GlassToast.LENGTH_SHORT).show();
         Executors.newSingleThreadExecutor().execute(() -> {
             try {
                 app.refreshDataSourceAuth();
                 app.dataSource.createUserPlaylist(name, false);
                 new Handler(Looper.getMainLooper()).post(() -> {
-                    Toast.makeText(this, R.string.music_remote_create_done, Toast.LENGTH_SHORT).show();
+                    GlassToast.makeText(this, R.string.music_remote_create_done, GlassToast.LENGTH_SHORT).show();
                     loadRemotePlaylists();
                 });
             } catch (Exception exception) {
                 new Handler(Looper.getMainLooper()).post(() ->
-                        Toast.makeText(this, R.string.music_remote_create_failed, Toast.LENGTH_SHORT).show());
+                        GlassToast.makeText(this, R.string.music_remote_create_failed, GlassToast.LENGTH_SHORT).show());
             }
         });
     }
@@ -335,16 +350,83 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
                 .show();
     }
 
+    private void bindSectionChips() {
+        // 三个分类是真 tab：点击切换显示对应区块，而非滚动定位
+        int[] chips = {R.id.music_chip_rec, R.id.music_chip_playlist, R.id.music_chip_remote};
+        for (int i = 0; i < chips.length; i++) {
+            final int index = i;
+            findViewById(chips[i]).setOnClickListener(v -> selectSection(index));
+        }
+        selectSection(0);
+    }
+
+    private void selectSection(int index) {
+        int[] chips = {R.id.music_chip_rec, R.id.music_chip_playlist, R.id.music_chip_remote};
+        for (int i = 0; i < chips.length; i++) {
+            TextView chip = findViewById(chips[i]);
+            boolean active = i == index;
+            chip.setBackgroundResource(active
+                    ? R.drawable.bg_chip_active : R.drawable.bg_chip_inactive);
+            chip.setTextColor(getResources().getColor(active
+                    ? R.color.text_on_primary : R.color.text_secondary, getTheme()));
+            chip.setTypeface(null, active ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
+        }
+        setSectionVisible(R.id.music_sec_rec, R.id.music_home_rec_list, index == 0);
+        setSectionVisible(R.id.music_sec_playlist, R.id.music_playlist_container, index == 1);
+        setSectionVisible(R.id.music_sec_remote, R.id.music_remote_playlist_container, index == 2);
+    }
+
+    private void setSectionVisible(int headerId, int contentId, boolean visible) {
+        View header = findViewById(headerId);
+        if (header != null) {
+            header.setVisibility(visible ? View.VISIBLE : View.GONE);
+        }
+        View content = findViewById(contentId);
+        if (content != null) {
+            content.setVisibility(visible ? View.VISIBLE : View.GONE);
+        }
+    }
+
     private void updateMiniPlayer() {
         // 常驻底部：首次调用时 inflate 布局并绑定事件
         if (miniTitle == null) {
             LayoutInflater.from(this).inflate(R.layout.bar_mini_player, (ViewGroup) miniPlayer, true);
             miniTitle = miniPlayer.findViewById(R.id.mini_player_title);
+            miniArtist = miniPlayer.findViewById(R.id.mini_player_artist);
             miniIcon = miniPlayer.findViewById(R.id.mini_player_icon);
             miniCover = miniPlayer.findViewById(R.id.mini_player_cover);
+            miniPlayIcon = miniPlayer.findViewById(R.id.mini_player_play);
             miniPrev = miniPlayer.findViewById(R.id.mini_player_prev);
             miniNext = miniPlayer.findViewById(R.id.mini_player_next);
             miniCenter = miniPlayer.findViewById(R.id.mini_player_center);
+            miniVinyl = miniPlayer.findViewById(R.id.mini_player_vinyl);
+            miniTonearm = miniPlayer.findViewById(R.id.mini_player_tonearm);
+            miniSourcePill = miniPlayer.findViewById(R.id.mini_player_source_pill);
+            turntable.bindArmPivot(miniTonearm);
+            // 歌单入口胶囊：播放中打开播放页并自动弹出队列弹窗（选择歌单/切歌）
+            if (miniSourcePill != null) {
+                miniSourcePill.setOnClickListener(v -> {
+                    if (app.player.currentSong() != null
+                            && app.player.getState() != MusicPlayer.State.IDLE) {
+                        startActivity(new Intent(this, MusicPlayerActivity.class)
+                                .putExtra(MusicPlayerActivity.EXTRA_OPEN_QUEUE, true));
+                    } else {
+                        restoreLastPlaybackMenu();
+                    }
+                });
+            }
+            View miniPlay = miniPlayer.findViewById(R.id.mini_player_play);
+            if (miniPlay != null) {
+                // 原型交互：迷你条上的播放小键只切换播放状态，不打开播放页
+                miniPlay.setOnClickListener(v -> {
+                    if (app.player.currentSong() != null
+                            && app.player.getState() != MusicPlayer.State.IDLE) {
+                        app.player.toggle();
+                    } else {
+                        restoreLastPlaybackMenu();
+                    }
+                });
+            }
             miniPrev.setOnClickListener(v -> app.player.previous());
             miniNext.setOnClickListener(v -> app.player.next());
             miniCenter.setOnClickListener(v -> {
@@ -361,11 +443,14 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
         boolean active = current != null && app.player.getState() != MusicPlayer.State.IDLE;
 
         if (active) {
-            // 标题行合并显示「歌曲名 - 艺术家」，居中
-            String label = current.artist != null && !current.artist.isEmpty()
-                    ? current.title + " - " + current.artist : current.title;
-            miniTitle.setText(label);
+            miniTitle.setText(LocalSongNames.displayTitle(current.title));
+            // 胶囊=当前播放的来源歌单（哪个列表一眼可见），无来源则隐藏
+            String sourceName = app.player.getPlaySourceName();
+            miniArtist.setText(sourceName);
             updateMiniArtwork(current);
+            if (miniSourcePill != null) {
+                miniSourcePill.setVisibility(sourceName.isEmpty() ? View.GONE : View.VISIBLE);
+            }
             miniPrev.setEnabled(true);
             miniNext.setEnabled(true);
             miniPrev.setAlpha(1f);
@@ -373,12 +458,25 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
         } else {
             // 空闲状态：显示默认图标，禁用上一首/下一首
             miniTitle.setText("");
+            miniArtist.setText("");
             showMiniTextIcon(null);
+            if (miniSourcePill != null) miniSourcePill.setVisibility(View.GONE);
             miniPrev.setEnabled(false);
             miniNext.setEnabled(false);
             miniPrev.setAlpha(0.4f);
             miniNext.setAlpha(0.4f);
         }
+        updateMiniPlayIcon();
+    }
+
+    /** 迷你条播放键状态：播放中显示暂停，否则显示播放；黑胶唱片随之转动/暂停。 */
+    private void updateMiniPlayIcon() {
+        if (miniPlayIcon == null) return;
+        boolean playing = app.player.getState() == MusicPlayer.State.PLAYING;
+        miniPlayIcon.setImageResource(playing
+                ? R.drawable.ic_pause_outline : R.drawable.ic_play_outline);
+        miniPlayIcon.setColorFilter(0xFFFFFFFF);
+        turntable.update(miniVinyl, miniTonearm, playing);
     }
 
     private void updateMiniArtwork(SongInfo song) {
@@ -428,7 +526,9 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
         List<SongInfo> currentQueue = app.player.getQueue();
         if (!currentQueue.isEmpty()) {
             int index = Math.max(0, app.player.getQueueIndex());
-            app.player.play(currentQueue, index, app.player.getPlaySource(), app.player.getPlaySourceName());
+            // play(...) 会重置来源标签，恢复播放前先取出、播放后补回，保证排序回写仍指向原歌单
+            String tag = app.player.getPlaySourceTag();
+            app.player.play(currentQueue, index, app.player.getPlaySource(), app.player.getPlaySourceName(), tag);
             startActivity(new Intent(this, MusicPlayerActivity.class));
             return;
         }
@@ -437,7 +537,7 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
         if ("downloaded".equals(type)) {
             List<SongInfo> songs = downloadedSongs();
             if (songs.isEmpty()) {
-                Toast.makeText(this, R.string.music_playlist_empty, Toast.LENGTH_SHORT).show();
+                GlassToast.makeText(this, R.string.music_playlist_empty, GlassToast.LENGTH_SHORT).show();
                 return;
             }
             app.player.play(songs, 0, MusicPlayer.PlaySource.DOWNLOADED,
@@ -449,7 +549,7 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
         if ("local".equals(type)) {
             String name = app.lastMenuName();
             if (name == null || name.isEmpty()) {
-                Toast.makeText(this, R.string.music_playlist_empty, Toast.LENGTH_SHORT).show();
+                GlassToast.makeText(this, R.string.music_playlist_empty, GlassToast.LENGTH_SHORT).show();
                 return;
             }
             List<SongInfo> songs = app.playlists.getSongs(name);
@@ -459,7 +559,7 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
                 return;
             }
             app.player.play(songs, 0, MusicPlayer.PlaySource.LOCAL_PLAYLIST,
-                    displayPlaylistName(name));
+                    displayPlaylistName(name), "local:" + name);
             startActivity(new Intent(this, MusicPlayerActivity.class));
             return;
         }
@@ -472,7 +572,7 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
             }
         }
 
-        Toast.makeText(this, R.string.music_playlist_empty, Toast.LENGTH_SHORT).show();
+        GlassToast.makeText(this, R.string.music_playlist_empty, GlassToast.LENGTH_SHORT).show();
     }
 
     private List<SongInfo> downloadedSongs() {
@@ -509,7 +609,11 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
     @Override public void onProgressChanged(int c, int t) {}
     @Override public void onSongChanged(SongInfo song) { updateMiniPlayer(); }
     @Override public void onError(String msg) {
-        Toast.makeText(this, getString(R.string.music_playback_failed), Toast.LENGTH_SHORT).show();
+        // 播放页在前台时由播放页统一提示；这里只在播放页不在时兜底，
+        // 避免同一条错误在多个页面各弹一次（toast 排队导致后续提示延迟 1-2s）
+        if (!MusicPlayerActivity.sPlayerForeground) {
+            MusicPlayerActivity.showPlaybackErrorToast(this, msg);
+        }
     }
 
     // ---- Adapter ----
@@ -532,11 +636,14 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
         }
         @Override public void onBindViewHolder(VH h, int pos) {
             SongInfo s = items.get(pos);
+            // 本地文件名兜底："王菲 - 传奇.mp3" → 标题"传奇"+歌手"王菲"
+            LocalSongNames.apply(s, h.itemView.getContext().getString(R.string.music_download_downloaded));
             h.title.setText(s.title);
             h.artist.setText(s.artist);
             h.duration.setText(s.durationFormatted());
             h.vipBadge.setVisibility(s.vipRequired ? View.VISIBLE : View.GONE);
             h.icon.setText(s.title.isEmpty() ? "♪" : String.valueOf(s.title.charAt(0)).toUpperCase());
+            bindCover(h, s);
             h.itemView.setOnClickListener(v -> listener.onClick(s));
             // “添加到歌单”按钮：仅在传入回调时显示
             if (addToListener != null && h.addBtn != null) {
@@ -548,8 +655,42 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
         }
         @Override public int getItemCount() { return items.size(); }
 
+        /** 行封面：有 imgUrl 时异步加载，失败/无图回退首字母占位（tag 防复用错位）。 */
+        private void bindCover(VH h, SongInfo s) {
+            android.widget.ImageView cover = h.cover;
+            if (cover == null) return;
+            String url = s == null ? null : s.imgUrl;
+            if (url == null || url.isEmpty()) {
+                cover.setTag(null);
+                cover.setVisibility(View.GONE);
+                h.icon.setVisibility(View.VISIBLE);
+                return;
+            }
+            cover.setTag(url);
+            java.util.concurrent.Executors.newSingleThreadExecutor().execute(() -> {
+                android.graphics.Bitmap bmp = null;
+                try (java.io.InputStream in = new java.net.URL(url).openStream()) {
+                    bmp = android.graphics.BitmapFactory.decodeStream(in);
+                } catch (Exception ignored) {
+                }
+                android.graphics.Bitmap finalBmp = bmp;
+                cover.post(() -> {
+                    if (!url.equals(cover.getTag())) return; // 行已复用给他歌
+                    if (finalBmp != null) {
+                        cover.setImageBitmap(finalBmp);
+                        cover.setVisibility(View.VISIBLE);
+                        h.icon.setVisibility(View.GONE);
+                    } else {
+                        cover.setVisibility(View.GONE);
+                        h.icon.setVisibility(View.VISIBLE);
+                    }
+                });
+            });
+        }
+
         static class VH extends RecyclerView.ViewHolder {
             TextView title, artist, duration, vipBadge, icon;
+            ImageView cover;
             ImageButton addBtn;
             VH(View v) {
                 super(v);
@@ -558,6 +699,7 @@ public final class MusicHomeActivity extends Activity implements MusicPlayer.Cal
                 duration = v.findViewById(R.id.song_row_duration);
                 vipBadge = v.findViewById(R.id.song_row_vip_badge);
                 icon = v.findViewById(R.id.song_row_icon);
+                cover = v.findViewById(R.id.song_row_cover);
                 addBtn = v.findViewById(R.id.song_row_add);
             }
         }

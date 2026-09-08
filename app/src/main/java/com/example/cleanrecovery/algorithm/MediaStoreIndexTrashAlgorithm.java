@@ -22,7 +22,8 @@ public final class MediaStoreIndexTrashAlgorithm implements RecoveryAlgorithm {
 
     @Override
     public RecoveryType[] supportedTypes() {
-        return new RecoveryType[] {RecoveryType.IMAGE, RecoveryType.VIDEO, RecoveryType.AUDIO};
+        return new RecoveryType[] {
+                RecoveryType.IMAGE, RecoveryType.VIDEO, RecoveryType.AUDIO, RecoveryType.DOCUMENT};
     }
 
     @Override

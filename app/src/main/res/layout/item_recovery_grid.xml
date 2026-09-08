@@ -5,7 +5,6 @@
     android:layout_marginBottom="@dimen/space_sm"
     android:background="@drawable/bg_grid_item"
     android:clickable="true"
-    android:elevation="2dp"
     android:focusable="true"
     android:foreground="?android:attr/selectableItemBackground"
     android:gravity="center_vertical"
@@ -120,5 +119,6 @@
         android:id="@+id/grid_checkbox"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="@dimen/space_sm" />
+        android:layout_marginStart="@dimen/space_sm"
+        android:buttonTint="@color/brand_primary" />
 </LinearLayout>

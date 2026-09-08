@@ -107,7 +107,7 @@ public class DownloadManager {
     /**
      * Root directory for downloaded music.
      *
-     * <p>存放在清寻恢复统一目录 {@code /storage/emulated/0/DataRecovery/Music/Downloads/}，
+     * <p>存放在枢统一目录 {@code /storage/emulated/0/DataRecovery/Music/Downloads/}，
      * 方便用户在系统文件管理器中查找，与应用恢复产物同根目录。
      * 若外部存储不可用则回退到应用私有目录。</p>
      */

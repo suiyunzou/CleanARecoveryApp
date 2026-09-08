@@ -15,6 +15,7 @@ import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.database.Cursor;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
 import android.media.AudioManager;
@@ -42,7 +43,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
-import android.widget.Toast;
+import com.example.cleanrecovery.ui.widget.GlassToast;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -62,6 +63,8 @@ public final class PreviewActivity extends Activity {
     public static final String EXTRA_SUSPECTED_DELETED = "com.example.cleanrecovery.extra.SUSPECTED_DELETED";
 
     private static final ExecutorService RECOVER_EXECUTOR = Executors.newSingleThreadExecutor();
+    private static final ExecutorService DECODE_EXECUTOR = Executors.newSingleThreadExecutor();
+    private static final int MAX_PREVIEW_DIMENSION_PX = 2048;
     private static final int OVERLAY_HIDE_DELAY_MS = 3000;
     private static final int PROGRESS_UPDATE_MS = 500;
     private static final int SEEK_BAR_MAX = 1000;
@@ -263,19 +266,16 @@ public final class PreviewActivity extends Activity {
             immersivePreview = true;
             setPlaybackChromeVisible(false);
             addImagePreview(currentFile);
-            hideOverlay();
         } else if (currentItem.type == RecoveryType.VIDEO) {
             currentItemIsMedia = true;
             immersivePreview = true;
             setPlaybackChromeVisible(true);
             addVideoPreview(currentFile);
-            hideOverlay();
         } else if (currentItem.type == RecoveryType.AUDIO) {
             currentItemIsMedia = true;
             immersivePreview = true;
             setPlaybackChromeVisible(true);
             addAudioPreview(currentFile);
-            hideOverlay();
         } else {
             setPlaybackChromeVisible(false);
             addDocumentPreview(currentFile);
@@ -425,12 +425,71 @@ public final class PreviewActivity extends Activity {
         ImageView imageView = new ImageView(this);
         imageView.setAdjustViewBounds(true);
         imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        imageView.setImageURI(Uri.fromFile(file));
+        // Show the type icon immediately: the actual bitmap is decoded sampled in
+        // the background (full-size setImageURI on camera photos means seconds of
+        // black screen or an OOM with zero feedback).
+        imageView.setImageResource(R.drawable.ic_type_image);
+        imageView.setPadding(dp(48), dp(48), dp(48), dp(48));
         contentHost.addView(imageView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
         ));
         bindImageGestures(imageView);
+        final File source = file;
+        DECODE_EXECUTOR.execute(new Runnable() {
+            @Override
+            public void run() {
+                final Bitmap bitmap = decodeSampledBitmap(source);
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (isFinishing() || !source.equals(currentFile)) {
+                            return;
+                        }
+                        if (bitmap != null) {
+                            imageView.setPadding(0, 0, 0, 0);
+                            imageView.setImageBitmap(bitmap);
+                            setRecoverability(R.string.preview_recoverability_ready);
+                        } else {
+                            setRecoverability(R.string.preview_recoverability_failed);
+                            showGestureFeedback(getString(R.string.preview_decode_failed));
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    /** Bounds-first sampled decode so huge camera photos cannot OOM the UI. */
+    private Bitmap decodeSampledBitmap(File file) {
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        BitmapFactory.decodeFile(file.getAbsolutePath(), bounds);
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            return null;
+        }
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inSampleSize = computeImageSampleSize(bounds.outWidth, bounds.outHeight);
+        options.inPreferredConfig = Bitmap.Config.RGB_565;
+        try {
+            return BitmapFactory.decodeFile(file.getAbsolutePath(), options);
+        } catch (OutOfMemoryError error) {
+            options.inSampleSize *= 4;
+            try {
+                return BitmapFactory.decodeFile(file.getAbsolutePath(), options);
+            } catch (OutOfMemoryError ignored) {
+                return null;
+            }
+        }
+    }
+
+    private int computeImageSampleSize(int width, int height) {
+        int max = Math.max(width, height);
+        int sample = 1;
+        while (max / sample > MAX_PREVIEW_DIMENSION_PX) {
+            sample *= 2;
+        }
+        return sample;
     }
 
     private void bindImageGestures(View view) {
@@ -935,7 +994,7 @@ public final class PreviewActivity extends Activity {
         setPlaybackEnabled(false);
         setRecoverability(R.string.preview_recoverability_failed);
         showOverlay(false);
-        Toast.makeText(this, R.string.preview_playback_error, Toast.LENGTH_SHORT).show();
+        GlassToast.makeText(this, R.string.preview_playback_error, GlassToast.LENGTH_SHORT).show();
     }
 
     private int resolveGestureZone(View view, float x) {

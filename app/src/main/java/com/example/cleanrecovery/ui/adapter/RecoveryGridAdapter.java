@@ -14,7 +14,7 @@ import android.view.ViewGroup;
 import android.widget.CheckBox;
 import android.widget.ImageView;
 import android.widget.TextView;
-import android.widget.Toast;
+import com.example.cleanrecovery.ui.widget.GlassToast;
 
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -50,26 +50,33 @@ public final class RecoveryGridAdapter extends RecyclerView.Adapter<RecoveryGrid
     public void onBindViewHolder(Holder holder, int position) {
         final RecoveryItem item = items.get(position);
         holder.checkbox.setOnCheckedChangeListener(null);
-        holder.checkbox.setChecked(item.selected);
+        holder.checkbox.setEnabled(item.recoverable);
+        holder.checkbox.setChecked(item.selected && item.recoverable);
         holder.nameView.setText(item.name);
         holder.typeBadgeView.setText(typeBadge(item));
         holder.metaView.setText(buildMeta(item));
         holder.pathView.setText(shortPath(item.path));
-        holder.previewBadgeView.setText(canPreview(item.type)
+        holder.previewBadgeView.setText(canPreview(item)
                 ? R.string.results_preview_available
                 : R.string.results_open_details);
-        if (item.suspectedDeleted) {
-            holder.badgeView.setText(R.string.status_deleted);
-            holder.badgeView.setBackgroundResource(R.drawable.bg_badge_deleted);
-            holder.badgeView.setTextColor(context.getResources().getColor(R.color.badge_deleted_text, context.getTheme()));
-        } else {
-            holder.badgeView.setText(R.string.status_existing);
+        if (!item.recoverable) {
+            holder.badgeView.setText(R.string.status_index_only);
             holder.badgeView.setBackgroundResource(R.drawable.bg_badge_existing);
             holder.badgeView.setTextColor(context.getResources().getColor(R.color.badge_existing_text, context.getTheme()));
+            holder.itemView.setAlpha(0.55f);
+        } else {
+            holder.itemView.setAlpha(1f);
+            holder.badgeView.setText(R.string.status_recoverable);
+            holder.badgeView.setBackgroundResource(R.drawable.bg_badge_deleted);
+            holder.badgeView.setTextColor(context.getResources().getColor(R.color.badge_deleted_text, context.getTheme()));
         }
         int placeholder = placeholderFor(item.type);
         ThumbnailLoader.loadInto(holder.thumbnailView, item, placeholder);
         holder.checkbox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (!item.recoverable) {
+                holder.checkbox.setChecked(false);
+                return;
+            }
             item.selected = isChecked;
             listener.onSelectionChanged();
         });
@@ -123,6 +130,12 @@ public final class RecoveryGridAdapter extends RecyclerView.Adapter<RecoveryGrid
             case MEDIASTORE_TRASH:
             case MEDIASTORE_PENDING:
                 return context.getString(R.string.results_source_media_index);
+            case MEDIASTORE_STALE_RECORD:
+                return context.getString(R.string.results_source_index_only);
+            case LOG_EVIDENCE_ONLY:
+                return context.getString(R.string.results_source_log_evidence);
+            case OFFLINE_CARVE:
+                return context.getString(R.string.results_source_offline_carve);
             case GENERIC_THUMBNAIL:
             case OEM_GALLERY_CACHE:
             case KNOWN_CACHE_BLOB:
@@ -154,10 +167,13 @@ public final class RecoveryGridAdapter extends RecyclerView.Adapter<RecoveryGrid
         return context.getString(R.string.results_type_file_short);
     }
 
-    private static boolean canPreview(RecoveryType type) {
-        return type == RecoveryType.IMAGE
-                || type == RecoveryType.VIDEO
-                || type == RecoveryType.AUDIO;
+    private static boolean canPreview(RecoveryItem item) {
+        if (item == null || !item.recoverable) {
+            return false;
+        }
+        return item.type == RecoveryType.IMAGE
+                || item.type == RecoveryType.VIDEO
+                || item.type == RecoveryType.AUDIO;
     }
 
     private static String shortPath(String path) {

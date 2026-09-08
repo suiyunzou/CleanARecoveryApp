@@ -27,11 +27,12 @@
             android:id="@+id/music_title"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/space_md"
+            android:layout_marginStart="@dimen/space_sm"
             android:layout_weight="1"
             android:text="@string/music_home_title"
             android:textColor="@color/text_primary"
-            android:textSize="@dimen/text_title" />
+            android:textSize="17sp"
+            android:textStyle="bold" />
 
         <ImageButton
             android:id="@+id/music_home_login_button"
@@ -39,8 +40,8 @@
             android:layout_height="40dp"
             android:background="@drawable/bg_icon_button"
             android:contentDescription="@string/music_login"
-            android:src="@drawable/ic_nav_about"
-            app:tint="@color/brand_accent" />
+            android:src="@drawable/ic_user"
+            app:tint="@color/text_secondary" />
     </LinearLayout>
 
     <!-- Search bar -->
@@ -50,15 +51,17 @@
         android:layout_height="48dp"
         android:layout_marginHorizontal="@dimen/space_lg"
         android:layout_marginBottom="@dimen/space_sm"
-        android:background="@drawable/bg_card"
+        android:background="@drawable/bg_button_secondary"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="@dimen/space_md">
+        android:paddingHorizontal="14dp">
 
-        <View
-            android:layout_width="24dp" android:layout_height="24dp"
-            android:background="@drawable/ic_nav_home"
-            android:backgroundTint="@color/text_muted" />
+        <ImageView
+            android:layout_width="16dp" android:layout_height="16dp"
+            android:contentDescription="@null"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_search"
+            app:tint="@color/text_hint" />
 
         <TextView
             android:layout_width="0dp" android:layout_height="wrap_content"
@@ -69,7 +72,59 @@
             android:textSize="@dimen/text_body" />
     </LinearLayout>
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="@dimen/space_lg"
+        android:paddingTop="@dimen/space_xs"
+        android:paddingBottom="@dimen/space_xs">
+
+        <TextView
+            android:id="@+id/music_chip_rec"
+            android:layout_width="wrap_content"
+            android:layout_height="34dp"
+            android:background="@drawable/bg_chip_active"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingHorizontal="15dp"
+            android:text="@string/music_tab_recommend"
+            android:textColor="@color/text_on_primary"
+            android:textSize="12.5sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/music_chip_remote"
+            android:layout_width="wrap_content"
+            android:layout_height="34dp"
+            android:layout_marginStart="@dimen/space_sm"
+            android:background="@drawable/bg_chip_inactive"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingHorizontal="15dp"
+            android:text="@string/music_tab_remote"
+            android:textColor="@color/text_secondary"
+            android:textSize="12.5sp" />
+
+        <TextView
+            android:id="@+id/music_chip_playlist"
+            android:layout_width="wrap_content"
+            android:layout_height="34dp"
+            android:layout_marginStart="@dimen/space_sm"
+            android:background="@drawable/bg_chip_inactive"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingHorizontal="15dp"
+            android:text="@string/music_tab_playlists"
+            android:textColor="@color/text_secondary"
+            android:textSize="12.5sp" />
+    </LinearLayout>
+
     <ScrollView
+        android:id="@+id/music_scroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1">
@@ -82,11 +137,13 @@
 
             <!-- Recommendations -->
             <TextView
+                android:id="@+id/music_sec_rec"
                 android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/space_lg" android:layout_marginTop="@dimen/space_lg"
+                android:letterSpacing="0.08"
                 android:text="@string/music_recommend"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/text_section" android:textStyle="bold" />
+                android:textColor="@color/text_hint"
+                android:textSize="11.5sp" android:textStyle="bold" />
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/music_home_rec_list"
@@ -97,11 +154,13 @@
 
             <!-- Playlists -->
             <TextView
+                android:id="@+id/music_sec_playlist"
                 android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/space_lg" android:layout_marginTop="@dimen/space_lg"
+                android:letterSpacing="0.08"
                 android:text="@string/music_playlists"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/text_section" android:textStyle="bold" />
+                android:textColor="@color/text_hint"
+                android:textSize="11.5sp" android:textStyle="bold" />
 
             <LinearLayout
                 android:id="@+id/music_playlist_container"
@@ -113,11 +172,13 @@
 
             <!-- Kugou cloud playlists -->
             <TextView
+                android:id="@+id/music_sec_remote"
                 android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/space_lg" android:layout_marginTop="@dimen/space_lg"
+                android:letterSpacing="0.08"
                 android:text="@string/music_remote_playlists"
-                android:textColor="@color/text_primary"
-                android:textSize="@dimen/text_section" android:textStyle="bold" />
+                android:textColor="@color/text_hint"
+                android:textSize="11.5sp" android:textStyle="bold" />
 
             <LinearLayout
                 android:id="@+id/music_remote_playlist_container"

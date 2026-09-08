@@ -274,7 +274,7 @@ public final class RecycleBin {
         });
     }
 
-    /** 同步彻底删除。 */
+    /** 同步彻底删除（真删，不保留隐藏副本）。 */
     public synchronized boolean permanentDeleteSync(String entryId) {
         File entryDir = new File(trashRoot, entryId);
         return PathManager.deleteRecursively(entryDir, false);

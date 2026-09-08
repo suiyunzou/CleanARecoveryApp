@@ -18,6 +18,7 @@ public final class AlgorithmRegistry {
             new AccessibleSignatureSnifferAlgorithm(),
             new LostDirOrphanSnifferAlgorithm(),
             new SystemTrashScannerAlgorithm(),
+            new DotTrashedFileScannerAlgorithm(),
             new WechatDirectoryScannerAlgorithm(),
             new DeepValidationAlgorithm(),
             new LogEvidenceImportAlgorithm(),
@@ -57,6 +58,12 @@ public final class AlgorithmRegistry {
 
     static boolean shouldRunInMode(RecoveryAlgorithm algorithm, ScanMode mode) {
         String id = algorithm.id();
+        // Gallery-visible files are never scan results: users already have the
+        // gallery for those. The file-tree walk only lists existing files, so it
+        // stays registered (tests / tooling) but never runs in product scans.
+        if (FileTreeVisibleAlgorithm.ID.equals(id)) {
+            return false;
+        }
         // Expensive or specialised algorithms run only in the experimental sweep:
         //  - jpeg_known_blob_carver: full-storage embedded-JPEG carving
         //  - log_evidence_import: stale-record evidence (no byte recovery)

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- VIA 搜索胶囊（灰底圆角，基准 58 顶搜索框） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#FFF1F1F1" />
+    <corners android:radius="20dp" />
+</shape>

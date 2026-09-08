@@ -61,6 +61,32 @@ public final class RawPartitionCarverTest {
         assertEquals(1, emitted);
     }
 
+    @Test
+    public void differentSourceTagsStageDifferentFiles() throws IOException {
+        // Two whole-file carves (offset 0) with distinct source tags must land on
+        // distinct staged paths — identical names made the deduper discard every
+        // hit after the first and overwrite staged bytes on device.
+        byte[] jpeg = new byte[256];
+        putJpeg(jpeg, 0);
+
+        File stagingDir = createTempDir("raw-carve-tags");
+        List<RecoveryCandidate> first = new ArrayList<>();
+        List<RecoveryCandidate> second = new ArrayList<>();
+        new RawPartitionCarver().carveBytes(jpeg, 0L, "aaaa", stagingDir,
+                CandidateSourceKind.OFFLINE_F2FS_METADATA, "plaintext", collecting(first));
+        new RawPartitionCarver().carveBytes(jpeg, 0L, "bbbb", stagingDir,
+                CandidateSourceKind.OFFLINE_F2FS_METADATA, "plaintext", collecting(second));
+
+        assertEquals(1, first.size());
+        assertEquals(1, second.size());
+        String firstPath = first.get(0).sourceUriOrPath;
+        String secondPath = second.get(0).sourceUriOrPath;
+        assertTrue("first staged name carries its tag", firstPath.contains("aaaa_"));
+        assertTrue("second staged name carries its tag", secondPath.contains("bbbb_"));
+        assertTrue("staged names must differ", !firstPath.equals(secondPath));
+        assertTrue("both staged files exist", new File(firstPath).isFile() && new File(secondPath).isFile());
+    }
+
     private static void putJpeg(byte[] data, int at) {
         data[at] = (byte) 0xFF;
         data[at + 1] = (byte) 0xD8;

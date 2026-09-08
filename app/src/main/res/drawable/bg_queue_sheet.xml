@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 概念版底部弹层：全圆角浅灰浮卡，四周留边悬浮 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/sheet_neu_bg" />
+    <corners android:radius="22dp" />
+</shape>

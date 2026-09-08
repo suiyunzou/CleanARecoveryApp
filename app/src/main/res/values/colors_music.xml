@@ -3,10 +3,10 @@
 <!-- keep after </resources> tag in colors.xml: merge into project file -->
 <resources>
     <color name="music_surface">#FFFFFF</color>
-    <color name="music_vip_badge_bg">#FEF3C7</color>
-    <color name="music_vip_badge_text">#92400E</color>
+    <color name="music_vip_badge_bg">#FBF3E6</color>
+    <color name="music_vip_badge_text">#9A6212</color>
     <color name="music_mini_player_bg">#FFFFFF</color>
-    <color name="music_progress_bg">#E5E7EB</color>
-    <color name="music_progress_fill">#14B8A6</color>
-    <color name="music_text_empty">#9CA3AF</color>
+    <color name="music_progress_bg">#E7ECEA</color>
+    <color name="music_progress_fill">#28C0F0</color>
+    <color name="music_text_empty">#96A29E</color>
 </resources>

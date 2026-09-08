@@ -21,4 +21,11 @@ public final class SubscriptionImport {
         }
         return new ArrayList<>(unique);
     }
+
+    /** Loose check: share-link list (any scheme) or base64 blob worth importing. */
+    public static boolean looksLikeNodeList(String value) {
+        if (value == null || value.isEmpty()) return false;
+        if (value.contains("://")) return true;
+        return value.length() >= 16 && value.matches("[A-Za-z0-9+/=\\-_,:.\\s]+");
+    }
 }

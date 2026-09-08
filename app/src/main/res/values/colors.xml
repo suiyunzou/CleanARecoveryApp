@@ -1,48 +1,73 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- 清寻恢复 · fresh teal-green palette -->
-    <color name="brand_primary">#14B8A6</color>
-    <color name="brand_primary_dark">#0EA5A0</color>
-    <color name="brand_secondary">#2DD4BF</color>
-    <color name="brand_accent">#3B82F6</color>
-    <color name="brand_accent_soft">#E0F2FE</color>
-    <color name="accent_purple">#8B5CF6</color>
-    <color name="accent_amber">#F59E0B</color>
-    <color name="accent_orange">#F97316</color>
+    <!-- 枢 · KuGou-blue palette (#28C0F0) -->
+    <color name="brand_primary">#28C0F0</color>
+    <color name="vip_gold">#ECA23C</color>
+    <color name="brand_primary_dark">#189FD1</color>
+    <color name="brand_secondary">#1BAAE0</color>
+    <color name="brand_accent">#28C0F0</color>
+    <color name="brand_accent_soft">#EDF1F0</color>
+    <color name="accent_purple">#5C6B67</color>
+    <color name="accent_amber">#B45309</color>
+    <color name="accent_orange">#5C6B67</color>
     <color name="accent_red">#EF4444</color>
-    <color name="accent_image">#14B8A6</color>
-    <color name="accent_video">#F97316</color>
-    <color name="accent_audio">#3B82F6</color>
-    <color name="accent_document">#8B5CF6</color>
-    <color name="background_app">#F8FAFC</color>
+    <color name="accent_image">#28C0F0</color>
+    <color name="accent_video">#5C6B67</color>
+    <color name="accent_audio">#28C0F0</color>
+    <color name="accent_document">#5C6B67</color>
+    <color name="background_app">#F7F8F8</color>
     <color name="surface_card">#FFFFFF</color>
-    <color name="text_primary">#111827</color>
-    <color name="text_card_title">#1F2937</color>
-    <color name="text_secondary">#374151</color>
-    <color name="text_muted">#6B7280</color>
-    <color name="text_hint">#9CA3AF</color>
+    <color name="text_primary">#15201D</color>
+    <color name="text_card_title">#15201D</color>
+    <color name="text_secondary">#3D4A46</color>
+    <color name="text_muted">#8A9894</color>
+    <color name="text_hint">#96A29E</color>
     <color name="text_on_primary">#FFFFFF</color>
-    <color name="border_subtle">#E5E7EB</color>
-    <color name="neutral_light">#D1D5DB</color>
-    <color name="status_success">#0EA5A0</color>
-    <color name="status_warning">#F59E0B</color>
-    <color name="status_running">#3B82F6</color>
-    <color name="status_skipped">#6B7280</color>
-    <color name="badge_deleted_bg">#FEF3C7</color>
-    <color name="badge_deleted_text">#92400E</color>
-    <color name="badge_existing_bg">#CCFBF1</color>
-    <color name="badge_existing_text">#0F766E</color>
-    <color name="permission_banner_bg">#CCFBF1</color>
+    <color name="border_subtle">#E7ECEA</color>
+    <color name="neutral_light">#C6CFCC</color>
+    <color name="status_success">#189FD1</color>
+    <color name="status_warning">#B45309</color>
+    <color name="status_running">#28C0F0</color>
+    <color name="status_skipped">#8A9894</color>
+    <color name="badge_deleted_bg">#FBF3E6</color>
+    <color name="badge_deleted_text">#9A6212</color>
+    <color name="badge_existing_bg">#EDF1F0</color>
+    <color name="badge_existing_text">#189FD1</color>
+    <color name="permission_banner_bg">#EDF1F0</color>
     <color name="overlay_scrim">#80111827</color>
-    <color name="preview_backdrop">#111827</color>
+    <color name="preview_backdrop">#15201D</color>
     <color name="algorithm_log_bg">#FFFFFF</color>
 
+    <color name="surface_track">#EDF1F0</color>
+    <color name="neu_surface">#F1F4F3</color>
+    <color name="neu_surface_raised">#F8FAF9</color>
+    <color name="sheet_neu_bg">#EFF1F0</color>
+    <!-- 队列面板对齐酷狗概念版（2026-09 取色）：天蓝正在播放/中性灰白面板/金描边VIP -->
+    <color name="queue_playing_accent">#28C0F0</color>
+    <color name="queue_sheet_bg">#F1F1F3</color>
+    <color name="queue_title_dark">#333333</color>
+    <color name="queue_artist_gray">#8A9894</color>
+    <color name="queue_number_gray">#B9C2BF</color>
+    <color name="queue_delete_gray">#A9B5B1</color>
+    <color name="queue_vip_gold">#D9A648</color>
+    <color name="queue_trash_gray">#A0A0A4</color>
+    <color name="icon_neu_action">#6F7D79</color>
+    <color name="scan_ring_track">#EEF2F1</color>
+
     <!-- VIA 浏览器配色（via-analysis.md §7）：品牌红 + 深色 -->
-    <color name="via_accent">#FFD64146</color>
+    <color name="via_accent">#FF6F8DE1</color>
     <color name="via_dark">#FF232323</color>
     <color name="via_dark_surface">#FF1C1B1D</color>
     <color name="via_text_light">#FFF0F0F0</color>
     <color name="via_grid_item_bg">#FFF5F5F5</color>
     <color name="via_proxy_on">#FFD64146</color>
     <color name="via_proxy_off">#FF9F9F9F</color>
+
+    <!-- 代理节点延迟配色（FlClash 风格：绿/橙/红/灰） -->
+    <color name="proxy_latency_good">#1F9D55</color>
+    <color name="proxy_latency_mid">#E08A00</color>
+    <color name="proxy_latency_bad">#D64545</color>
+    <color name="proxy_latency_idle">#8A9894</color>
+    <color name="music_progress_blue">#41A2EE</color>
+    <color name="music_track_gray">#D3DAD7</color>
 </resources>

@@ -6,6 +6,7 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 
 import java.io.File;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +52,12 @@ public final class DownloadQueueManager {
         public final String pageUrl;
         public final String pageTitle;
         public final int priority;
+        /** 发起下载时的请求头快照，导航或站点配置变化后仍使用同一请求身份。 */
+        public final Map<String, String> requestHeaders;
+        /** 浏览器下载原始资源文件；不将 m3u8/mpd 自动解析为合并下载。 */
+        public final boolean rawResource;
+        /** 用户在「新建下载」里指定的文件名（可空；空则按页面标题/URL 推导）。 */
+        public volatile String fileName;
         public int retryCount = 0;
         public volatile TaskStatus status = TaskStatus.PENDING;
         public volatile String errorMessage;
@@ -64,12 +71,26 @@ public final class DownloadQueueManager {
 
         DownloadTask(int id, String url, String mimeType, String pageUrl,
                      String pageTitle, int priority) {
+            this(id, url, mimeType, pageUrl, pageTitle, priority, null);
+        }
+
+        DownloadTask(int id, String url, String mimeType, String pageUrl,
+                     String pageTitle, int priority, Map<String, String> requestHeaders) {
+            this(id, url, mimeType, pageUrl, pageTitle, priority, requestHeaders, false);
+        }
+
+        DownloadTask(int id, String url, String mimeType, String pageUrl,
+                     String pageTitle, int priority, Map<String, String> requestHeaders,
+                     boolean rawResource) {
             this.id = id;
             this.url = url;
             this.mimeType = mimeType;
             this.pageUrl = pageUrl;
             this.pageTitle = pageTitle;
             this.priority = priority;
+            this.requestHeaders = requestHeaders == null ? Collections.emptyMap()
+                    : Collections.unmodifiableMap(new HashMap<>(requestHeaders));
+            this.rawResource = rawResource;
         }
 
         @Override
@@ -128,7 +149,7 @@ public final class DownloadQueueManager {
         if (initialized) return;
         synchronized (lock) {
             if (initialized) return;
-            dbHelper = new DownloadTaskDbHelper(context);
+            dbHelper = DownloadTaskDbHelper.getInstance(context);
 
             // 恢复 taskIdGenerator 为数据库中最大 ID
             int maxId = dbHelper.getMaxTaskId();
@@ -157,7 +178,10 @@ public final class DownloadQueueManager {
 
     /** 设置任务执行器。 */
     public void setExecutor(TaskExecutor executor) {
-        this.executor = executor;
+        synchronized (lock) {
+            this.executor = executor;
+            startProcessing();
+        }
     }
 
     /**
@@ -170,8 +194,30 @@ public final class DownloadQueueManager {
      * @return 任务 ID，-1 表示重复未入队
      */
     public int enqueue(String url, String mimeType, String pageUrl, String pageTitle) {
+        return enqueue(url, mimeType, pageUrl, pageTitle, null);
+    }
+
+    /**
+     * 入队下载任务（可指定文件名，「新建下载」入口使用）。
+     *
+     * @param fileName 用户期望的文件名，null/空表示自动推导
+     */
+    public int enqueue(String url, String mimeType, String pageUrl, String pageTitle,
+                       String fileName) {
+        return enqueue(url, mimeType, pageUrl, pageTitle, fileName, null, false);
+    }
+
+    /** 浏览器显式下载：保存请求头，并按原资源字节下载（包含清单文件）。 */
+    public int enqueue(String url, String mimeType, String pageUrl, String pageTitle,
+                       String fileName, Map<String, String> requestHeaders) {
+        return enqueue(url, mimeType, pageUrl, pageTitle, fileName, requestHeaders, true);
+    }
+
+    private int enqueue(String url, String mimeType, String pageUrl, String pageTitle,
+                        String fileName, Map<String, String> requestHeaders, boolean rawResource) {
         if (url == null || url.isEmpty()) return -1;
 
+        final int taskId;
         synchronized (lock) {
             // 去重
             if (taskMap.containsKey(url)) {
@@ -183,7 +229,10 @@ public final class DownloadQueueManager {
             int priority = calculatePriority(url, mimeType);
 
             DownloadTask task = new DownloadTask(
-                    taskIdGenerator.incrementAndGet(), url, mimeType, pageUrl, pageTitle, priority);
+                    taskIdGenerator.incrementAndGet(), url, mimeType, pageUrl, pageTitle,
+                    priority, requestHeaders, rawResource);
+            taskId = task.id;
+            task.fileName = (fileName == null || fileName.trim().isEmpty()) ? null : fileName.trim();
             taskMap.put(url, task);
             queue.add(task);
 
@@ -202,7 +251,7 @@ public final class DownloadQueueManager {
 
         // 触发执行
         startProcessing();
-        return taskIdGenerator.get();
+        return taskId;
     }
 
     /** 计算任务优先级（数值越大优先级越高）。 */
@@ -227,48 +276,45 @@ public final class DownloadQueueManager {
 
     /** 启动队列处理。 */
     private void startProcessing() {
-        if (running) return;
-        running = true;
-        Thread thread = new Thread(this::processQueue, "BgDownloadQueue");
-        thread.setDaemon(true);
-        thread.start();
+        synchronized (lock) {
+            if (running || executor == null || queue.isEmpty()) return;
+            running = true;
+            Thread thread = new Thread(this::processQueue, "BgDownloadQueue");
+            thread.setDaemon(true);
+            thread.start();
+        }
     }
 
     /** 处理队列。 */
     private void processQueue() {
         Log.i(TAG, "队列处理线程启动");
-        while (running) {
+        while (true) {
             DownloadTask task;
+            TaskExecutor taskExecutor;
             synchronized (lock) {
+                if (executor == null || queue.isEmpty()) {
+                    running = false;
+                    Log.i(TAG, "队列处理线程结束");
+                    return;
+                }
                 task = queue.poll();
+                taskExecutor = executor;
+                currentTask = task;
             }
-            if (task == null) {
-                break;
-            }
-            currentTask = task;
-            processTask(task);
+            processTask(task, taskExecutor);
             currentTask = null;
         }
-        running = false;
-        Log.i(TAG, "队列处理线程结束");
     }
 
     /** 处理单个任务（含重试逻辑）。 */
-    private void processTask(DownloadTask task) {
+    private void processTask(DownloadTask task, TaskExecutor taskExecutor) {
         Log.i(TAG, "开始处理 " + task);
 
         while (task.retryCount <= MAX_RETRY) {
             task.status = DownloadTask.TaskStatus.RUNNING;
             persistStatus(task);
             try {
-                if (executor == null) {
-                    task.errorMessage = "未设置执行器";
-                    task.status = DownloadTask.TaskStatus.FAILED;
-                    persistStatus(task);
-                    break;
-                }
-
-                File result = executor.executeTask(task);
+                File result = taskExecutor.executeTask(task);
                 if (result != null && result.exists() && result.length() > 0) {
                     task.resultPath = result.getAbsolutePath();
                     task.fileSize = result.length();
@@ -347,7 +393,6 @@ public final class DownloadQueueManager {
             queue.clear();
             taskMap.clear();
         }
-        running = false;
         Log.i(TAG, "已取消所有任务");
     }
 

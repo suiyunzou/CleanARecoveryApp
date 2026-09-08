@@ -10,13 +10,13 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-final class MediaMuxerUtil {
+public final class MediaMuxerUtil {
 
     private static final int BUFFER_SIZE = 1024 * 1024;
 
     private MediaMuxerUtil() {}
 
-    static void merge(File videoFile, File audioFile, File outputFile) throws IOException {
+    public static void merge(File videoFile, File audioFile, File outputFile) throws IOException {
         if (videoFile == null || audioFile == null || outputFile == null) {
             throw new IOException("merge input is null");
         }
@@ -96,7 +96,16 @@ final class MediaMuxerUtil {
 
     private static void copyTrack(TrackSource source, MediaMuxer muxer) throws IOException {
         source.extractor.selectTrack(source.inputTrack);
-        ByteBuffer buffer = ByteBuffer.allocateDirect(BUFFER_SIZE);
+        // 高分辨率流的单帧可超过 1MB（实测 4K avc1 崩溃）：必须按轨道
+        // KEY_MAX_INPUT_SIZE 分配缓冲，否则 readSampleData 抛 IllegalArgumentException
+        int bufferSize = BUFFER_SIZE;
+        try {
+            bufferSize = Math.max(BUFFER_SIZE,
+                    source.format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE, BUFFER_SIZE));
+        } catch (Exception ignored) {
+            // 格式未声明时退回默认缓冲
+        }
+        ByteBuffer buffer = ByteBuffer.allocateDirect(bufferSize);
         MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
         copySelectedTrack(source.extractor, muxer, source.outputTrack, buffer, info);
         source.extractor.unselectTrack(source.inputTrack);

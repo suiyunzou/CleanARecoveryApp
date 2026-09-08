@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 通知卡片进度条:4dp 圆角条,浅灰轨道 + 墨色进度 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@android:id/background" android:gravity="center_vertical">
+        <shape android:shape="rectangle">
+            <corners android:radius="2dp" />
+            <size android:height="4dp" />
+            <solid android:color="#FFE3E7E6" />
+        </shape>
+    </item>
+    <item android:id="@android:id/progress" android:gravity="center_vertical">
+        <clip>
+            <shape android:shape="rectangle">
+                <corners android:radius="2dp" />
+                <size android:height="4dp" />
+                <solid android:color="#FF1F2430" />
+            </shape>
+        </clip>
+    </item>
+</layer-list>

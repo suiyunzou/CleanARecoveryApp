@@ -5,13 +5,16 @@ import com.example.cleanrecovery.recovery.RecoveryItem;
 import com.example.cleanrecovery.recovery.RecoveryType;
 import com.example.cleanrecovery.util.PathManager;
 
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.MediaMetadataRetriever;
 import android.media.ThumbnailUtils;
+import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.MediaStore;
+import android.util.Size;
 import android.widget.ImageView;
 
 import java.io.File;
@@ -63,7 +66,7 @@ public final class ThumbnailLoader {
         EXECUTOR.execute(new Runnable() {
             @Override
             public void run() {
-                final Bitmap bitmap = decodeThumbnail(item);
+                final Bitmap bitmap = decodeThumbnail(target.getContext(), item);
                 MAIN.post(new Runnable() {
                     @Override
                     public void run() {
@@ -95,7 +98,10 @@ public final class ThumbnailLoader {
         cache().clear();
     }
 
-    private static Bitmap decodeThumbnail(RecoveryItem item) {
+    private static Bitmap decodeThumbnail(Context context, RecoveryItem item) {
+        if (item.path != null && item.path.startsWith("content://")) {
+            return decodeContentThumbnail(context, Uri.parse(item.path), item.type);
+        }
         File file = item.asFile();
         if (!file.exists() || !file.canRead()) {
             return null;
@@ -107,6 +113,49 @@ public final class ThumbnailLoader {
             return decodeVideoFrame(file);
         }
         return null;
+    }
+
+    /**
+     * Thumbnails for MediaStore-backed items (trash/pending rows included): the
+     * system generates them from the still-existing backing file, so trashed
+     * photos/videos preview correctly instead of showing a placeholder icon.
+     */
+    private static Bitmap decodeContentThumbnail(Context context, Uri uri, RecoveryType type) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q
+                && (type == RecoveryType.IMAGE || type == RecoveryType.VIDEO)) {
+            try {
+                Bitmap thumbnail = context.getContentResolver()
+                        .loadThumbnail(uri, new Size(TARGET_PX, TARGET_PX), null);
+                if (thumbnail != null) {
+                    return thumbnail;
+                }
+            } catch (Exception ignored) {
+                // Fall through to stream decode.
+            }
+        }
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        try (java.io.InputStream stream = context.getContentResolver().openInputStream(uri)) {
+            if (stream != null) {
+                BitmapFactory.decodeStream(stream, null, bounds);
+            }
+        } catch (Exception ignored) {
+            return null;
+        }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            return null;
+        }
+        BitmapFactory.Options sample = new BitmapFactory.Options();
+        sample.inSampleSize = computeSampleSize(bounds.outWidth, bounds.outHeight, TARGET_PX);
+        sample.inPreferredConfig = Bitmap.Config.RGB_565;
+        try (java.io.InputStream stream = context.getContentResolver().openInputStream(uri)) {
+            if (stream == null) {
+                return null;
+            }
+            return BitmapFactory.decodeStream(stream, null, sample);
+        } catch (Exception error) {
+            return null;
+        }
     }
 
     private static Bitmap decodeImageSample(File file) {

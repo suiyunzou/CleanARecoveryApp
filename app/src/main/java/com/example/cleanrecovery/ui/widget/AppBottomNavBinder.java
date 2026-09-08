@@ -47,7 +47,7 @@ public final class AppBottomNavBinder {
         TextView settingsLabel = activity.findViewById(R.id.nav_about_label);
 
         int activeColor = activity.getResources().getColor(R.color.brand_primary, activity.getTheme());
-        int inactiveColor = activity.getResources().getColor(R.color.text_secondary, activity.getTheme());
+        int inactiveColor = activity.getResources().getColor(R.color.text_muted, activity.getTheme());
 
         style(home, homeIcon, homeLabel, activeTab == Tab.HOME, activeColor, inactiveColor);
         style(scan, scanIcon, scanLabel, activeTab == Tab.SCAN, activeColor, inactiveColor);
@@ -74,12 +74,20 @@ public final class AppBottomNavBinder {
                     return;
                 }
                 FileBrowserActivity.open(activity, RecoveryOutputPaths.primaryDataRecoveryDir());
+                // 底部 tab 属于同一导航层，禁用过场动画，避免整页（含底栏）看起来被切换
+                activity.overridePendingTransition(0, 0);
             }
         });
         settings.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                activity.startActivity(new Intent(activity, AboutActivity.class));
+                if (activity instanceof AboutActivity) {
+                    return;
+                }
+                Intent intent = new Intent(activity, AboutActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                activity.startActivity(intent);
+                activity.overridePendingTransition(0, 0);
             }
         });
     }
@@ -108,6 +116,7 @@ public final class AppBottomNavBinder {
         }
         activity.startActivity(intent);
         activity.finish();
+        activity.overridePendingTransition(0, 0);
     }
 
     private static void style(
@@ -119,7 +128,8 @@ public final class AppBottomNavBinder {
             int inactiveColor
     ) {
         int color = active ? activeColor : inactiveColor;
-        container.setBackgroundResource(active ? R.drawable.bg_nav_item_active : android.R.color.transparent);
+        container.setBackground(null);
+        icon.setBackgroundResource(active ? R.drawable.bg_nav_item_active : 0);
         icon.setColorFilter(color);
         label.setTextColor(color);
     }

@@ -28,6 +28,11 @@ public final class ProxyNode {
         this.protocol = "ss";
     }
 
+    /** 是否具备可直连测速的地址（TCP 握手用）。 */
+    public boolean isReachableHost() {
+        return server != null && !server.isEmpty() && port > 0 && port < 65536;
+    }
+
     /** 是否为可用节点（关键字段非空、端口合法）。 */
     public boolean isValid() {
         if (clashYaml != null && !clashYaml.trim().isEmpty()) {

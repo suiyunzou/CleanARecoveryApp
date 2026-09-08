@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="via_offline_saving">Saving offline page…</string>
     <!-- VIA 风格浏览器 -->
     <string name="via_menu_new_tab">新建标签</string>
     <string name="via_menu_close_tab">关闭标签</string>
@@ -22,8 +23,7 @@
     <string name="via_download_status_cancelled">已取消</string>
     <string name="via_download_status_pending">等待中</string>
     <string name="via_menu_translate">翻译</string>
-    <string name="via_menu_night">夜间模式</string>
-    <string name="via_menu_ua">电脑模式</string>
+    <string name="via_menu_night">夜间模式</string>    <string name="via_menu_ua">电脑模式</string>
     <string name="via_menu_computer_mode">电脑模式</string>
     <string name="via_menu_mobile_mode">移动模式</string>
     <string name="via_computer_mode_on">电脑模式 已开启</string>
@@ -56,6 +56,13 @@
     <string name="via_menu_add_favorite">加入收藏</string>
     <string name="via_menu_add_to_home">添加到桌面</string>
     <string name="via_menu_incognito">隐身</string>
+    <string name="via_incognito_started">已进入隐身浏览</string>
+    <string name="via_incognito_exit">退出隐身浏览</string>
+    <string name="via_incognito_close_title">关闭所有标签</string>
+    <string name="via_incognito_close_message">你想要在退出隐身模式前，关闭所有标签吗？</string>
+    <string name="via_incognito_keep">保留</string>
+    <string name="via_incognito_close">关闭</string>
+    <string name="via_incognito_hint">你处于隐身模式时浏览将不会被记录。</string>
     <string name="via_menu_game_mode">游戏模式</string>
     <string name="via_menu_rotation">屏幕方向</string>
     <string name="via_menu_view_source">源码</string>
@@ -89,7 +96,10 @@
     <string name="via_fullscreen_off">已退出全屏</string>
     <string name="via_view_source_title">源码</string>
     <string name="via_reader_enabled">已进入阅读模式</string>
+    <string name="via_reader_show">打开阅读模式</string>
+    <string name="via_reader_hide">关闭阅读模式</string>
     <string name="via_reader_failed">当前页面不支持阅读模式</string>
+    <string name="via_reader_confirm_msg">是否进入阅读模式？</string>
     <string name="via_read_aloud_empty">页面没有可朗读文字</string>
     <string name="via_read_aloud_failed">系统语音服务不可用</string>
     <string name="via_script_warning">脚本将在当前网页上下文执行，请仅运行可信代码。</string>
@@ -99,7 +109,6 @@
     <string name="via_network_log_empty">这个页面没有网络日志。</string>
     <string name="via_save_failed">网页保存失败</string>
     <string name="via_offline_saved">离线网页已保存：%1$s</string>
-    <string name="via_incognito_started">已新建无痕标签（不使用缓存）</string>
     <string name="via_game_on">游戏模式：开</string>
     <string name="via_game_off">游戏模式：关</string>
     <string name="via_ai_chooser">发送到 AI 应用</string>
@@ -120,13 +129,23 @@
     <string name="via_no_back_history">没有可后退的页面</string>
     <string name="via_no_forward_history">没有可前进的页面</string>
     <string name="via_site_information">网站信息</string>
+    <string name="via_view_certificate">查看证书</string>
+    <string name="via_view_cookies">查看 Cookies</string>
+    <string name="via_view_scripts">查看脚本</string>
+    <string name="via_clear_current_cookies">清除此站 Cookies</string>
+    <string name="via_certificate_empty">当前页面没有可读取的 HTTPS 证书。</string>
+    <string name="via_cookie_empty">No cookies.</string>
+    <string name="via_copied">已复制</string>
     <!-- 搜索引擎 -->
     <string name="via_settings_search_engine">搜索引擎</string>
+    <string name="via_search_hint_simple"></string>
     <string name="via_search_engine_youtube">YouTube</string>
     <string name="via_search_engine_google">Google</string>
     <string name="via_search_engine_bing">Bing</string>
     <string name="via_search_engine_baidu">百度</string>
     <string name="via_search_engine_duckduckgo">DuckDuckGo</string>
+    <string name="via_search_engine_yahoo">雅虎</string>
+    <string name="via_search_engine_startpage">StartPage</string>
     <string name="via_search_engine_custom">自定义</string>
     <string name="via_settings_search_prefix">自定义搜索前缀</string>
     <string name="via_settings_search_prefix_hint">https://example.com/search?q=</string>
@@ -234,13 +253,12 @@
     <string name="via_settings_ignore_ssl_desc">请小心，忽略 SSL 证书警告可能会使网站的连接不安全</string>
     <string name="via_settings_proxy_desc">本应用扩展：订阅节点与本地代理</string>
     <string name="via_settings_scripts_empty">暂无脚本</string>
-    <string name="via_settings_about_name">清寻浏览器</string>
+    <string name="via_settings_about_name">枢浏览器</string>
     <string name="via_settings_check_update">检查更新</string>
     <string name="via_settings_contact">通过邮件联系我</string>
     <string name="via_settings_terms">使用协议</string>
     <string name="via_settings_privacy_policy">隐私政策</string>
     <string name="via_settings_licenses">开源许可协议</string>
-    <string name="via_settings_developing">开发中</string>
     <string name="via_settings_ua_default">默认</string>
     <string name="via_settings_ua_android_phone">Android (手机)</string>
     <string name="via_settings_ua_android_tablet">Android (平板)</string>
@@ -257,6 +275,26 @@
     <string name="via_settings_adblock_builtin_desc">内建规则仅拦截常见广告</string>
     <string name="via_settings_adblock_custom">自定义规则</string>
     <string name="via_settings_adblock_subscribe">规则订阅</string>
+
+    <string name="via_settings_adblock_stats">规则统计</string>
+    <string name="via_settings_adblock_stats_desc">Host：%1$d · URL：%2$d · 元素隐藏：%3$d</string>
+    <string name="via_settings_adblock_rules_count">自定义 %1$d 条</string>
+    <string name="via_settings_adblock_empty">暂无规则</string>
+    <string name="via_settings_adblock_hosts">拦截域名</string>
+    <string name="via_settings_adblock_hosts_hint">每行一个域名，例如：ads.example.com</string>
+    <string name="via_settings_adblock_url_rules">URL 规则</string>
+    <string name="via_settings_adblock_url_rules_hint">每行一条 ABP-lite 规则，例如：||example.com^ 或 /ad.js</string>
+    <string name="via_settings_adblock_cosmetic">元素隐藏规则</string>
+    <string name="via_settings_adblock_cosmetic_hint">每行一条，例如：example.com##.ad-banner</string>
+    <string name="via_settings_adblock_import">导入规则</string>
+    <string name="via_settings_adblock_import_desc">粘贴 EasyList/ABP-lite 文本追加导入</string>
+    <string name="via_settings_adblock_import_hint">支持 ||domain^、@@、通配符、example.com##.ad 等</string>
+    <string name="via_settings_adblock_import_done">已导入 %1$d 条规则</string>
+    <string name="via_settings_adblock_export">导出规则</string>
+    <string name="via_settings_adblock_export_desc">复制当前自定义规则文本</string>
+    <string name="via_settings_adblock_clear">清空自定义规则</string>
+    <string name="via_settings_adblock_clear_confirm">清空拦截域名、URL 规则和元素隐藏规则？</string>
+    <string name="via_settings_adblock_clear_done">已清空自定义规则</string>
     <string name="via_settings_clear_cache">缓存</string>
     <string name="via_settings_clear_form">表单数据</string>
     <string name="via_settings_clear_history">历史</string>
@@ -320,4 +358,121 @@
 
     <string name="via_ad_marker_ready">已进入广告标记模式：点击页面广告区域</string>
     <string name="via_ad_marker_saved">广告规则已保存</string>
+    <string name="via_go">前往</string>
+    <string name="via_find_prev">上一个</string>
+    <string name="via_find_next">下一个</string>
+    <string name="via_site_settings">网站设定</string>
+    <string name="via_exit_toast">再按一次返回键退出</string>
+    <string name="via_undo">撤销</string>
+    <string name="via_tab_closed">已关闭 %1$s</string>
+    <string name="via_restore_tabs_title">恢复标签页</string>
+    <string name="via_restore_tabs_msg">你想要恢复上次会话未关闭的标签页吗？</string>
+    <string name="via_page_resource_none">这个页面没有资源。</string>
+    <string name="via_page_resource_note">注：音乐或视频在播放时更容易被获取。资源嗅探不支持部分网站。</string>
+    <string name="via_network_log_none">这个页面没有网络日志。</string>
+    <string name="via_proxy_locked">代理入口不可移除</string>
+    <string name="via_add_to_home_fav">添加到主页收藏</string>
+    <string name="via_search_engine">搜索引擎</string>
+    <!-- 书签库：树形文件夹 + 长按菜单（对齐真 Via 7.2.1 基准 73-78） -->
+    <string name="via_bk_open_bg">后台打开</string>
+    <string name="via_bk_open_newtab">新标签打开</string>
+    <string name="via_bk_edit">编辑</string>
+    <string name="via_bk_delete">删除</string>
+    <string name="via_bk_copy_link">复制链接</string>
+    <string name="via_bk_share">分享</string>
+    <string name="via_folder_delete_confirm">这会同时删除 %1$s 文件夹内的书签，确定要删除吗？</string>
+    <string name="via_title_required">%s 为必填项</string>
+    <string name="via_new_folder">新建文件夹</string>
+    <string name="via_edit_bookmark">编辑书签</string>
+    <string name="via_sort_by">排序方式</string>
+    <string name="via_sort_name">名称顺序</string>
+    <string name="via_sort_newest">最新的优先</string>
+    <string name="via_sort_oldest">最旧的优先</string>
+    <string name="via_show_details">显示细节</string>
+    <string name="via_hide_details">隐藏细节</string>
+    <string name="via_import_bookmarks">导入书签</string>
+    <string name="via_backup_bookmarks">备份书签</string>
+    <string name="via_root_folder">根目录</string>
+    <string name="via_bk_backup_done">书签备份到：%1$s</string>
+    <string name="via_bk_import_done">%1$d 个书签已导入</string>
+    <string name="via_search_hint_folder">搜索 %1$s</string>
+    <string name="via_opened_bg">已在后台打开</string>
+    <string name="via_bk_field_title">标题</string>
+    <string name="via_bk_field_url">地址</string>
+    <string name="via_done">完成</string>
+    <string name="via_pick_folder">选择目录</string>
+    <string name="via_new_folder_dots">新建文件夹…</string>
+    <!-- 下载页（对齐真 Via 基准 58：七类 chips + 日期头 + 大小副标题） -->
+    <string name="via_dl_chip_all">全部</string>
+    <string name="via_dl_chip_doc">文档</string>
+    <string name="via_dl_chip_archive">压缩包</string>
+    <string name="via_dl_chip_apk">安装包</string>
+    <string name="via_dl_chip_image">图片</string>
+    <string name="via_dl_chip_video">视频</string>
+    <string name="via_dl_chip_audio">音频</string>
+    <string name="via_dl_running_fmt">下载中 %1$d%% · %2$s</string>
+    <string name="via_dl_running_no_total">下载中 · %1$s</string>
+    <string name="via_dl_pending">等待中</string>
+    <string name="via_dl_failed_fmt">失败：%1$s</string>
+    <string name="via_dl_cancelled">已取消</string>
+    <string name="via_dl_new">新建</string>
+    <string name="via_dl_edit">编辑</string>
+    <string name="via_dl_edit_hint">长按条目可删除记录</string>
+    <string name="via_dl_delete_confirm">删除该下载记录？</string>
+    <string name="via_dl_deleted">已删除</string>
+    <string name="via_dl_new_title">新建下载</string>
+    <string name="via_cancel">Cancel</string>
+    <string name="via_dl_action">Download</string>
+    <string name="via_dl_filename_hint">Filename</string>
+    <string name="via_dl_url_required">Enter a download URL</string>
+    <string name="via_bk_folder_exists">Folder already exists</string>
+    <string name="via_bk_import_failed">Import failed: %1$s</string>
+    <string name="via_bk_export_failed">Export failed: %1$s</string>
+    <string name="via_folder_no_bookmarks">No bookmarks in this folder</string>
+    <string name="via_lp_view_image">View image</string>
+    <string name="via_lp_save_image">Save image</string>
+    <string name="via_lp_download_image">Download image</string>
+    <string name="via_lp_share_image">Share image</string>
+    <string name="via_lp_search_image">Search by image</string>
+    <string name="via_sug_search_format">Search \"%1$s\"</string>
+    <string name="via_sug_paste">Paste and go</string>
+    <string name="via_sniffer_page_note">下列是网页加载中的资源日志。</string>
+    <string name="via_sniffer_unsupported">资源嗅探不支持此网站。</string>
+    <string name="via_sniffer_play">通过应用播放…</string>
+    <string name="via_sniffer_no_player">无法启动外部播放器</string>
+    <string name="via_sniffer_clear">清空</string>
+    <string name="via_sniffer_clear_confirm">清空此页面的资源日志？</string>
+    <string name="via_sniffer_more">更多</string>
+    <string name="via_sniffer_download_queued">已加入下载队列</string>
+    <string name="via_sniffer_already_queued">已有此资源的下载任务，请到下载页查看</string>
+    <string name="via_sniffer_download_started">已开始下载</string>
+    <!-- 广告拦截：防劫持与弹窗 -->
+    <string name="via_redirect_ask">允许页面重定向到 %1$s 吗？</string>
+    <string name="via_hijack_blocked">已拦截可疑跳转（%1$s）：疑似透明遮挡层/播放器区域劫持</string>
+    <string name="via_allow_once">允许一次</string>
+    <string name="via_popup_blocked">已拦截弹出式窗口</string>
+    <string name="via_open_external_confirm">在外部应用中打开此链接？</string>
+    <string name="via_no_app_open">没有应用可以打开此链接</string>
+    <!-- 广告拦截：规则订阅 -->
+    <string name="via_sub_added">订阅已添加（%1$d 条规则）</string>
+    <string name="via_sub_add_failed">订阅添加失败：%1$s</string>
+    <string name="via_sub_updated">订阅已更新</string>
+    <string name="via_sub_update_failed">订阅更新失败：%1$s</string>
+    <string name="via_sub_update_now">立即更新</string>
+    <string name="via_sub_last_update">上次更新：%1$s · %2$d 条规则</string>
+    <string name="via_sub_catalog">推荐订阅</string>
+    <string name="via_sub_my">我的订阅</string>
+    <!-- 抖音模式 -->
+    <string name="via_menu_douyin_mode">抖音模式</string>
+    <string name="feed_mode_title">抖音模式 · 上滑切换视频</string>
+    <string name="feed_back">返回</string>
+    <string name="feed_play_pause">播放/暂停</string>
+    <string name="feed_no_url">当前页面不是视频页</string>
+    <string name="via_clipboard_copy_confirm" formatted="false">Are you sure you want to copy text from %DOMAIN%?</string>
+    <string name="via_js_message_title">Message</string>
+    <string name="via_js_message_from">Message from %1$s</string>
+    <string name="via_js_ignore_minute">Ignore this site message for a minute</string>
+    <string name="via_js_leave_title">Confirm to leave</string>
+    <string name="via_js_leave">Leave</string>
+    <string name="via_js_stay">Stay</string>
 </resources>

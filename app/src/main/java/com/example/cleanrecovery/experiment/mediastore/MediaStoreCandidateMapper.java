@@ -20,13 +20,17 @@ public final class MediaStoreCandidateMapper {
             Uri collectionUri,
             MediaStoreQuerySpec.QueryMode queryMode,
             String volumeName,
-            MediaStoreReadabilityProbe.ProbeResult probeResult
+            boolean filesCollection,
+            String dataPath,
+            MediaStoreExistenceProbe.ProbeResult probeResult
     ) {
         long id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID));
         String displayName = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME));
         String relativePath = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.RELATIVE_PATH));
         String mimeType = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE));
         long size = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.SIZE));
+        long modifiedAtMs = secondsToMillis(cursor, MediaStore.MediaColumns.DATE_MODIFIED);
+        long expiresAtMs = secondsToMillis(cursor, MediaStore.MediaColumns.DATE_EXPIRES);
         Uri contentUri = ContentUris.withAppendedId(collectionUri, id);
 
         CandidateSourceKind sourceKind = sourceKindFor(queryMode);
@@ -36,15 +40,23 @@ public final class MediaStoreCandidateMapper {
                 .candidateId(UUID.randomUUID().toString())
                 .sourceKind(sourceKind)
                 .sourceUriOrPath(contentUri.toString())
-                .extractionMethod("mediastore_query:" + queryMode.name().toLowerCase())
-                .originalContainer(volumeName + ":" + relativePath)
+                .dataPath(dataPath == null ? "" : dataPath)
+                // The _files suffix marks rows from the MediaStore.Files collection:
+                // unknown-mime rows must only surface under DOCUMENT scans.
+                .extractionMethod("mediastore_query:" + queryMode.name().toLowerCase()
+                        + (filesCollection ? "_files" : ""))
+                // relativePath alone has no file name for trashed rows (their
+                // display name carries the .trashed-<ts>- prefix) — append it so
+                // downstream naming can recover the original file name.
+                .originalContainer(volumeName + ":" + (relativePath == null ? "" : relativePath)
+                        + (displayName == null ? "" : displayName))
                 .byteLength(size)
                 .mimeDetected(mimeType == null ? "" : mimeType)
-                .decodeStatus(probeResult.readable ? probeResult.decodeStatus : "UNREADABLE")
-                .width(probeResult.width)
-                .height(probeResult.height)
-                .sha256(probeResult.sha256)
-                .readBytes(probeResult.readBytes)
+                .decodeStatus(probeResult.readable ? probeResult.status : "UNREADABLE")
+                .modifiedAt(modifiedAtMs)
+                .expiresAt(expiresAtMs)
+                .readBytes(probeResult.readable && probeResult.status != null
+                        && probeResult.status.equals(MediaStoreExistenceProbe.STATUS_STREAM_OK) ? 16L : 0L)
                 .elapsedMs(probeResult.elapsedMs)
                 .errorCode(probeResult.errorCode)
                 .label(label)
@@ -66,7 +78,7 @@ public final class MediaStoreCandidateMapper {
 
     private static CandidateLabel labelFor(
             MediaStoreQuerySpec.QueryMode queryMode,
-            MediaStoreReadabilityProbe.ProbeResult probeResult
+            MediaStoreExistenceProbe.ProbeResult probeResult
     ) {
         if (!probeResult.readable) {
             return CandidateLabel.METADATA_ONLY;
@@ -78,5 +90,14 @@ public final class MediaStoreCandidateMapper {
             return CandidateLabel.ORIGINAL_VISIBLE_FILE;
         }
         return CandidateLabel.UNVERIFIED;
+    }
+
+    private static long secondsToMillis(Cursor cursor, String column) {
+        int index = cursor.getColumnIndex(column);
+        if (index < 0) {
+            return 0L;
+        }
+        long seconds = cursor.getLong(index);
+        return seconds > 0L ? seconds * 1000L : 0L;
     }
 }

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 播放页大封面右下软阴影：径向渐变灰斑，置于封面层之下并向右下偏移 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <gradient
+        android:centerX="0.5"
+        android:centerY="0.5"
+        android:endColor="#00000000"
+        android:startColor="#2E000000"
+        android:type="radial" />
+</shape>

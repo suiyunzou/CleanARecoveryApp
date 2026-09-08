@@ -19,6 +19,12 @@ public final class RecoveryItem {
     public final int height;
     public final boolean suspectedDeleted;
     public final RecoverySourceKind sourceKind;
+    /** Backing file path when known (e.g. MediaStore {@code _data}); used for cross-source dedup. */
+    public final String sourceFilePath;
+    /** True when real backing data was verified for this item; false = index/evidence only. */
+    public final boolean recoverable;
+    /** Epoch millis when system trash auto-purges this item (0 = not applicable). */
+    public final long expiresAt;
     public boolean selected;
 
     public RecoveryItem(
@@ -45,6 +51,40 @@ public final class RecoveryItem {
             boolean suspectedDeleted,
             RecoverySourceKind sourceKind
     ) {
+        this(type, name, path, size, modifiedAt, width, height, suspectedDeleted, sourceKind, true, 0L);
+    }
+
+    public RecoveryItem(
+            RecoveryType type,
+            String name,
+            String path,
+            long size,
+            long modifiedAt,
+            int width,
+            int height,
+            boolean suspectedDeleted,
+            RecoverySourceKind sourceKind,
+            boolean recoverable,
+            long expiresAt
+    ) {
+        this(type, name, path, size, modifiedAt, width, height, suspectedDeleted,
+                sourceKind, recoverable, expiresAt, null);
+    }
+
+    public RecoveryItem(
+            RecoveryType type,
+            String name,
+            String path,
+            long size,
+            long modifiedAt,
+            int width,
+            int height,
+            boolean suspectedDeleted,
+            RecoverySourceKind sourceKind,
+            boolean recoverable,
+            long expiresAt,
+            String sourceFilePath
+    ) {
         this.type = type;
         this.name = name;
         this.path = path;
@@ -54,6 +94,9 @@ public final class RecoveryItem {
         this.height = height;
         this.suspectedDeleted = suspectedDeleted;
         this.sourceKind = sourceKind == null ? RecoverySourceKind.VISIBLE_SHARED_FILE : sourceKind;
+        this.recoverable = recoverable;
+        this.expiresAt = expiresAt;
+        this.sourceFilePath = sourceFilePath == null || sourceFilePath.isEmpty() ? null : sourceFilePath;
     }
 
     public File asFile() {
@@ -62,7 +105,9 @@ public final class RecoveryItem {
 
     public String subtitle(Context context) {
         StringBuilder builder = new StringBuilder();
-        builder.append(context.getString(suspectedDeleted ? R.string.status_deleted : R.string.status_existing));
+        builder.append(context.getString(recoverable
+                ? R.string.status_recoverable
+                : R.string.status_index_only));
         builder.append(" | ");
         builder.append(formatSize(size));
         if (width > 0 && height > 0) {
@@ -70,6 +115,13 @@ public final class RecoveryItem {
         }
         if (modifiedAt > 0) {
             builder.append(" | ").append(DateFormat.getDateTimeInstance().format(new Date(modifiedAt)));
+        }
+        if (!recoverable) {
+            builder.append("\n").append(context.getString(R.string.status_index_only_hint));
+        } else if (suspectedDeleted && expiresAt > System.currentTimeMillis()) {
+            builder.append("\n").append(context.getString(
+                    R.string.subtitle_trash_expires,
+                    DateFormat.getDateTimeInstance().format(new Date(expiresAt))));
         }
         builder.append("\n").append(path);
         return builder.toString();

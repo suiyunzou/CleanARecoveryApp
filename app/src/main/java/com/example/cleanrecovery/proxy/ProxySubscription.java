@@ -5,6 +5,8 @@ public final class ProxySubscription {
     public final String id;
     public String name;
     public String url;
+    /** Last successful fetch timestamp (millis); 0 = never updated. */
+    public long updatedAt;
 
     public ProxySubscription(String id, String name, String url) {
         this.id = id;

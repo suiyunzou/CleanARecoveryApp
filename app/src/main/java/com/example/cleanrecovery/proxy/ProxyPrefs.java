@@ -62,32 +62,50 @@ public final class ProxyPrefs {
     }
 
     public void saveNodes(List<ProxyNode> nodes) {
-        JSONArray arr = new JSONArray();
-        for (ProxyNode n : nodes) {
-            JSONObject o = new JSONObject();
-            try {
-                o.put("name", n.name);
-                o.put("server", n.server);
-                o.put("port", n.port);
-                o.put("cipher", n.cipher);
-                o.put("password", n.password);
-                o.put("protocol", n.protocol);
-                o.put("clashYaml", n.clashYaml);
-            } catch (Exception ignored) {
-            }
-            arr.put(o);
-        }
         SharedPreferences.Editor editor = sp.edit().putString(
-                profileKey(K_NODES), secretCipher.encrypt(arr.toString()));
+                profileKey(K_NODES), secretCipher.encrypt(nodesToJson(nodes)));
         if (DEFAULT_ID.equals(activeSubscriptionId())) editor.remove(K_NODES);
         editor.apply();
     }
 
+    /** Write node cache for an explicit profile (used by background updates). */
+    public void saveNodesFor(String subscriptionId, List<ProxyNode> nodes) {
+        if (subscriptionId == null || subscriptionId.isEmpty()) return;
+        sp.edit().putString(K_NODES + "_" + subscriptionId,
+                secretCipher.encrypt(nodesToJson(nodes))).apply();
+    }
+
+    private static String nodesToJson(List<ProxyNode> nodes) {
+        JSONArray arr = new JSONArray();
+        if (nodes != null) {
+            for (ProxyNode n : nodes) {
+                JSONObject o = new JSONObject();
+                try {
+                    o.put("name", n.name);
+                    o.put("server", n.server);
+                    o.put("port", n.port);
+                    o.put("cipher", n.cipher);
+                    o.put("password", n.password);
+                    o.put("protocol", n.protocol);
+                    o.put("clashYaml", n.clashYaml);
+                } catch (Exception ignored) {
+                }
+                arr.put(o);
+            }
+        }
+        return arr.toString();
+    }
+
     public List<ProxyNode> loadNodes() {
+        return loadNodes(activeSubscriptionId());
+    }
+
+    /** Per-profile node list (profile id explicit, for UI cards). */
+    public List<ProxyNode> loadNodes(String subscriptionId) {
         List<ProxyNode> out = new ArrayList<>();
-        String stored = sp.getString(profileKey(K_NODES), null);
+        String stored = sp.getString(K_NODES + "_" + subscriptionId, null);
         if (stored == null) {
-            stored = DEFAULT_ID.equals(activeSubscriptionId())
+            stored = DEFAULT_ID.equals(subscriptionId)
                     ? sp.getString(K_NODES, "") : "";
         }
         boolean needsMigration = !stored.isEmpty() && !secretCipher.isEncrypted(stored);
@@ -109,7 +127,8 @@ public final class ProxyPrefs {
             }
         } catch (Exception ignored) {
         }
-        if (needsMigration && !out.isEmpty()) saveNodes(out);
+        if (needsMigration && !out.isEmpty()
+                && DEFAULT_ID.equals(subscriptionId)) saveNodes(out);
         return out;
     }
 
@@ -125,10 +144,12 @@ public final class ProxyPrefs {
                     JSONObject item = array.getJSONObject(i);
                     String id = item.optString("id");
                     if (id.isEmpty()) continue;
-                    out.add(new ProxySubscription(
+                    ProxySubscription sub = new ProxySubscription(
                             id,
                             item.optString("name", "订阅 " + (i + 1)),
-                            item.optString("url")));
+                            item.optString("url"));
+                    sub.updatedAt = item.optLong("updatedAt", 0L);
+                    out.add(sub);
                 }
             } catch (Exception ignored) {
             }
@@ -154,6 +175,7 @@ public final class ProxyPrefs {
                     json.put("id", item.id);
                     json.put("name", item.name);
                     json.put("url", item.url);
+                    json.put("updatedAt", item.updatedAt);
                     array.put(json);
                 } catch (Exception ignored) {
                 }
@@ -207,6 +229,27 @@ public final class ProxyPrefs {
         List<ProxySubscription> all = subscriptions();
         ProxySubscription active = find(all, activeSubscriptionId());
         return active == null ? all.get(0) : active;
+    }
+
+    /** Mark a subscription as successfully updated (persisted immediately). */
+    public void touchSubscription(String id) {
+        List<ProxySubscription> all = subscriptions();
+        ProxySubscription sub = find(all, id);
+        if (sub == null) return;
+        sub.updatedAt = System.currentTimeMillis();
+        saveSubscriptions(all);
+    }
+
+    /** Rename a subscription; returns false when the id is unknown. */
+    public boolean renameSubscription(String id, String newName) {
+        List<ProxySubscription> all = subscriptions();
+        ProxySubscription sub = find(all, id);
+        if (sub == null) return false;
+        String safe = newName == null ? "" : newName.trim();
+        if (safe.isEmpty()) return false;
+        sub.name = safe;
+        saveSubscriptions(all);
+        return true;
     }
 
     private String profileKey(String base) {

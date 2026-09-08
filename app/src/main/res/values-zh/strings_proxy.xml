@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 代理/配置双板块新增文案；与 values/strings_proxy.xml 对齐。 -->
+    <string name="proxy_tab_proxies">代理</string>
+    <string name="proxy_tab_profiles">配置</string>
+    <string name="proxy_group_all">全部</string>
+    <string name="proxy_latency_test">延迟测试</string>
+    <string name="proxy_latency_testing">测速中…</string>
+    <string name="proxy_latency_untested">未测速</string>
+    <string name="proxy_latency_failed">超时</string>
+    <string name="proxy_latency_done">测速完成：可用 %1$d · 失败 %2$d</string>
+    <string name="proxy_status_title_on">代理运行中</string>
+    <string name="proxy_status_title_off">代理未运行</string>
+    <string name="proxy_status_detail_on">%1$s · 本地端口 %2$d（SOCKS5/HTTP）</string>
+    <string name="proxy_status_detail_off">启动后为内置浏览器提供本地代理</string>
+    <string name="proxy_node_empty_title">暂无节点</string>
+    <string name="proxy_node_empty_hint">切换到「配置」页添加订阅并更新后，节点会显示在这里</string>
+    <string name="proxy_profile_active">使用中</string>
+    <string name="proxy_profile_updated_just">刚刚更新</string>
+    <string name="proxy_profile_updated_min">%1$d 分钟前更新</string>
+    <string name="proxy_profile_updated_hour">%1$d 小时前更新</string>
+    <string name="proxy_profile_updated_never">尚未更新</string>
+    <string name="proxy_profile_nodes">%1$d 个节点</string>
+    <string name="proxy_profile_local">本地导入</string>
+    <string name="proxy_profile_menu_update">立即更新</string>
+    <string name="proxy_profile_menu_edit">编辑</string>
+    <string name="proxy_profile_menu_delete">删除</string>
+    <string name="proxy_profile_empty_title">还没有配置</string>
+    <string name="proxy_profile_empty_hint">点击右下角「添加配置」，粘贴订阅链接或节点分享链接</string>
+    <string name="proxy_update_ok">已更新 %1$d 个节点</string>
+    <string name="proxy_update_failed">更新失败：%1$s</string>
+    <string name="proxy_edit_subscription_title">编辑配置</string>
+    <string name="proxy_profile_add">添加配置</string>
+    <string name="proxy_no_node_selected_short">先在「代理」页选择节点</string>
+    <string name="proxy_stop_before_switch">请先停止代理再切换配置</string>
+    <string name="proxy_profile_default_name">订阅 %1$d</string>
+    <string name="proxy_profile_local_name">本地导入 %1$d</string>
+    <string name="proxy_node_requires_running_title">代理未运行</string>
+    <string name="proxy_node_requires_running_hint">在「配置」页打开代理开关后，节点会显示在这里</string>
+    <string name="proxy_switch_desc">代理开关</string>
+    <string name="proxy_node_switched">已切换到：%1$s</string>
+    <string name="proxy_start_no_node">没有可用节点，请先在「配置」页更新订阅</string>
+</resources>

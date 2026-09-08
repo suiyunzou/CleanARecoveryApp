@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 唱臂：支点在右上（盘外），播放时针落在盘面右侧约 72% 半径处，暂停顺时针抬到盘缘 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="30dp"
+    android:height="40dp"
+    android:viewportWidth="30"
+    android:viewportHeight="40">
+    <!-- 配重短柄（支点向外延伸） -->
+    <path
+        android:strokeColor="#DDE0E4"
+        android:strokeWidth="2.6"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M26,8L29.2,5.6" />
+    <!-- 臂杆：支点(26,8) -> 针头(11.2,17.1) -->
+    <path
+        android:strokeColor="#E8EAEE"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M26,8L11.2,17.1" />
+    <!-- 支点关节 -->
+    <path
+        android:fillColor="#D2D6DB"
+        android:pathData="M26,8m-3,0a3,3 0 1,0 6,0a3,3 0 1,0 -6,0" />
+    <path
+        android:fillColor="#9AA0A7"
+        android:pathData="M26,8m-1.2,0a1.2,1.2 0 1,0 2.4,0a1.2,1.2 0 1,0 -2.4,0" />
+    <!-- 针头 -->
+    <path
+        android:fillColor="#D2D6DB"
+        android:pathData="M11.2,17.1m-2.4,0a2.4,2.4 0 1,0 4.8,0a2.4,2.4 0 1,0 -4.8,0" />
+    <path
+        android:fillColor="#7A8087"
+        android:pathData="M11.2,17.1m-1,0a1,1 0 1,0 2,0a1,1 0 1,0 -2,0" />
+</vector>

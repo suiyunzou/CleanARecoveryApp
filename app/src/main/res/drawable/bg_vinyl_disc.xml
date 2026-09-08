@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 无封面时的黑胶唱盘占位（概念版样式：软圆盘 + 纹路 + 中心标） -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#F2F5F4" />
+        </shape>
+    </item>
+    <item
+        android:bottom="14dp"
+        android:left="14dp"
+        android:right="14dp"
+        android:top="14dp">
+        <shape android:shape="oval">
+            <stroke
+                android:width="1.5dp"
+                android:color="#E4EBE9" />
+            <solid android:color="@android:color/transparent" />
+        </shape>
+    </item>
+    <item
+        android:bottom="30dp"
+        android:left="30dp"
+        android:right="30dp"
+        android:top="30dp">
+        <shape android:shape="oval">
+            <stroke
+                android:width="1.5dp"
+                android:color="#E4EBE9" />
+            <solid android:color="@android:color/transparent" />
+        </shape>
+    </item>
+    <item
+        android:bottom="94dp"
+        android:left="94dp"
+        android:right="94dp"
+        android:top="94dp">
+        <shape android:shape="oval">
+            <solid android:color="#E7ECEA" />
+        </shape>
+    </item>
+    <item
+        android:bottom="98dp"
+        android:left="98dp"
+        android:right="98dp"
+        android:top="98dp">
+        <shape android:shape="oval">
+            <stroke
+                android:width="1dp"
+                android:color="#DBE3E0" />
+            <solid android:color="@android:color/transparent" />
+        </shape>
+    </item>
+    <item
+        android:bottom="126dp"
+        android:left="126dp"
+        android:right="126dp"
+        android:top="126dp">
+        <shape android:shape="oval">
+            <solid android:color="#C9D3D0" />
+        </shape>
+    </item>
+</layer-list>

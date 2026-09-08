@@ -1,6 +1,7 @@
 package com.example.cleanrecovery.ui.activity;
 
 import com.example.cleanrecovery.R;
+import com.example.cleanrecovery.recovery.MediaStoreTrashRestorer;
 import com.example.cleanrecovery.recovery.PreviewSession;
 import com.example.cleanrecovery.recovery.RecoveryCoordinator;
 import com.example.cleanrecovery.recovery.RecoveryItem;
@@ -16,15 +17,17 @@ import com.example.cleanrecovery.storage.StorageAccessController;
 import com.example.cleanrecovery.ui.adapter.AlgorithmStepAdapter;
 import com.example.cleanrecovery.ui.adapter.RecoveryGridAdapter;
 import com.example.cleanrecovery.ui.widget.AppBottomNavBinder;
-import com.example.cleanrecovery.ui.widget.ParticleScanView;
+import com.example.cleanrecovery.ui.widget.ProgressScanView;
 import com.example.cleanrecovery.ui.widget.SystemUiHelper;
 import com.example.cleanrecovery.util.PathManager;
 import com.example.cleanrecovery.util.RootShell;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.PendingIntent;
 import android.content.ClipData;
 import android.content.ClipboardManager;
+import android.content.SharedPreferences;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
@@ -38,7 +41,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
-import android.widget.Toast;
+import com.example.cleanrecovery.ui.widget.GlassToast;
 
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -59,6 +62,7 @@ public final class MainActivity extends Activity {
     public static final String EXTRA_SHOW_RESULTS = "extra_show_results";
 
     private static final int REQUEST_ONBOARDING = 5100;
+    private static final int REQUEST_RESTORE_TRASH = 5200;
     private static final long PROGRESS_TICK_MS = 200L;
 
     private final RecoveryState recoveryState = new RecoveryState();
@@ -76,6 +80,7 @@ public final class MainActivity extends Activity {
     private int lastScannedCount;
     private int lastFoundCount;
     private int multiTypeCompletedScanned;
+    private List<RecoveryItem> pendingRestoredItems;
 
     private View homePanel;
     private View scanPanel;
@@ -89,7 +94,8 @@ public final class MainActivity extends Activity {
     private View recentScansContent;
     private TextView lastScanWhen;
     private TextView lastScanFoundCount;
-    private ParticleScanView scanParticleView;
+    private TextView lastScanFoundLabel;
+    private ProgressScanView scanParticleView;
     private TextView scanPathToggle;
     private TextView scanCurrentPath;
     private TextView resultsCount;
@@ -150,6 +156,16 @@ public final class MainActivity extends Activity {
         refreshHome();
         maybeLaunchOnboarding();
         updateBottomNav(Panel.HOME);
+
+        // 开屏内容：按「设置→启动后显示」冷启动路由（默认音乐不跳）。
+        // 首启引导：onboarding 已完成的老用户直接弹；未完成的等 onboarding 结束再弹。
+        if (savedInstanceState == null) {
+            if (AppStartup.choiceMade(this)) {
+                AppStartup.routeIfConfigured(this);
+            } else if (ScanHistoryStore.isOnboardingComplete(this)) {
+                AppStartup.maybeShowFirstRunChoice(this);
+            }
+        }
         handleNavIntent(getIntent());
         // 初始化应用工作目录并异步清理过期回收站条目（>30 天）
         initializeAppPaths();
@@ -258,7 +274,56 @@ public final class MainActivity extends Activity {
         if (requestCode == REQUEST_ONBOARDING) {
             refreshPermissionBanner();
             refreshHome();
+            // onboarding 完成后引导一次「启动后显示」
+            if (resultCode == RESULT_OK) {
+                AppStartup.maybeShowFirstRunChoice(this);
+            }
+        } else if (requestCode == REQUEST_RESTORE_TRASH) {
+            handleTrashRestoreResult(resultCode);
         }
+    }
+
+    /** 系统回收站还原结果:成功则把已还原条目从结果列表移除并展示完成页。 */
+    private void handleTrashRestoreResult(int resultCode) {
+        List<RecoveryItem> restored = pendingRestoredItems;
+        pendingRestoredItems = null;
+        if (restored == null || restored.isEmpty()) {
+            return;
+        }
+        if (resultCode != RESULT_OK) {
+            GlassToast.makeText(this, R.string.restore_trash_cancelled, GlassToast.LENGTH_SHORT).show();
+            return;
+        }
+        recoveryState.removeAll(restored);
+        for (RecoveryItem item : restored) {
+            item.selected = false;
+        }
+        RecoveryResultsSession.saveFrom(
+                recoveryState,
+                currentScanType,
+                scanAllMode,
+                experimentalMode,
+                lastScannedCount,
+                recoveryState.getAllCount()
+        );
+        RecoveryResultsStore.saveFrom(
+                this,
+                recoveryState,
+                currentScanType,
+                scanAllMode,
+                experimentalMode,
+                lastScannedCount,
+                recoveryState.getAllCount()
+        );
+        gridAdapter.notifyDataSetChanged();
+        updateResultsSummary();
+        updateCounters();
+        Intent intent = new Intent(this, RecoverCompleteActivity.class);
+        intent.putExtra(RecoverCompleteActivity.EXTRA_SUCCESS, restored.size());
+        intent.putExtra(RecoverCompleteActivity.EXTRA_FAILED, 0);
+        intent.putExtra(RecoverCompleteActivity.EXTRA_OUTPUT_PATH,
+                getString(R.string.restore_trash_output_location));
+        startActivity(intent);
     }
 
     @Override
@@ -280,6 +345,7 @@ public final class MainActivity extends Activity {
         recentScansContent = findViewById(R.id.recent_scans_content);
         lastScanWhen = findViewById(R.id.last_scan_when);
         lastScanFoundCount = findViewById(R.id.last_scan_found_count);
+        lastScanFoundLabel = findViewById(R.id.last_scan_found_label);
         scanParticleView = findViewById(R.id.scan_particle_view);
         resultsCount = findViewById(R.id.results_count);
         resultsSummaryScope = findViewById(R.id.results_summary_scope);
@@ -347,10 +413,9 @@ public final class MainActivity extends Activity {
     private void setupCategoryCard(View card, final RecoveryType type, int iconResId, int accentColorRes) {
         ImageView icon = card.findViewById(R.id.category_icon);
         TextView title = card.findViewById(R.id.category_title);
-        title.setText(type.labelResId);
+        title.setText(homeCategoryTitleRes(type));
         icon.setImageResource(iconResId);
-        icon.setBackgroundTintList(android.content.res.ColorStateList.valueOf(resolveColorRes(accentColorRes)));
-        icon.setImageTintList(android.content.res.ColorStateList.valueOf(resolveColorRes(R.color.text_on_primary)));
+        icon.setImageTintList(android.content.res.ColorStateList.valueOf(resolveColorRes(R.color.text_secondary)));
         card.setBackgroundResource(R.drawable.bg_category_card_surface);
         card.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -366,17 +431,15 @@ public final class MainActivity extends Activity {
             @Override
             public void onClick(View view) {
                 performLightHaptic(view);
-                startScanAll();
+                SharedPreferences prefs = getSharedPreferences(AboutActivity.PREFS_NAME, MODE_PRIVATE);
+                if (prefs.getBoolean(AboutActivity.KEY_DEFAULT_DEEP, false)) {
+                    startExperimentalScanAll();
+                } else {
+                    startScanAll();
+                }
             }
         };
         findViewById(R.id.scan_all_button).setOnClickListener(startScanAllClick);
-        findViewById(R.id.experimental_scan_button).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                performLightHaptic(view);
-                showAlgorithmicRecoveryPicker();
-            }
-        });
         findViewById(R.id.recent_scans_card).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -397,12 +460,6 @@ public final class MainActivity extends Activity {
                 recoveryCoordinator.cancelCurrentWork();
                 scanProgressTracker.complete();
                 finishScanUi(lastScannedCount, lastFoundCount);
-            }
-        });
-        findViewById(R.id.results_back_button).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                showPanel(Panel.HOME);
             }
         });
         resultsStatusFilterButton.setOnClickListener(v -> showStatusFilterSheet());
@@ -447,10 +504,10 @@ public final class MainActivity extends Activity {
         ScanHistoryStore.Snapshot snapshot = ScanHistoryStore.read(this);
         boolean hasHistory = snapshot.hasScanHistory();
         if (recentScansEmpty != null) {
-            recentScansEmpty.setVisibility(hasHistory ? View.GONE : View.VISIBLE);
+            recentScansEmpty.setVisibility(View.GONE);
         }
         if (recentScansContent != null) {
-            recentScansContent.setVisibility(hasHistory ? View.VISIBLE : View.GONE);
+            recentScansContent.setVisibility(View.VISIBLE);
         }
         if (hasHistory) {
             CharSequence when = DateUtils.getRelativeTimeSpanString(
@@ -461,9 +518,7 @@ public final class MainActivity extends Activity {
             if (lastScanWhen != null) {
                 lastScanWhen.setText(when);
             }
-            if (lastScanFoundCount != null) {
-                lastScanFoundCount.setText(String.valueOf(snapshot.lastFoundCount));
-            }
+            bindLastScanFound(snapshot.lastFoundCount);
             if (lastScanSummary != null) {
                 lastScanSummary.setText(getString(
                         R.string.last_scan_compact,
@@ -472,12 +527,45 @@ public final class MainActivity extends Activity {
                 ));
                 lastScanSummary.setVisibility(View.GONE);
             }
-        } else if (lastScanSummary != null) {
-            lastScanSummary.setText(R.string.last_scan_empty);
-            lastScanSummary.setVisibility(View.GONE);
+        } else {
+            if (lastScanWhen != null) {
+                lastScanWhen.setText(R.string.last_scan_none_when);
+            }
+            bindLastScanFound(0);
+            if (lastScanSummary != null) {
+                lastScanSummary.setText(R.string.last_scan_empty);
+                lastScanSummary.setVisibility(View.GONE);
+            }
         }
         updateCategoryCounts(snapshot);
         refreshPermissionBanner();
+    }
+
+    private void bindLastScanFound(int foundCount) {
+        if (lastScanFoundCount != null) {
+            lastScanFoundCount.setVisibility(View.GONE);
+        }
+        if (lastScanFoundLabel == null) {
+            return;
+        }
+        if (foundCount > 0) {
+            lastScanFoundLabel.setText(getString(R.string.recent_scan_summary, foundCount));
+        } else {
+            lastScanFoundLabel.setText(R.string.last_scan_none_found);
+        }
+    }
+
+    private static int homeCategoryTitleRes(RecoveryType type) {
+        if (type == RecoveryType.IMAGE) {
+            return R.string.home_category_images;
+        }
+        if (type == RecoveryType.VIDEO) {
+            return R.string.home_category_videos;
+        }
+        if (type == RecoveryType.AUDIO) {
+            return R.string.home_category_audio;
+        }
+        return R.string.home_category_documents;
     }
 
     private void updateCategoryCounts(ScanHistoryStore.Snapshot snapshot) {
@@ -553,7 +641,7 @@ public final class MainActivity extends Activity {
 
     private void gateAlgorithmicRecovery(final RecoveryType type, final boolean allTypes) {
         // Root probe may open a localhost socket (emulator bridge) — never on UI thread.
-        Toast.makeText(this, R.string.algorithmic_recovery_checking_root, Toast.LENGTH_SHORT).show();
+        GlassToast.makeText(this, R.string.algorithmic_recovery_checking_root, GlassToast.LENGTH_SHORT).show();
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -573,7 +661,20 @@ public final class MainActivity extends Activity {
                                     .show();
                             return;
                         }
-                        new AlertDialog.Builder(MainActivity.this)
+        final SharedPreferences prefs = getSharedPreferences(AboutActivity.PREFS_NAME, MODE_PRIVATE);
+        final boolean showHint = prefs.getBoolean(AboutActivity.KEY_DEEP_HINT, true);
+        if (!showHint) {
+            if (allTypes) {
+                startExperimentalScanAll();
+            } else {
+                startExperimentalScan(type);
+            }
+            return;
+        }
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+        new AlertDialog.Builder(MainActivity.this)
                                 .setTitle(R.string.algorithmic_recovery_title)
                                 .setMessage(R.string.algorithmic_recovery_warning)
                                 .setPositiveButton(R.string.experimental_scan_confirm,
@@ -589,6 +690,8 @@ public final class MainActivity extends Activity {
                                         })
                                 .setNegativeButton(android.R.string.cancel, null)
                                 .show();
+            }
+        });
                     }
                 });
             }
@@ -600,7 +703,7 @@ public final class MainActivity extends Activity {
             return;
         }
         if (!storageAccessController.hasStorageAccess()) {
-            Toast.makeText(this, R.string.storage_access_required, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.storage_access_required, GlassToast.LENGTH_SHORT).show();
             storageAccessController.requestStorageAccess();
             return;
         }
@@ -650,8 +753,30 @@ public final class MainActivity extends Activity {
         }
         List<RecoveryItem> selected = recoveryState.getSelectedItems();
         if (selected.isEmpty()) {
-            Toast.makeText(this, R.string.no_files_selected, Toast.LENGTH_SHORT).show();
+            GlassToast.makeText(this, R.string.no_files_selected, GlassToast.LENGTH_SHORT).show();
             return;
+        }
+        // 真恢复优先:系统回收站里的条目走官方还原流程,恢复到原位置,
+        // 而不是复制一份到 DataRecovery。提供方拒绝/不支持时回退为复制。
+        if (MediaStoreTrashRestorer.anyMediaStoreRestorable(selected)) {
+            PendingIntent request = MediaStoreTrashRestorer.createRestoreRequest(this, selected);
+            if (request != null) {
+                try {
+                    pendingRestoredItems = new ArrayList<>();
+                    for (RecoveryItem item : selected) {
+                        if (MediaStoreTrashRestorer.isMediaStoreRestorable(item)) {
+                            pendingRestoredItems.add(item);
+                        }
+                    }
+                    startIntentSenderForResult(request.getIntentSender(), REQUEST_RESTORE_TRASH, null, 0, 0, 0);
+                    return;
+                } catch (android.content.IntentSender.SendIntentException exception) {
+                    pendingRestoredItems = null;
+                    GlassToast.makeText(this, R.string.restore_trash_failed, GlassToast.LENGTH_SHORT).show();
+                }
+            } else {
+                GlassToast.makeText(this, R.string.restore_trash_unavailable, GlassToast.LENGTH_SHORT).show();
+            }
         }
         recoveryCoordinator.recoverSelected(selected);
     }
@@ -749,7 +874,7 @@ public final class MainActivity extends Activity {
     private void styleTypeChip(TextView chip, boolean active, String label, int count) {
         chip.setText(getString(R.string.results_type_chip_format, label, count));
         chip.setBackgroundResource(active ? R.drawable.bg_results_chip_selected : R.drawable.bg_results_chip_unselected);
-        chip.setTextColor(resolveColorRes(active ? R.color.text_on_primary : R.color.text_secondary));
+        chip.setTextColor(resolveColorRes(active ? R.color.brand_primary_dark : R.color.text_hint));
     }
 
     private void styleStatusFilterButton() {
@@ -759,11 +884,11 @@ public final class MainActivity extends Activity {
     }
 
     private String labelForStatusFilter(RecoveryState.FilterMode filter) {
-        if (filter == RecoveryState.FilterMode.EXISTING) {
-            return getString(R.string.filter_existing);
+        if (filter == RecoveryState.FilterMode.RECOVERABLE) {
+            return getString(R.string.filter_recoverable);
         }
-        if (filter == RecoveryState.FilterMode.DELETED) {
-            return getString(R.string.filter_deleted);
+        if (filter == RecoveryState.FilterMode.INDEX_ONLY) {
+            return getString(R.string.filter_index_only);
         }
         return getString(R.string.filter_all);
     }
@@ -772,8 +897,8 @@ public final class MainActivity extends Activity {
         BottomSheetDialog dialog = new BottomSheetDialog(this);
         View sheet = getLayoutInflater().inflate(R.layout.bottom_sheet_results_status_filter, null);
         bindStatusFilterOption(dialog, sheet, R.id.status_filter_all, RecoveryState.FilterMode.ALL);
-        bindStatusFilterOption(dialog, sheet, R.id.status_filter_existing, RecoveryState.FilterMode.EXISTING);
-        bindStatusFilterOption(dialog, sheet, R.id.status_filter_deleted, RecoveryState.FilterMode.DELETED);
+        bindStatusFilterOption(dialog, sheet, R.id.status_filter_existing, RecoveryState.FilterMode.RECOVERABLE);
+        bindStatusFilterOption(dialog, sheet, R.id.status_filter_deleted, RecoveryState.FilterMode.INDEX_ONLY);
         dialog.setContentView(sheet);
         dialog.show();
     }
@@ -804,13 +929,14 @@ public final class MainActivity extends Activity {
                 R.string.results_summary_compact,
                 currentScanLabel(),
                 recoveryState.getAllCount(),
-                recoveryState.countSuspectedDeleted()));
+                recoveryState.countRecoverable()));
         resultsCount.setText(getString(
                 R.string.results_summary_found,
                 recoveryState.getAllCount()));
         resultsSummaryDeleted.setText(getString(
-                R.string.results_summary_deleted,
-                recoveryState.countSuspectedDeleted()));
+                R.string.results_summary_recoverable,
+                recoveryState.countRecoverable(),
+                recoveryState.countIndexOnly()));
         resultsSummaryOutput.setText(getString(
                 R.string.results_summary_output,
                 RecoveryOutputPaths.primaryDataRecoveryDir().getAbsolutePath()));

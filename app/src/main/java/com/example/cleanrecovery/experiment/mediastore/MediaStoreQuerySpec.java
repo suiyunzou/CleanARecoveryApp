@@ -98,6 +98,37 @@ public final class MediaStoreQuerySpec {
                 .build();
     }
 
+    /**
+     * Trashed rows from the {@link MediaStore.Files} collection: documents and
+     * other non-media files deleted through the system Files/Downloads UI.
+     * Media mime types are excluded because Images/Video/Audio trash queries
+     * already cover them (with different collection URIs, so they would
+     * otherwise appear twice).
+     */
+    public static MediaStoreQuerySpec trashedFiles(String volumeName) {
+        return baseBuilder(volumeName, QueryMode.TRASHED)
+                .collectionUri(MediaStore.Files.getContentUri(volumeName))
+                .selection(MediaStore.MediaColumns.IS_TRASHED + "=? AND ("
+                        + MediaStore.MediaColumns.MIME_TYPE + " IS NULL OR ("
+                        + MediaStore.MediaColumns.MIME_TYPE + " NOT LIKE 'image/%' AND "
+                        + MediaStore.MediaColumns.MIME_TYPE + " NOT LIKE 'video/%' AND "
+                        + MediaStore.MediaColumns.MIME_TYPE + " NOT LIKE 'audio/%'))")
+                .selectionArgs(new String[]{"1"})
+                .build();
+    }
+
+    public static MediaStoreQuerySpec pendingFiles(String volumeName) {
+        return baseBuilder(volumeName, QueryMode.PENDING)
+                .collectionUri(MediaStore.Files.getContentUri(volumeName))
+                .selection(MediaStore.MediaColumns.IS_PENDING + "=? AND ("
+                        + MediaStore.MediaColumns.MIME_TYPE + " IS NULL OR ("
+                        + MediaStore.MediaColumns.MIME_TYPE + " NOT LIKE 'image/%' AND "
+                        + MediaStore.MediaColumns.MIME_TYPE + " NOT LIKE 'video/%' AND "
+                        + MediaStore.MediaColumns.MIME_TYPE + " NOT LIKE 'audio/%'))")
+                .selectionArgs(new String[]{"1"})
+                .build();
+    }
+
     private static Builder baseBuilder(String volumeName, QueryMode mode) {
         return new Builder()
                 .volumeName(volumeName)

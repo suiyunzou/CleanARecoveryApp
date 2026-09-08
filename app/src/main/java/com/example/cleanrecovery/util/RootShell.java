@@ -33,6 +33,8 @@ public final class RootShell {
         "/dev/block/by-name/userdata",
         "/dev/block/bootdevice/by-name/userdata",
         "/dev/block/platform/bootdevice/by-name/userdata",
+        // Emulator / dynamic-partition devices expose it via devmapper mapper links.
+        "/dev/block/mapper/userdata",
     };
 
     /** Emulator root-bridge TCP port (localhost only). */
@@ -98,6 +100,16 @@ public final class RootShell {
             }
         }
         return null;
+    }
+
+    /** Read a system property through the root backend (works over the bridge). */
+    public static String getSystemProperty(String name) {
+        try {
+            ShellResult result = runRoot("getprop " + name, PROBE_TIMEOUT_MS);
+            return result == null ? "" : result.stdout.trim();
+        } catch (Exception ignored) {
+            return "";
+        }
     }
 
     /** Read the first {@code length} bytes of a block device via {@code dd}. */

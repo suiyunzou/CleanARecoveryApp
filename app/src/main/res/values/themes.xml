@@ -23,4 +23,27 @@
         <item name="android:windowEnterAnimation">@anim/music_sheet_slide_up</item>
         <item name="android:windowExitAnimation">@anim/music_sheet_slide_down</item>
     </style>
+
+    <!-- 底部弹层主题：非浮动窗口，fill×wrap 的窗口宽度才会生效
+         （默认 Dialog 主题 windowIsFloating=true 会把宽度压回 wrap，弹层缩成窄条） -->
+    <style name="MusicBottomSheetDialogTheme" parent="@android:style/Theme.Material.Dialog">
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:backgroundDimAmount">0.5</item>
+        <item name="android:windowFrame">@null</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowAnimationStyle">@style/MusicBottomSheetAnimation</item>
+    </style>
+
+    <!-- 歌单封面圆角（ShapeableImageView 用） -->
+    <style name="ShapeCover16dp">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">16dp</item>
+    </style>
+
+    <style name="ShapeCover8dp">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">8dp</item>
+    </style>
 </resources>

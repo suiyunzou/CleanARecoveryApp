@@ -11,6 +11,25 @@ import static org.junit.Assert.assertTrue;
 
 public class ViaSnifferStateMachineTest {
     @Test
+    public void reusedWebViewMustCommitTheNewPageBeforeExposingResources() {
+        ViaSnifferStateMachine sniffer = new ViaSnifferStateMachine();
+        startAndCommit(sniffer, 1, 10, "https://example.com/old");
+        sniffer.onPageStarted(1, 10, "https://example.com/new");
+        sniffer.onRequest(1, 10, "https://example.com/new.mp4", false, null);
+        assertTrue("A previous page commit must not authorize the new page", sniffer.candidates(1).isEmpty());
+        assertFalse(sniffer.shouldShowButton(1));
+        assertTrue(sniffer.onPageCommitVisible(1, 10));
+    }
+
+    @Test
+    public void cosmeticCacheBusterMustNotConsumeTheResourceWindow() {
+        ViaSnifferStateMachine sniffer = new ViaSnifferStateMachine();
+        startAndCommit(sniffer, 1, 10, "https://example.com/page");
+        assertFalse(sniffer.onRequest(1, 10,
+                "https://example.com/via_inject_blocker.css?v=123#style", true, null).recorded());
+    }
+
+    @Test
     public void keepsIndependentStateAcrossTabs() {
         ViaSnifferStateMachine sniffer = new ViaSnifferStateMachine();
         startAndCommit(sniffer, 1, 101, "https://one.example/page");
@@ -42,7 +61,7 @@ public class ViaSnifferStateMachineTest {
     }
 
     @Test
-    public void pageStartClearsPreviousPageCandidates() {
+    public void newWebViewStartsWithoutExposingThePreviousPagesCandidates() {
         ViaSnifferStateMachine sniffer = new ViaSnifferStateMachine();
         startAndCommit(sniffer, 3, 30, "https://example.com/first");
         sniffer.onRequest(3, 30, "https://cdn.example/first.mp4", false, null);
@@ -53,6 +72,113 @@ public class ViaSnifferStateMachineTest {
         assertTrue(sniffer.candidates(3).isEmpty());
         assertTrue(sniffer.mediaUrls(3).isEmpty());
         assertFalse(sniffer.shouldShowButton(3));
+    }
+
+    @Test
+    public void returningToRetainedPageRestoresItsOwnCommittedResources() {
+        ViaSnifferStateMachine sniffer = new ViaSnifferStateMachine();
+        startAndCommit(sniffer, 1, 10, "https://one.example/watch");
+        sniffer.onRequest(1, 10, "https://cdn.example/one.mp4", false, null);
+        startAndCommit(sniffer, 1, 11, "https://two.example/watch");
+        sniffer.onRequest(1, 11, "https://cdn.example/two.mp3", false, null);
+
+        sniffer.activatePage(1, 10);
+        assertEquals("Back navigation must recover A's resources without reloading it",
+                Collections.singletonList("https://cdn.example/one.mp4"), sniffer.mediaUrls(1));
+        assertTrue(sniffer.shouldShowButton(1));
+        assertFalse("Requests from retained B cannot leak into active A",
+                sniffer.onRequest(1, 11, "https://cdn.example/late-b.mp4", false, null).recorded());
+
+        sniffer.activatePage(1, 11);
+        assertEquals("Forward navigation must recover B's independent resources",
+                Collections.singletonList("https://cdn.example/two.mp3"), sniffer.mediaUrls(1));
+        assertTrue(sniffer.shouldShowButton(1));
+    }
+
+    @Test
+    public void oldCommitCannotExposeOrHideTheActivePagesResources() {
+        ViaSnifferStateMachine sniffer = new ViaSnifferStateMachine();
+        sniffer.onPageStarted(1, 10, "https://one.example/watch");
+        sniffer.onRequest(1, 10, "https://cdn.example/one.mp4", false, null);
+        sniffer.onPageStarted(1, 11, "https://two.example/watch");
+        sniffer.onRequest(1, 11, "https://cdn.example/two.mp4", false, null);
+
+        assertFalse("A's commit must not authorize uncommitted B", sniffer.onPageCommitVisible(1, 10));
+        assertTrue(sniffer.candidates(1).isEmpty());
+        assertTrue(sniffer.onPageCommitVisible(1, 11));
+        assertTrue("A's late commit must not replace B's active identity", sniffer.onPageCommitVisible(1, 10));
+        assertEquals(Collections.singletonList("https://cdn.example/two.mp4"), sniffer.mediaUrls(1));
+
+        sniffer.activatePage(1, 10);
+        assertEquals("A's own commit remains attached to A", Collections.singletonList("https://cdn.example/one.mp4"), sniffer.mediaUrls(1));
+    }
+
+    @Test
+    public void reusingOnePageResetsOnlyThatPagesDocument() {
+        ViaSnifferStateMachine sniffer = new ViaSnifferStateMachine();
+        startAndCommit(sniffer, 1, 10, "https://one.example/old");
+        sniffer.onRequest(1, 10, "https://cdn.example/old.mp4", false, null);
+        startAndCommit(sniffer, 1, 11, "https://two.example/retained");
+        sniffer.onRequest(1, 11, "https://cdn.example/retained.mp4", false, null);
+
+        sniffer.onPageStarted(1, 10, "https://one.example/new");
+        sniffer.onRequest(1, 10, "https://cdn.example/new.mp4", false, null);
+        assertTrue("A new document must wait for its own commit", sniffer.candidates(1).isEmpty());
+        sniffer.activatePage(1, 11);
+        assertEquals("Reloading A must not erase retained B", Collections.singletonList("https://cdn.example/retained.mp4"), sniffer.mediaUrls(1));
+        sniffer.activatePage(1, 10);
+        assertTrue(sniffer.candidates(1).isEmpty());
+        sniffer.onPageCommitVisible(1, 10);
+        assertEquals("The reused page must contain only its new document", Collections.singletonList("https://cdn.example/new.mp4"), sniffer.mediaUrls(1));
+    }
+
+    @Test
+    public void discardedPageCannotBeResurrectedByLateCallbacks() {
+        ViaSnifferStateMachine sniffer = new ViaSnifferStateMachine();
+        startAndCommit(sniffer, 1, 10, "https://one.example/watch");
+        sniffer.onRequest(1, 10, "https://cdn.example/discarded.mp4", false, null);
+        startAndCommit(sniffer, 1, 11, "https://two.example/watch");
+        sniffer.onRequest(1, 11, "https://cdn.example/kept.mp4", false, null);
+
+        sniffer.removePage(1, 10);
+        assertFalse(sniffer.onRequest(1, 10, "https://cdn.example/late.mp4", false, null).recorded());
+        assertTrue("A discarded page's commit must not disturb active B", sniffer.onPageCommitVisible(1, 10));
+        assertEquals(Collections.singletonList("https://cdn.example/kept.mp4"), sniffer.mediaUrls(1));
+        sniffer.activatePage(1, 10);
+        assertTrue("Removed captures must not reappear through activation", sniffer.candidates(1).isEmpty());
+        assertFalse(sniffer.shouldShowButton(1));
+
+        sniffer.activatePage(1, 11);
+        assertEquals(Collections.singletonList("https://cdn.example/kept.mp4"), sniffer.mediaUrls(1));
+        sniffer.removePage(1, 11);
+        assertTrue(sniffer.candidates(1).isEmpty());
+        assertFalse(sniffer.onPageCommitVisible(1, 11));
+        assertFalse(sniffer.onRequest(1, 11, "https://cdn.example/late-active.mp4", false, null).recorded());
+        sniffer.activatePage(1, 11);
+        assertTrue(sniffer.candidates(1).isEmpty());
+    }
+
+    @Test
+    public void clearingActiveResourcesPreservesOtherPagesButClosingTabReleasesAll() {
+        ViaSnifferStateMachine sniffer = new ViaSnifferStateMachine();
+        startAndCommit(sniffer, 1, 10, "https://one.example/watch");
+        sniffer.onRequest(1, 10, "https://cdn.example/one.mp4", false, null);
+        startAndCommit(sniffer, 1, 11, "https://two.example/watch");
+        sniffer.onRequest(1, 11, "https://cdn.example/two.mp4", false, null);
+
+        sniffer.clear(1);
+        assertTrue(sniffer.candidates(1).isEmpty());
+        sniffer.activatePage(1, 10);
+        assertEquals("The resource-page clear action belongs to its active source page",
+                Collections.singletonList("https://cdn.example/one.mp4"), sniffer.mediaUrls(1));
+
+        sniffer.removeTab(1);
+        assertFalse(sniffer.onPageCommitVisible(1, 10));
+        assertFalse(sniffer.onRequest(1, 10, "https://cdn.example/late.mp4", false, null).recorded());
+        sniffer.activatePage(1, 10);
+        assertTrue(sniffer.candidates(1).isEmpty());
+        sniffer.activatePage(1, 11);
+        assertTrue(sniffer.candidates(1).isEmpty());
     }
 
     @Test

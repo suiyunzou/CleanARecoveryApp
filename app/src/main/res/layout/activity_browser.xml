@@ -1,131 +1,331 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- VIA 主布局：顶栏(网站信息|标题/地址|扫码) + 内容 + 底栏五键(后|前|主页|标签|菜单) -->
+<!-- VIA 主布局（1:1 对齐 7.2.1 实测）：
+     顶栏 48dp 两态：主页态[🔍 主页 [-]]；浏览态[🔍 标题 ↻]
+     网站信息下拉卡 / 进度条 2dp 蓝 / 主页(Logo+胶囊搜索+快捷链接) / WebView
+     查找栏(贴底栏上方) / 嗅探面板 / 底栏 48dp 五键(< > ⌂ [n] ☰) -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F5F5"
+    android:background="@color/via_page_bg"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
     android:fitsSystemWindows="true"
     android:orientation="vertical">
 
-    <LinearLayout
+    <FrameLayout
         android:id="@+id/browser_toolbar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@android:color/white"
-        android:orientation="vertical">
+        android:layout_height="48dp"
+        android:background="@android:color/white">
 
+        <!-- 主页态 -->
         <LinearLayout
-            android:id="@+id/browser_toolbar_primary"
+            android:id="@+id/browser_bar_home"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="match_parent"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <ImageButton
-                android:id="@+id/browser_nav_back"
+            <ImageView
+                android:id="@+id/browser_search_toggle"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:background="@drawable/bg_via_toolbar_button"
-                android:contentDescription="@string/browser_nav_back"
-                android:padding="12dp"
+                android:contentDescription="@string/browser_url_hint"
+                android:padding="14dp"
                 android:scaleType="centerInside"
-                android:src="@drawable/ic_back"
-                android:visibility="gone" />
+                android:src="@drawable/via_top_search" />
 
-            <ImageButton
-                android:id="@+id/browser_nav_forward"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="@drawable/bg_via_toolbar_button"
-                android:contentDescription="@string/browser_nav_forward"
-                android:padding="12dp"
-                android:scaleType="centerInside"
-                android:src="@drawable/ic_forward"
-                android:visibility="gone" />
-
-            <EditText
-                android:id="@+id/browser_url_input"
+            <TextView
+                android:id="@+id/browser_home_title"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:background="@android:color/transparent"
-                android:hint="@string/browser_url_hint"
-                android:imeOptions="actionGo"
-                android:inputType="textUri|textNoSuggestions"
-                android:maxLines="1"
-                android:paddingHorizontal="8dp"
-                android:textColor="@color/text_primary"
-                android:textColorHint="@color/text_muted"
-                android:textSize="16sp"
-                android:visibility="gone" />
+                android:paddingHorizontal="4dp"
+                android:text="@string/via_home_title"
+                android:textColor="@color/via_text"
+                android:textSize="18sp" />
 
-            <ImageButton
-                android:id="@+id/browser_home"
+            <ImageView
+                android:id="@+id/browser_hide_bar"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:background="@drawable/bg_via_toolbar_button"
-                android:contentDescription="@string/nav_home"
-                android:padding="12dp"
+                android:contentDescription="@string/via_menu_scan"
+                android:padding="13dp"
                 android:scaleType="centerInside"
-                android:src="@drawable/ic_home"
-                android:visibility="gone" />
+                android:src="@drawable/via_toolbar_scan" />
+            <ImageView
+                android:id="@+id/browser_app_home"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_via_toolbar_button"
+                android:contentDescription="返回主页"
+                android:padding="13dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/via_nav_home" />
+        </LinearLayout>
+
+        <!-- 浏览态 -->
+        <LinearLayout
+            android:id="@+id/browser_bar_page"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
 
             <FrameLayout
                 android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:visibility="gone">
+                android:layout_height="48dp">
 
-                <ImageButton
-                    android:id="@+id/browser_tabs"
+                <ImageView
+                    android:id="@+id/browser_site_info"
                     android:layout_width="48dp"
                     android:layout_height="48dp"
                     android:background="@drawable/bg_via_toolbar_button"
-                    android:contentDescription="@string/via_menu_tabs"
+                    android:contentDescription="@string/via_site_information"
                     android:padding="12dp"
                     android:scaleType="centerInside"
-                    android:src="@drawable/ic_tabs" />
+                    android:src="@drawable/via_site_info" />
 
                 <TextView
-                    android:id="@+id/browser_tab_badge"
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
-                    android:layout_gravity="center"
-                    android:background="@drawable/bg_tab_badge"
+                    android:id="@+id/browser_ad_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="bottom|end"
+                    android:layout_marginEnd="5dp"
+                    android:layout_marginBottom="5dp"
+                    android:background="@drawable/bg_via_ad_badge"
                     android:gravity="center"
-                    android:text="1"
-                    android:textColor="@color/text_primary"
-                    android:textSize="12sp"
-                    android:textStyle="bold" />
+                    android:minWidth="16dp"
+                    android:paddingHorizontal="3dp"
+                    android:textColor="#FFFFFF"
+                    android:textSize="9sp"
+                    android:visibility="gone" />
             </FrameLayout>
 
-            <ImageButton
-                android:id="@+id/browser_menu"
+            <TextView
+                android:id="@+id/browser_page_title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:paddingHorizontal="4dp"
+                android:singleLine="true"
+                android:textColor="@color/via_text"
+                android:textSize="18sp" />
+
+            <ImageView
+                android:id="@+id/browser_page_home"
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:background="@drawable/bg_via_toolbar_button"
-                android:contentDescription="@string/via_menu_button"
-                android:padding="12dp"
+                android:contentDescription="返回主页"
+                android:padding="13dp"
                 android:scaleType="centerInside"
-                android:src="@drawable/ic_menu"
+                android:src="@drawable/via_nav_home" />
+            <ImageView
+                android:id="@+id/browser_reload"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="@drawable/bg_via_toolbar_button"
+                android:contentDescription="@string/via_menu_reload"
+                android:padding="13dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/via_top_reload" />
+        </LinearLayout>
+
+        <!-- 地址编辑态 -->
+        <LinearLayout
+            android:id="@+id/browser_bar_edit"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/browser_engine_avatar"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_marginStart="6dp"
+                android:contentDescription="@string/via_search_engine"
+                android:gravity="center"
                 android:visibility="gone" />
 
             <ImageView
-                android:id="@+id/browser_proxy_dot"
-                android:layout_width="10dp"
-                android:layout_height="10dp"
-                android:layout_gravity="center_vertical"
-                android:background="@drawable/bg_proxy_dot"
-                android:contentDescription="@string/via_proxy_off_short"
-                android:visibility="gone" />
+                android:id="@+id/browser_edit_search"
+                android:layout_width="40dp"
+                android:layout_height="48dp"
+                android:padding="10dp"
+                android:background="@drawable/bg_via_toolbar_button"
+                android:contentDescription="@string/via_search_engine"
+                android:scaleType="centerInside"
+                android:src="@drawable/via_top_search" />
+            <EditText
+                android:id="@+id/browser_url_input"
+                android:layout_width="0dp"
+                android:layout_height="42dp"
+                android:layout_marginStart="0dp"
+                android:layout_weight="1"
+                android:background="@android:color/transparent"
+                android:hint="@string/browser_url_hint"
+                android:imeOptions="actionGo|flagNoExtractUi|flagNoFullscreen"
+                android:inputType="textUri|textNoSuggestions"
+                android:maxLines="1"
+                android:paddingHorizontal="2dp"
+                android:textColor="@color/via_text"
+                android:textColorHint="#B0B0B0"
+                android:textSize="16sp" />
+
+            <ImageView
+                android:id="@+id/browser_edit_clear"
+                android:layout_width="40dp"
+                android:layout_height="48dp"
+                android:padding="11dp"
+                android:background="@drawable/bg_via_toolbar_button"
+                android:contentDescription="清空输入"
+                android:scaleType="centerInside"
+                android:src="@drawable/via_toolbar_stop" />
+            <ImageView
+                android:id="@+id/browser_edit_scan"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:padding="13dp"
+                android:background="@drawable/bg_via_toolbar_button"
+                android:contentDescription="@string/via_menu_scan"
+                android:scaleType="centerInside"
+                android:src="@drawable/via_toolbar_scan" />
+            <ImageView
+                android:id="@+id/browser_url_go"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:padding="13dp"
+                android:background="@drawable/bg_via_toolbar_button"
+                android:contentDescription="@string/via_go"
+                android:scaleType="centerInside"
+                android:src="@drawable/via_toolbar_go" />
         </LinearLayout>
+    </FrameLayout>
+
+    <!-- 网站信息下拉卡（点放大镜弹出） -->
+    <LinearLayout
+        android:id="@+id/browser_site_card"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_via_sitecard"
+        android:elevation="6dp"
+        android:orientation="vertical"
+        android:paddingLeft="16dp"
+        android:paddingTop="14dp"
+        android:paddingRight="10dp"
+        android:paddingBottom="14dp"
+        android:visibility="gone">
 
         <LinearLayout
-            android:id="@+id/browser_toolbar_address_row"
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="wrap_content"
             android:gravity="center_vertical"
-            android:orientation="horizontal"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:id="@+id/browser_site_card_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="2"
+                    android:textColor="@color/via_text"
+                    android:textSize="16sp" />
+                <TextView
+                    android:id="@+id/browser_site_card_url"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:ellipsize="end"
+                    android:maxLines="2"
+                    android:textColor="@color/via_text_sub"
+                    android:textSize="14sp" />
+            </LinearLayout>
+            <ImageView
+                android:id="@+id/browser_site_card_history"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_via_toolbar_button"
+                android:contentDescription="@string/via_menu_history"
+                android:padding="10dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/via_site_clock" />
+            <ImageView
+                android:id="@+id/browser_site_card_qr"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="@drawable/bg_via_toolbar_button"
+                android:contentDescription="生成二维码"
+                android:padding="10dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/via_site_qr" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/browser_site_card_cert"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_via_menu_cell"
+            android:paddingVertical="8dp"
+            android:paddingRight="12dp"
+            android:text="@string/via_view_certificate"
+            android:textColor="@color/via_accent"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/browser_site_card_cookies"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_via_menu_cell"
+            android:paddingVertical="8dp"
+            android:paddingRight="12dp"
+            android:text="@string/via_view_cookies"
+            android:textColor="@color/via_accent"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/browser_site_card_settings"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_via_menu_cell"
+            android:paddingVertical="8dp"
+            android:paddingRight="12dp"
+            android:text="@string/via_site_settings"
+            android:textColor="@color/via_accent"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/browser_site_card_scripts"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_via_menu_cell"
+            android:paddingVertical="8dp"
+            android:paddingRight="12dp"
+            android:text="@string/via_view_scripts"
+            android:textColor="@color/via_accent"
+            android:textSize="15sp" />
+
+        <LinearLayout
+            android:id="@+id/browser_reader_controls"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
             android:visibility="gone" />
     </LinearLayout>
 
@@ -145,17 +345,6 @@
         android:layout_height="0dp"
         android:layout_weight="1">
 
-        <TextView
-            android:id="@+id/browser_empty_hint"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:padding="24dp"
-            android:text="@string/browser_empty_hint"
-            android:textColor="@color/text_muted"
-            android:visibility="gone" />
-
-        <!-- VIA 主页：Logo + 胶囊搜索框（快捷链接可滚动到下方） -->
         <ScrollView
             android:id="@+id/browser_home_scroll"
             android:layout_width="match_parent"
@@ -169,7 +358,7 @@
                 android:layout_height="wrap_content"
                 android:gravity="center_horizontal"
                 android:orientation="vertical"
-                android:paddingTop="72dp"
+                android:paddingTop="196dp"
                 android:paddingBottom="24dp">
 
                 <ImageView
@@ -182,121 +371,227 @@
                 <EditText
                     android:id="@+id/browser_home_search"
                     android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginStart="28dp"
-                    android:layout_marginTop="28dp"
-                    android:layout_marginEnd="28dp"
+                    android:layout_height="46dp"
+                    android:layout_marginLeft="20dp"
+                    android:layout_marginTop="30dp"
+                    android:layout_marginRight="20dp"
                     android:background="@drawable/bg_via_pill_search"
-                    android:hint="@string/browser_url_hint"
-                    android:imeOptions="actionGo"
+                    android:imeOptions="actionGo|flagNoExtractUi|flagNoFullscreen"
                     android:inputType="textUri|textNoSuggestions"
                     android:maxLines="1"
                     android:paddingHorizontal="20dp"
-                    android:textColor="@color/text_primary"
+                    android:textColor="@color/via_text"
                     android:textColorHint="#B0B0B0"
                     android:textSize="15sp" />
 
-                <GridLayout
-                    android:id="@+id/browser_home_grid"
+                <!-- 隐身模式小提醒（真 Via kb 字符串：浏览将不会被记录） -->
+                <TextView
+                    android:id="@+id/browser_incognito_hint"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="40dp"
+                    android:layout_marginTop="10dp"
+                    android:gravity="center"
+                    android:paddingHorizontal="24dp"
+                    android:text="@string/via_incognito_hint"
+                    android:textColor="#FF999999"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
+
+                <GridLayout
+                    android:id="@+id/browser_home_grid"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="36dp"
                     android:columnCount="4"
                     android:orientation="horizontal"
-                    android:paddingHorizontal="16dp"
-                    android:useDefaultMargins="true" />
-
-                <ImageButton
-                    android:id="@+id/browser_home_add"
-                    android:layout_width="52dp"
-                    android:layout_height="52dp"
-                    android:layout_marginTop="12dp"
-                    android:background="@drawable/bg_icon_button"
-                    android:contentDescription="@string/via_home_add"
-                    android:padding="12dp"
-                    android:scaleType="centerInside"
-                    android:src="@drawable/ic_add"
-                    android:visibility="gone"
-                    app:tint="#9E9E9E" />
+                    android:paddingHorizontal="0dp"
+                    android:useDefaultMargins="false" />
             </LinearLayout>
         </ScrollView>
+
+        <!-- 夜间模式主页蒙层（forceDark 只作用于 WebView，主页用蒙层暗化） -->
+        <View
+            android:id="@+id/browser_night_mask"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#66000000"
+            android:clickable="false"
+            android:focusable="false"
+            android:visibility="gone" />
     </FrameLayout>
 
+    <!-- 页内查找栏（贴底栏上方，1:1 顶左圆角） -->
     <LinearLayout
-        android:id="@+id/browser_sniffer_panel"
+        android:id="@+id/browser_find_bar"
         android:layout_width="match_parent"
-        android:layout_height="320dp"
-        android:background="@color/surface_card"
-        android:elevation="4dp"
-        android:orientation="vertical"
-        android:padding="16dp"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_via_findbar"
+        android:elevation="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingLeft="16dp"
+        android:paddingTop="6dp"
         android:visibility="gone">
 
-        <LinearLayout
+        <EditText
+            android:id="@+id/browser_find_input"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_via_input"
+            android:hint="@string/via_menu_find"
+            android:imeOptions="actionSearch"
+            android:inputType="text"
+            android:maxLines="1"
+            android:textColor="@color/via_text"
+            android:textColorHint="#B0B0B0"
+            android:textSize="15sp" />
+
+        <ImageView
+            android:id="@+id/browser_find_prev"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_via_toolbar_button"
+            android:contentDescription="@string/via_find_prev"
+            android:padding="12dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_chevron_up" />
+
+        <ImageView
+            android:id="@+id/browser_find_next"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_via_toolbar_button"
+            android:contentDescription="@string/via_find_next"
+            android:padding="12dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_chevron_down" />
+
+        <ImageView
+            android:id="@+id/browser_find_close"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="@drawable/bg_via_toolbar_button"
+            android:contentDescription="@string/browser_close_panel"
+            android:padding="12dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_close" />
+    </LinearLayout>
+
+    <!-- 搜索工具栏（搜索结果页底栏上方横向滚动胶囊，对齐 Via C3768m） -->
+    <LinearLayout
+        android:id="@+id/browser_search_toolbar_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@android:color/white"
+        android:visibility="gone">
+
+        <View
+            android:id="@+id/browser_search_toolbar_divider"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:layout_height="1px"
+            android:background="#E0E0E0" />
 
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/browser_sniffer_title"
-                android:textColor="@color/text_primary"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/browser_sniffer_count"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
-                android:textColor="@color/brand_accent"
-                android:visibility="gone" />
-
-            <ImageButton
-                android:id="@+id/browser_sniffer_close"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:background="@drawable/bg_icon_button"
-                android:contentDescription="@string/browser_close_panel"
-                android:padding="8dp"
-                android:scaleType="centerInside"
-                android:src="@drawable/ic_close" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/browser_sniffer_hint"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="@string/browser_sniffer_hint"
-            android:textColor="@color/text_muted"
-            android:textSize="12sp" />
-
-        <ScrollView
+        <HorizontalScrollView
+            android:id="@+id/browser_search_toolbar_scroll"
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_marginTop="8dp"
-            android:layout_weight="1">
+            android:layout_height="42dp"
+            android:scrollbars="none"
+            android:fadingEdge="none"
+            android:overScrollMode="never">
 
             <LinearLayout
-                android:id="@+id/browser_media_list"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical" />
-        </ScrollView>
+                android:id="@+id/browser_search_toolbar_chips"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp" />
+        </HorizontalScrollView>
+    </LinearLayout>
 
-        <Button
-            android:id="@+id/browser_download_all"
-            android:layout_width="match_parent"
-            android:layout_height="44dp"
-            android:layout_marginTop="8dp"
-            android:background="@drawable/bg_button_primary"
-            android:text="@string/browser_download_selected"
-            android:textAllCaps="false"
-            android:textColor="@color/surface_card" />
+    <!-- 底栏 48dp：后 前 主页 标签 菜单 -->
+    <LinearLayout
+        android:id="@+id/browser_bottom_bar"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:background="@android:color/white"
+        android:orientation="horizontal">
+
+        <ImageButton
+            android:id="@+id/browser_nav_back"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_via_toolbar_button"
+            android:contentDescription="@string/browser_nav_back"
+            android:padding="13dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/via_nav_back" />
+
+        <ImageButton
+            android:id="@+id/browser_nav_forward"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_via_toolbar_button"
+            android:contentDescription="@string/browser_nav_forward"
+            android:padding="13dp"
+            android:scaleX="-1"
+            android:scaleType="centerInside"
+            android:src="@drawable/via_nav_back" />
+
+        <ImageButton
+            android:id="@+id/browser_home"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_via_toolbar_button"
+            android:contentDescription="@string/nav_home"
+            android:padding="13dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/via_nav_home" />
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1">
+
+            <ImageButton
+                android:id="@+id/browser_tabs"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_via_toolbar_button"
+                android:contentDescription="@string/via_menu_tabs"
+                android:padding="13dp"
+                android:scaleType="centerInside"
+                android:src="@drawable/via_nav_tabs" />
+
+            <TextView
+                android:id="@+id/browser_tab_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:gravity="center"
+                android:minWidth="16dp"
+                android:text="1"
+                android:textColor="@color/via_text"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </FrameLayout>
+
+        <ImageButton
+            android:id="@+id/browser_menu"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/bg_via_toolbar_button"
+            android:contentDescription="@string/via_menu_button"
+            android:padding="13dp"
+            android:scaleType="centerInside"
+            android:src="@drawable/via_nav_menu" />
     </LinearLayout>
 
 </LinearLayout>
