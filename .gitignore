@@ -1,23 +1,39 @@
-# Gradle
-.gradle/
-build/
+# Only application sources and required build files are published.
+/*
+!/.gitignore
+!/README.md
+!/build.gradle
+!/settings.gradle
+!/gradle.properties
+!/gradlew
+!/gradlew.bat
+!/lint.xml
+!/gradle/
+/gradle/*
+!/gradle/wrapper/
+/gradle/wrapper/*
+!/gradle/wrapper/gradle-wrapper.jar
+!/gradle/wrapper/gradle-wrapper.properties
+!/app/
+/app/*
+!/app/build.gradle
+!/app/proguard-rules.pro
+!/app/src/
+
+# Generated output and local tooling are never source files.
 **/build/
-
-# Local SDK and machine-specific config
-local.properties
-_android_sdk/
-
-# IDE
-.idea/
-*.iml
-.vscode/
-
-# Build outputs
-dist/
+**/.gradle/
+**/.idea/
+**/.cursor/
+**/.claude/
+**/.codex/
+**/.task/
+**/docs/
+**/CLAUDE.md
+**/AGENTS.md
 *.apk
-*.ap_
 *.aab
-
-# OS
+*.log
+*.iml
 .DS_Store
 Thumbs.db
