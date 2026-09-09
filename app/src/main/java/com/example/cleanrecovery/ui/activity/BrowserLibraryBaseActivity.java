@@ -105,7 +105,14 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(Color.WHITE);
         root.setFitsSystemWindows(false);
-        root.setPadding(0, statusBarHeight(), 0, 0);
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
+            androidx.core.graphics.Insets bars = insets.getInsets(
+                    androidx.core.view.WindowInsetsCompat.Type.systemBars()
+                    | androidx.core.view.WindowInsetsCompat.Type.ime());
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom + dp(8));
+            return insets;
+        });
         setContentView(root, new LinearLayout.LayoutParams(-1, -1));
 
         LinearLayout top = new LinearLayout(this);
@@ -115,7 +122,7 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         root.addView(top, new LinearLayout.LayoutParams(-1, dp(56)));
 
         ImageButton back = new ImageButton(this);
-        back.setImageResource(R.drawable.ic_back);
+        back.setImageResource(R.drawable.via_toolbar_back);
         back.setBackgroundResource(R.drawable.bg_via_toolbar_button);
         back.setPadding(dp(14), dp(14), dp(14), dp(14));
         back.setOnClickListener(v -> finish());
@@ -468,8 +475,8 @@ abstract class BrowserLibraryBaseActivity extends Activity {
             else if (d.equals(yesterday) && !yesterdayTitle) { addSection("昨天"); yesterdayTitle = true; }
             else if (!d.equals(today) && !d.equals(yesterday) && !olderTitle) { addSection("更早"); olderTitle = true; }
             String host = hostText(e.url);
-            addEntryRow(host.contains("baidu") ? "♣" : "◷", host.contains("baidu") ? 0xff4c8dff : 0xff777777,
-                    TextUtils.isEmpty(e.title) ? e.url : e.title, host, v -> returnUrl(e.url),
+            addEntryRow("◷", 0xff333333,
+                    TextUtils.isEmpty(e.title) ? e.url : e.title, e.url.replaceFirst("^https?://", ""), v -> returnUrl(e.url),
                     v -> { showEntryMenu(e.title, e.url, () -> { db.removeHistory(e.id); renderList(); }); return true; });
             count++;
         }
@@ -527,12 +534,17 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         row.setMinimumHeight(dp(58));
         row.setOnClickListener(click);
         if (longClick != null) row.setOnLongClickListener(longClick);
-        TextView ic = new TextView(this);
-        ic.setText(icon);
-        ic.setTextSize(21);
-        ic.setGravity(Gravity.CENTER);
-        ic.setTextColor(iconColor);
-        row.addView(ic, new LinearLayout.LayoutParams(dp(40), dp(42)));
+        ImageView ic = new ImageView(this);
+        ic.setImageResource(mode == MODE_HISTORY ? R.drawable.ic_via_history2 : R.drawable.via_menu_offline);
+        if (mode == MODE_HISTORY) {
+            android.graphics.Bitmap favicon = com.example.cleanrecovery.ui.browser.BrowserFavicons.get(
+                    "https://" + subText);
+            if (favicon != null) ic.setImageBitmap(favicon);
+        }
+        ic.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(20), dp(20));
+        iconParams.setMargins(dp(8), 0, dp(16), 0);
+        row.addView(ic, iconParams);
         LinearLayout texts = new LinearLayout(this);
         texts.setOrientation(LinearLayout.VERTICAL);
         texts.setGravity(Gravity.CENTER_VERTICAL);
@@ -577,12 +589,34 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         } else if (mode == MODE_HISTORY) {
             addBottom("标签页", v -> finishWithLibraryAction(ACTION_OPEN_TABS), 1);
             addBottom("清空", v -> confirmClearHistory(), 0);
-            addBottom("编辑", v -> GlassToast.makeText(this, "已按最近访问去重", GlassToast.LENGTH_SHORT).show(), 0);
+            addBottom("编辑", v -> editHistory(), 0);
         } else {
             addBottom("标签页", v -> finishWithLibraryAction(ACTION_OPEN_TABS), 1);
             addBottom("清空", v -> clearMissingOffline(), 0);
             addBottom("编辑", v -> GlassToast.makeText(this, "长按条目删除", GlassToast.LENGTH_SHORT).show(), 0);
         }
+    }
+
+    private void editHistory() {
+        List<BrowserDatabaseHelper.Entry> entries = new ArrayList<>();
+        for (BrowserDatabaseHelper.Entry entry : db.listHistory()) {
+            if (match(entry.title, entry.url)) entries.add(entry);
+        }
+        String[] labels = new String[entries.size()];
+        boolean[] selected = new boolean[entries.size()];
+        for (int i = 0; i < entries.size(); i++) {
+            BrowserDatabaseHelper.Entry entry = entries.get(i);
+            labels[i] = TextUtils.isEmpty(entry.title) ? entry.url : entry.title;
+        }
+        new AlertDialog.Builder(this).setTitle("编辑历史记录")
+                .setMultiChoiceItems(labels, selected, (dialog, which, checked) -> selected[which] = checked)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton("删除", (dialog, which) -> {
+                    for (int i = 0; i < selected.length; i++) {
+                        if (selected[i]) db.removeHistory(entries.get(i).id);
+                    }
+                    renderList();
+                }).show();
     }
 
     /** 更多菜单（基准 _via_bkmore：添加书签/新建文件夹/排序方式/显示细节/导入书签/备份书签）。 */

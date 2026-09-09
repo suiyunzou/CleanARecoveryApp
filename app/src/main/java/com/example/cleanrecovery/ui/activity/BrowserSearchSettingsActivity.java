@@ -210,7 +210,7 @@ public final class BrowserSearchSettingsActivity extends Activity {
                 int from = viewHolder.getAdapterPosition() - 2;
                 int to = target.getAdapterPosition() - 2;
                 if (from < 0 || to < 0 || from >= engines.size() || to >= engines.size()) return false;
-                Collections.swap(engines, from, to);
+                engines.add(to, engines.remove(from));
                 adapter.notifyItemMoved(viewHolder.getAdapterPosition(), target.getAdapterPosition());
                 prefs.setSearchToolbarOrder(engines);
                 return true;
@@ -222,7 +222,7 @@ public final class BrowserSearchSettingsActivity extends Activity {
 
             @Override
             public boolean isLongPressDragEnabled() {
-                return false;
+                return true;
             }
         });
         touchHelper.attachToRecyclerView(toolbarRv);

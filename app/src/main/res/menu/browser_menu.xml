@@ -54,7 +54,7 @@
         android:title="@string/via_menu_mark_ad" />
     <item
         android:id="@+id/menu_douyin_mode"
-        android:icon="@drawable/ic_feed_play"
+        android:icon="@drawable/ic_browser_douyin"
         android:title="@string/via_menu_douyin_mode" />
     <item
         android:id="@+id/menu_network_log"

@@ -20,7 +20,7 @@ public class SearchEnginesTest {
 
     @Test
     public void google() {
-        assertEquals("https://www.google.com/search?q=",
+        assertEquals("https://www.google.com/search?udm=14&q=",
                 SearchEngines.prefix(SearchEngines.GOOGLE, ""));
     }
 
@@ -45,13 +45,13 @@ public class SearchEnginesTest {
     @Test
     public void customEmptyFallback() {
         // 自定义为空时回退 Google
-        assertEquals("https://www.google.com/search?q=",
+        assertEquals("https://www.google.com/search?udm=14&q=",
                 SearchEngines.prefix(SearchEngines.CUSTOM, ""));
     }
 
     @Test
     public void customNullFallback() {
-        assertEquals("https://www.google.com/search?q=",
+        assertEquals("https://www.google.com/search?udm=14&q=",
                 SearchEngines.prefix(SearchEngines.CUSTOM, null));
     }
 
@@ -64,7 +64,7 @@ public class SearchEnginesTest {
     @Test
     public void fullSearchUrl() {
         String url = SearchEngines.prefix(SearchEngines.GOOGLE, "") + "hello";
-        assertTrue(url.startsWith("https://www.google.com/search?q=hello"));
+        assertTrue(url.startsWith("https://www.google.com/search?udm=14&q=hello"));
     }
 
     @Test
@@ -75,7 +75,7 @@ public class SearchEnginesTest {
 
     @Test
     public void parseGoogleSearchResult() {
-        SearchEngines.SearchResult res = SearchEngines.parseSearchResult("https://www.google.com/search?q=City+University+Hong+Kong&oq=city");
+        SearchEngines.SearchResult res = SearchEngines.parseSearchResult("https://www.google.com/search?udm=14&q=City+University+Hong+Kong&oq=city");
         org.junit.Assert.assertNotNull(res);
         assertEquals(SearchEngines.GOOGLE, res.engine);
         assertEquals("City University Hong Kong", res.query);
