@@ -318,8 +318,8 @@ public final class BrowserActivity extends Activity {
         });
         siteInfoIcon.setOnClickListener(v -> onReaderIconClick());
         urlGoButton.setOnClickListener(v -> loadUrlFromInput());
-        findViewById(R.id.browser_app_home).setOnClickListener(v -> showHome());
-        findViewById(R.id.browser_page_home).setOnClickListener(v -> showHome());
+        findViewById(R.id.browser_app_home).setOnClickListener(v -> returnToAppHome());
+        findViewById(R.id.browser_page_home).setOnClickListener(v -> returnToAppHome());
         findViewById(R.id.browser_edit_clear).setOnClickListener(v -> { urlInput.setText(""); urlInput.requestFocus(); });
         homeBarTitle.setOnClickListener(v -> focusAddressBar());
         hideBarIcon.setOnClickListener(v -> launchQrScanner());
@@ -628,6 +628,12 @@ public final class BrowserActivity extends Activity {
     }
 
     /** 显示 VIA 风格主页（Logo + 胶囊搜索 + 快捷链接）。 */
+    private void returnToAppHome() {
+        startActivity(new Intent(this, MainActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP));
+        finish();
+    }
+
     private void showHome() {
         endSearchInput();
         if ((prefs.homeMode() == 1 || prefs.homeMode() == 3)
@@ -3632,8 +3638,6 @@ public final class BrowserActivity extends Activity {
                 prefs.setClosedTabs(recent.toString());
                 hasRestorableClosedTab = true;
             } catch (org.json.JSONException e) { Log.w(TAG, "Cannot record closed tab", e); }
-            if (prefs.undoCloseToast()) Snackbar.make(webContainer, "已关闭标签", Snackbar.LENGTH_LONG)
-                    .setAction("撤销", v -> newTab(closedUrl)).show();
         }
         for (TabManager.Page page : removed.clearPages()) destroyPage(page);
         viaSniffer.removeTab(removed.id);
@@ -3884,6 +3888,7 @@ public final class BrowserActivity extends Activity {
         }
         barHome.setVisibility(!editing && atHome ? View.VISIBLE : View.GONE);
         barEdit.setVisibility(editing ? View.VISIBLE : View.GONE);
+        findViewById(R.id.browser_edit_scan).setVisibility(View.GONE);
         barPage.setVisibility(!editing && !atHome ? View.VISIBLE : View.GONE);
         if (engineAvatar != null) {
             engineAvatar.setVisibility(
@@ -4210,27 +4215,8 @@ public final class BrowserActivity extends Activity {
         int accentColor = androidx.core.content.ContextCompat.getColor(this, R.color.via_accent);
 
         for (int engine : engines) {
-            TextView chip = new TextView(this);
-            chip.setText(SearchEngines.label(engine));
-            chip.setTextSize(13);
-            chip.setGravity(Gravity.CENTER);
-            chip.setSingleLine(true);
-            boolean selected = (engine == activeSearchEngine);
-
-            chip.setTextColor(selected ? accentColor : (night ? 0xFFCCCCCC : 0xFF3C4043));
-
-            GradientDrawable bg = new GradientDrawable();
-            bg.setShape(GradientDrawable.RECTANGLE);
-            bg.setCornerRadius(dp(16));
-            bg.setColor(night ? 0xFF2B2B2B : Color.WHITE);
-            bg.setStroke(dp(1), selected ? accentColor : (night ? 0xFF444444 : 0xFFDADCE0));
-            chip.setBackground(bg);
-
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(28));
-            lp.setMargins(0, 0, dp(6), 0);
-            chip.setPadding(dp(14), 0, dp(14), 0);
-            searchToolbarChips.addView(chip, lp);
+            TextView chip = addSearchToolbarChip(SearchEngines.label(engine),
+                    engine == activeSearchEngine, night, accentColor);
 
             final int targetEngine = engine;
             chip.setOnClickListener(v -> {
@@ -4247,6 +4233,30 @@ public final class BrowserActivity extends Activity {
                 }
             });
         }
+        TextView settings = addSearchToolbarChip(getString(R.string.via_menu_settings),
+                false, night, accentColor);
+        settings.setOnClickListener(v -> startActivityForResult(
+                new Intent(this, BrowserSearchSettingsActivity.class).putExtra("page", "toolbar"), REQ_SETTINGS));
+    }
+
+    private TextView addSearchToolbarChip(String title, boolean selected, boolean night, int accentColor) {
+        TextView chip = new TextView(this);
+        chip.setText(title);
+        chip.setTextSize(13);
+        chip.setGravity(Gravity.CENTER);
+        chip.setSingleLine(true);
+        chip.setTextColor(selected ? accentColor : (night ? 0xFFCCCCCC : 0xFF3C4043));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(dp(16));
+        bg.setColor(night ? 0xFF2B2B2B : Color.WHITE);
+        bg.setStroke(dp(1), selected ? accentColor : (night ? 0xFF444444 : 0xFFDADCE0));
+        chip.setBackground(bg);
+        chip.setPadding(dp(14), 0, dp(14), 0);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(28));
+        lp.setMargins(0, 0, dp(6), 0);
+        searchToolbarChips.addView(chip, lp);
+        return chip;
     }
 
     private String searchEngineLabel(int engine) {
@@ -4620,10 +4630,10 @@ public final class BrowserActivity extends Activity {
         }
     }
 
+    // Expand semantic disclosure content only; never synthesize clicks on page controls.
     private void expandCollapsedContent(WebView webView) {
         webView.evaluateJavascript(
                 "(function(){try{document.querySelectorAll('details:not([open])').forEach(function(e){e.open=true});"
-                        + "document.querySelectorAll('[aria-expanded=\"false\"][aria-controls]').forEach(function(e){e.click()});"
                         + "return true}catch(e){return false}})()", null);
     }
 
@@ -5207,6 +5217,12 @@ public final class BrowserActivity extends Activity {
         };
         tab.webView.setWebViewClient(viaClient);
         tab.webView.setWebChromeClient(new WebChromeClient() {
+            @Override public void onReceivedIcon(WebView view, android.graphics.Bitmap icon) {
+                TabState iconState = getState(tab);
+                if (iconState != null && !iconState.incognito) {
+                    com.example.cleanrecovery.ui.browser.BrowserFavicons.put(view.getUrl(), icon);
+                }
+            }
             @Override public void onReceivedTitle(WebView view, String title) {
                 if (tab.webView == view && !TextUtils.isEmpty(view.getUrl())) hasRestorableClosedTab = false;
             }
@@ -5575,12 +5591,7 @@ public final class BrowserActivity extends Activity {
     /** 盾牌徽标：显示当前页已拦截广告数。 */
     private void updateAdBadge(int count) {
         if (adBadge == null) return;
-        if (count > 0) {
-            adBadge.setText(count > 99 ? "99+" : String.valueOf(count));
-            adBadge.setVisibility(View.VISIBLE);
-        } else {
-            adBadge.setVisibility(View.GONE);
-        }
+        adBadge.setVisibility(View.GONE);
     }
 
     /** 切换显示的标签 WebView。 */

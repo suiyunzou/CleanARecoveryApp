@@ -52,7 +52,7 @@ public final class BrowserBottomMenu {
             "menu_fullscreen", "menu_image_mode", "menu_sniff", "menu_useragent", "menu_network_log",
             "menu_scan", "menu_add_to_home", "menu_read_aloud", "menu_ai", "menu_rotation",
             "menu_adblock", "menu_mark_ad", "menu_font_size", "menu_clear_data", "menu_customize_menu",
-            "menu_proxy"
+            "menu_proxy", "menu_douyin_mode"
     };
 
     /** VIA 定制页底部「可添加」池（默认隐藏）。 */
@@ -129,7 +129,7 @@ public final class BrowserBottomMenu {
         dialog = new Dialog(activity);
         LinearLayout root = new LinearLayout(activity);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(0, dp(20), 0, 0);
+        root.setPadding(0, dp(12), 0, 0);
         root.setBackground(sheetBackground());
 
         pageCount = Math.max(1, (visibleEntries.size() + PAGE_SIZE - 1) / PAGE_SIZE);
@@ -164,7 +164,7 @@ public final class BrowserBottomMenu {
             dotsRow.addView(dot);
         }
         root.addView(dotsRow, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(18)));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(10)));
 
         LinearLayout footer = new LinearLayout(activity);
         footer.setGravity(Gravity.CENTER_VERTICAL);
@@ -187,7 +187,7 @@ public final class BrowserBottomMenu {
         collapse.setRotation(270);
         footer.addView(collapse, new LinearLayout.LayoutParams(0, dp(44), 1f));
         root.addView(footer, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(50)));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(48)));
 
         dialog.setContentView(root);
         dialog.setCanceledOnTouchOutside(true);
@@ -294,7 +294,7 @@ public final class BrowserBottomMenu {
         LinearLayout cell = new LinearLayout(activity);
         cell.setOrientation(LinearLayout.VERTICAL);
         cell.setGravity(Gravity.CENTER_HORIZONTAL);
-        cell.setPadding(0, dp(8), 0, 0); // VIA 图标中心距面板顶 39.4dp
+        cell.setPadding(0, dp(16), 0, 0); // VIA 图标中心距面板顶 39.4dp
         cell.setClickable(true);
         cell.setFocusable(true);
         cell.setBackgroundResource(R.drawable.bg_via_menu_cell);
@@ -309,7 +309,7 @@ public final class BrowserBottomMenu {
 
         TextView label = new TextView(activity);
         label.setText(entry.title);
-        label.setTextSize(12);
+        label.setTextSize(11);
         label.setGravity(Gravity.CENTER);
         label.setMaxLines(1);
         label.setIncludeFontPadding(false);
@@ -455,6 +455,21 @@ public final class BrowserBottomMenu {
         body.addView(availableList, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
+        // Both grids live in a ScrollView: explicitly update their row heights,
+        // including the initially empty available pool, after every transfer.
+        Runnable resizePools = () -> {
+            activeList.getLayoutParams().height = dp(activity, 86) * ((active.size() + 4) / 5);
+            availableList.getLayoutParams().height = dp(activity, 86) * ((available.size() + 4) / 5);
+            activeList.requestLayout();
+            availableList.requestLayout();
+        };
+        RecyclerView.AdapterDataObserver poolObserver = new RecyclerView.AdapterDataObserver() {
+            @Override public void onChanged() { resizePools.run(); }
+        };
+        activeAdapter.registerAdapterDataObserver(poolObserver);
+        availableAdapter.registerAdapterDataObserver(poolObserver);
+        resizePools.run();
+
         activeAdapter.setOnTap(position -> {
             if (position < 0 || position >= active.size()) return;
             Entry moved = active.get(position);
@@ -465,7 +480,7 @@ public final class BrowserBottomMenu {
             }
             active.remove(position);
             moved.visible = false;
-            available.add(0, moved);
+            available.add(moved);
             activeAdapter.notifyDataSetChanged();
             availableAdapter.notifyDataSetChanged();
             persist(prefs, active, available);
@@ -576,7 +591,13 @@ public final class BrowserBottomMenu {
 
     private static List<Entry> applySavedOrder(List<Entry> entries, BrowserPrefs prefs) {
         Map<String, Entry> byName = new LinkedHashMap<>();
-        for (Entry entry : entries) byName.put(entry.resourceName, entry);
+        for (Entry entry : entries) {
+            // Legacy convenience actions remain available through tabs/gestures/footer,
+            // but must not reappear as a fourth menu page from an old saved order.
+            if (java.util.Arrays.asList("menu_new_tab", "menu_close_tab", "menu_screenshot", "menu_exit")
+                    .contains(entry.resourceName)) continue;
+            byName.put(entry.resourceName, entry);
+        }
 
         List<String> saved = prefs.menuOrder();
         List<String> order = new ArrayList<>();

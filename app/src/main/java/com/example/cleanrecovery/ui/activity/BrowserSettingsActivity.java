@@ -491,7 +491,6 @@ public final class BrowserSettingsActivity extends Activity {
         addRow(navRow("隐私", null, () -> open(Page.PRIVACY)));
         addRow(navRow("高级", null, () -> open(Page.ADVANCED)));
         addRow(navRow("脚本", null, () -> open(Page.SCRIPTS)));
-        addRow(navRow("检查更新", null, () -> startActivity(new Intent(this, AppUpdateActivity.class))));
     }
 
     private void renderGeneral() {
@@ -524,8 +523,6 @@ public final class BrowserSettingsActivity extends Activity {
         addRow(navRow("导入数据", null, this::showImportDataDialog));
         addRow(navRow("导出数据", "导出书签、设置、脚本和广告规则", this::exportAllData));
         addRow(navRowWithSub("启动时恢复未关闭标签", restoreLabel(), this::showRestoreDialog));
-        addRow(toggleRow("显示撤销关闭标签的提示", "如果开启了隐身模式，则不会显示提示",
-                prefs.undoCloseToast(), on -> prefs.setUndoCloseToast(on)));
         addRow(navRow("设置默认浏览器", null, this::openDefaultBrowserSettings));
     }
 

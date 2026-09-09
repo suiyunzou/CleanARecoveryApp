@@ -24,7 +24,7 @@ public final class SearchEngines {
     public static String prefix(int engine, String customPrefix) {
         switch (engine) {
             case GOOGLE:
-                return "https://www.google.com/search?q=";
+                return "https://www.google.com/search?udm=14&q=";
             case BING:
                 return "https://www.bing.com/search?q=";
             case BAIDU:
@@ -33,7 +33,7 @@ public final class SearchEngines {
                 return "https://duckduckgo.com/?q=";
             case CUSTOM:
                 return (customPrefix == null || customPrefix.isEmpty())
-                        ? "https://www.google.com/search?q=" : customPrefix;
+                        ? "https://www.google.com/search?udm=14&q=" : customPrefix;
             case YAHOO:
                 return "https://search.yahoo.com/search?p=";
             case STARTPAGE:

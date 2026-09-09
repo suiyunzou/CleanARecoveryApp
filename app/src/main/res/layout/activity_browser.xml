@@ -61,7 +61,7 @@
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:background="@drawable/bg_via_toolbar_button"
-                android:contentDescription="返回主页"
+                android:contentDescription="返回应用主页"
                 android:padding="13dp"
                 android:scaleType="centerInside"
                 android:src="@drawable/via_nav_home" />
@@ -122,7 +122,7 @@
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:background="@drawable/bg_via_toolbar_button"
-                android:contentDescription="返回主页"
+                android:contentDescription="返回应用主页"
                 android:padding="13dp"
                 android:scaleType="centerInside"
                 android:src="@drawable/via_nav_home" />

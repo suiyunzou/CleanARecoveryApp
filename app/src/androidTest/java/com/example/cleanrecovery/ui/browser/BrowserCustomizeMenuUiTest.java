@@ -72,6 +72,175 @@ public class BrowserCustomizeMenuUiTest {
             image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out);
         } image.recycle();
     }
+    @Test public void automaticExpansionNeverClicksWebMenus() throws Exception {
+        Activity activity = launch(BrowserActivity.class);
+        android.webkit.WebView[] page = {null};
+        java.util.concurrent.CountDownLatch loaded = new java.util.concurrent.CountDownLatch(1);
+        try {
+            main(() -> {
+                page[0] = new android.webkit.WebView(activity);
+                page[0].getSettings().setJavaScriptEnabled(true);
+                page[0].setWebViewClient(new android.webkit.WebViewClient() {
+                    @Override public void onPageFinished(android.webkit.WebView view, String url) { loaded.countDown(); }
+                });
+                page[0].loadDataWithBaseURL("https://fixture.invalid", "<script>window.clicks=0</script>"
+                    + "<button aria-expanded='false' aria-controls='tools' onclick='window.clicks++'>Tools</button>"
+                    + "<div id='tools'></div><details><summary>Article</summary>Content</details>", "text/html", "UTF-8", null);
+                return null;
+            });
+            assertTrue(loaded.await(15, java.util.concurrent.TimeUnit.SECONDS));
+            java.util.concurrent.CountDownLatch checked = new java.util.concurrent.CountDownLatch(1);
+            String[] result = {null};
+            main(() -> {
+                java.lang.reflect.Method expand = BrowserActivity.class.getDeclaredMethod("expandCollapsedContent", android.webkit.WebView.class);
+                expand.setAccessible(true);
+                expand.invoke(activity, page[0]);
+                expand.invoke(activity, page[0]);
+                page[0].evaluateJavascript("JSON.stringify([window.clicks,document.querySelector('details').open])",
+                    value -> { result[0] = value; checked.countDown(); });
+                return null;
+            });
+            assertTrue(checked.await(5, java.util.concurrent.TimeUnit.SECONDS));
+            assertEquals("\"[0,true]\"", result[0]);
+        } finally { main(() -> { if (page[0] != null) page[0].destroy(); activity.finish(); return null; }); }
+    }
+
+    @Test public void toolbarDragOrderPersistsAndMatchesBrowserChips() throws Exception {
+        BrowserPrefs prefs = new BrowserPrefs(instrument.getTargetContext());
+        java.util.List<Integer> oldOrder = prefs.searchToolbarOrder();
+        Activity settings = instrument.startActivitySync(new Intent(instrument.getTargetContext(),
+                com.example.cleanrecovery.ui.activity.BrowserSearchSettingsActivity.class)
+                .putExtra("page", "toolbar").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        Activity[] browser = {null};
+        try {
+            instrument.waitForIdleSync();
+            main(() -> {
+                RecyclerView rv = (RecyclerView) field(settings, "toolbarRv");
+                androidx.recyclerview.widget.ItemTouchHelper helper = (androidx.recyclerview.widget.ItemTouchHelper) field(settings, "toolbarTouchHelper");
+                java.lang.reflect.Field callbackField = androidx.recyclerview.widget.ItemTouchHelper.class.getDeclaredField("mCallback");
+                callbackField.setAccessible(true);
+                androidx.recyclerview.widget.ItemTouchHelper.Callback callback = (androidx.recyclerview.widget.ItemTouchHelper.Callback) callbackField.get(helper);
+                assertTrue("Whole-row long press enables dragging", callback.isLongPressDragEnabled());
+                java.util.List<Integer> before = prefs.searchToolbarOrder();
+                assertTrue(callback.onMove(rv, rv.findViewHolderForAdapterPosition(2), rv.findViewHolderForAdapterPosition(5)));
+                before.add(3, before.remove(0));
+                assertEquals(before, new BrowserPrefs(settings).searchToolbarOrder());
+                return null;
+            });
+            browser[0] = launch(BrowserActivity.class);
+            main(() -> {
+                java.lang.reflect.Method rebuild = BrowserActivity.class.getDeclaredMethod("rebuildSearchEngineRow");
+                rebuild.setAccessible(true); rebuild.invoke(browser[0]);
+                ViewGroup chips = browser[0].findViewById(R.id.browser_search_toolbar_chips);
+                java.util.List<Integer> order = prefs.searchToolbarEngines();
+                for (int i = 0; i < order.size(); i++) assertEquals(SearchEngines.label(order.get(i)), ((TextView) chips.getChildAt(i)).getText().toString());
+                assertEquals(order.size() + 1, chips.getChildCount());
+                View first = chips.getChildAt(0), last = chips.getChildAt(chips.getChildCount() - 1);
+                assertEquals(first.getLayoutParams().height, last.getLayoutParams().height);
+                assertEquals(first.getPaddingLeft(), last.getPaddingLeft());
+                assertEquals(first.getBackground().getClass(), last.getBackground().getClass());
+                return null;
+            });
+        } finally { main(() -> { prefs.setSearchToolbarOrder(oldOrder); settings.finish(); if (browser[0] != null) browser[0].finish(); return null; }); }
+    }
+
+    @Test public void oldConvenienceActionsStayOutOfMenuAndPanelMatchesViaHeight() throws Exception {
+        Activity activity = launch(BrowserActivity.class);
+        BrowserPrefs prefs = new BrowserPrefs(activity);
+        java.util.List<String> oldOrder = prefs.menuOrder();
+        java.util.Set<String> oldHidden = prefs.hiddenMenuItems();
+        Dialog[] dialog = {null};
+        try {
+            main(() -> {
+                prefs.saveMenuConfiguration(java.util.Arrays.asList("menu_new_tab", "menu_close_tab", "menu_screenshot", "menu_exit", "menu_douyin_mode"), java.util.Collections.emptySet());
+                java.lang.reflect.Method builder = BrowserActivity.class.getDeclaredMethod("buildMenuEntries"); builder.setAccessible(true);
+                BrowserBottomMenu menu = new BrowserBottomMenu(activity, prefs, (java.util.List<BrowserBottomMenu.Entry>) builder.invoke(activity), id -> {});
+                for (BrowserBottomMenu.Entry entry : (java.util.List<BrowserBottomMenu.Entry>) field(menu, "visibleEntries")) {
+                    assertFalse(java.util.Arrays.asList("menu_new_tab", "menu_close_tab", "menu_screenshot", "menu_exit").contains(entry.resourceName));
+                    if ("menu_douyin_mode".equals(entry.resourceName)) assertNotNull(entry.icon);
+                }
+                menu.show(); dialog[0] = (Dialog) field(menu, "dialog");
+                return null;
+            });
+            instrument.waitForIdleSync();
+            main(() -> {
+                ViewGroup content = dialog[0].findViewById(android.R.id.content);
+                assertEquals(Math.round(242 * activity.getResources().getDisplayMetrics().density), content.getChildAt(0).getHeight());
+                return null;
+            });
+            snapshot("feedback-menu-via-height");
+        } finally { main(() -> { if (dialog[0] != null) dialog[0].dismiss(); if (oldOrder.isEmpty()) prefs.resetMenuConfiguration(); else prefs.saveMenuConfiguration(oldOrder, oldHidden); activity.finish(); return null; }); }
+    }
+
+    @Test public void searchEditingHidesScannerAndToolbarEndsWithSettings() throws Exception {
+        Activity activity = launch(BrowserActivity.class);
+        try {
+            main(() -> {
+                java.lang.reflect.Method focus = BrowserActivity.class.getDeclaredMethod("focusAddressBar");
+                focus.setAccessible(true); focus.invoke(activity);
+                assertEquals(View.GONE, activity.findViewById(R.id.browser_edit_scan).getVisibility());
+                java.lang.reflect.Method rebuild = BrowserActivity.class.getDeclaredMethod("rebuildSearchEngineRow");
+                rebuild.setAccessible(true); rebuild.invoke(activity);
+                ViewGroup chips = activity.findViewById(R.id.browser_search_toolbar_chips);
+                TextView settings = (TextView) chips.getChildAt(chips.getChildCount() - 1);
+                assertEquals(activity.getString(R.string.via_menu_settings), settings.getText().toString());
+                assertTrue(settings.isClickable());
+                return null;
+            });
+        } finally { main(() -> { activity.finish(); return null; }); }
+    }
+
+    @Test public void hiddenItemMovesToAvailablePoolAndCanBeRestoredAfterReopening() throws Exception {
+        Activity activity = launch(BrowserActivity.class);
+        BrowserPrefs prefs = new BrowserPrefs(activity);
+        java.util.List<String> oldOrder = prefs.menuOrder();
+        java.util.Set<String> oldHidden = prefs.hiddenMenuItems();
+        Dialog[] dialog = {null};
+        java.util.List<BrowserBottomMenu.Entry> entries = new java.util.ArrayList<>();
+        entries.add(new BrowserBottomMenu.Entry(1, "fixture_restore", "恢复测试", activity.getDrawable(R.drawable.via_menu_power)));
+        try {
+            main(() -> {
+                prefs.saveMenuConfiguration(java.util.Arrays.asList("fixture_restore"), java.util.Collections.emptySet());
+                dialog[0] = BrowserBottomMenu.showCustomizer(activity, prefs, entries);
+                return null;
+            });
+            instrument.waitForIdleSync();
+            main(() -> {
+                View label = text(dialog[0].getWindow().getDecorView(), "恢复测试");
+                assertNotNull(label);
+                ((View) label.getParent()).performClick();
+                return null;
+            });
+            instrument.waitForIdleSync();
+            main(() -> {
+                View label = text(dialog[0].getWindow().getDecorView(), "恢复测试");
+                assertNotNull("Hidden item remains rendered in the available pool", label);
+                Rect rect = new Rect();
+                assertTrue("Initially empty pool expands after hiding", label.getGlobalVisibleRect(rect));
+                assertTrue(prefs.hiddenMenuItems().contains("fixture_restore"));
+                dialog[0].dismiss();
+                dialog[0] = BrowserBottomMenu.showCustomizer(activity, prefs, entries);
+                return null;
+            });
+            instrument.waitForIdleSync();
+            main(() -> {
+                View label = text(dialog[0].getWindow().getDecorView(), "恢复测试");
+                assertNotNull("Hidden entry survives reopening", label);
+                ((View) label.getParent()).performClick();
+                assertFalse(prefs.hiddenMenuItems().contains("fixture_restore"));
+                return null;
+            });
+        } finally {
+            main(() -> {
+                if (dialog[0] != null) dialog[0].dismiss();
+                if (oldOrder.isEmpty()) prefs.resetMenuConfiguration();
+                else prefs.saveMenuConfiguration(oldOrder, oldHidden);
+                activity.finish();
+                return null;
+            });
+        }
+    }
+
     @Test public void everyMenuPageRendersBothRowsInsideClickableCells() throws Exception {
         Activity activity = launch(BrowserActivity.class);
         Dialog[] dialog = {null};
