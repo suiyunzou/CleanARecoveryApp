@@ -184,6 +184,13 @@
     <string name="via_history_empty">没有历史记录</string>
     <string name="via_history_clear">清空历史</string>
     <string name="via_history_cleared">历史已清空</string>
+    <string name="via_history_clear_browsing">清除浏览历史</string>
+    <string name="via_history_clear_confirm">确定清除「%1$s」的浏览历史？</string>
+    <string name="via_history_range_hour">过去一小时</string>
+    <string name="via_history_range_today">今天</string>
+    <string name="via_history_range_today_yesterday">今天和昨天</string>
+    <string name="via_history_range_7days">过去 7 天</string>
+    <string name="via_history_range_all">所有时间</string>
     <string name="via_settings_title">设置</string>
     <string name="via_settings_ua">User-Agent</string>
     <string name="via_settings_ua_desktop">桌面</string>

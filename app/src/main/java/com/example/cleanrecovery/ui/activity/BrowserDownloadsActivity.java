@@ -1,5 +1,7 @@
 package com.example.cleanrecovery.ui.activity;
 
+import com.example.cleanrecovery.ui.browser.ViaDialogBuilder;
+
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ClipData;
@@ -138,7 +140,7 @@ public final class BrowserDownloadsActivity extends Activity {
             Object item = listItems.get(pos);
             if (!(item instanceof DownloadTaskDbHelper.DownloadRow)) return false;
             DownloadTaskDbHelper.DownloadRow row = (DownloadTaskDbHelper.DownloadRow) item;
-            new AlertDialog.Builder(this)
+            new ViaDialogBuilder(this)
                     .setTitle(R.string.via_dl_delete_confirm)
                     .setMessage(row.fileName)
                     .setPositiveButton(android.R.string.ok, (d, w) -> {
@@ -181,7 +183,7 @@ public final class BrowserDownloadsActivity extends Activity {
         nameInput.setHint(R.string.via_dl_filename_hint);
         box.addView(nameInput, new LinearLayout.LayoutParams(-1, -2));
 
-        new AlertDialog.Builder(this)
+        new ViaDialogBuilder(this)
                 .setTitle(R.string.via_dl_new)
                 .setView(box)
                 .setPositiveButton(R.string.via_dl_action, (d, w) -> {
@@ -211,8 +213,8 @@ public final class BrowserDownloadsActivity extends Activity {
         for (final String label : CHIPS) {
             TextView tv = new TextView(this);
             tv.setText(label);
-            tv.setTextSize(14);
-            tv.setPadding(dp(18), dp(7), dp(18), dp(7));
+            tv.setTextSize(11);
+            tv.setPadding(dp(10), dp(2), dp(10), dp(2));
             tv.setGravity(Gravity.CENTER);
             styleChip(tv, label.equals(chip));
             tv.setOnClickListener(v -> {
@@ -223,7 +225,7 @@ public final class BrowserDownloadsActivity extends Activity {
                 rebuild();
             });
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
-            lp.rightMargin = dp(10);
+            lp.rightMargin = dp(6);
             chipsBox.addView(tv, lp);
         }
     }

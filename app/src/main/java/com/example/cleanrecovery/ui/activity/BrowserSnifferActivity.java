@@ -1,5 +1,7 @@
 package com.example.cleanrecovery.ui.activity;
 
+import com.example.cleanrecovery.ui.browser.ViaDialogBuilder;
+
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ClipData;
@@ -184,7 +186,7 @@ public final class BrowserSnifferActivity extends Activity {
                 getString(R.string.via_bk_copy_link),
                 "调用外部播放器播放"
         };
-        new AlertDialog.Builder(this)
+        new ViaDialogBuilder(this)
                 .setTitle(shortOf(url))
                 .setItems(items, (dialog, which) -> {
                     if (which == 0) {

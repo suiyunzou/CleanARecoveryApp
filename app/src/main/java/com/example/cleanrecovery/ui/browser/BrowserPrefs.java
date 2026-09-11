@@ -1314,7 +1314,7 @@ public final class BrowserPrefs {
     public void setDesktopMode(boolean v) { sp.edit().putBoolean("desktop_mode", v).putInt(K_UA, v ? 0 : 1).apply(); }
     public boolean cookiesEnabled() { return b("cookies_enabled", true); }
     public void setCookiesEnabled(boolean v) { put("cookies_enabled", v); }
-    public boolean popupsEnabled() { return b("popups_enabled", true); }
+    public boolean popupsEnabled() { return b("popups_enabled", false); }
     public void setPopupsEnabled(boolean v) { put("popups_enabled", v); }
 
     /** 网站设定-权限（allow/ask/block）。 */

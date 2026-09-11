@@ -35,6 +35,7 @@ public class BrowserToolbarParityUiTest {
     @Before public void setup()throws Exception{
         prefs=new BrowserPrefs(instrument.getTargetContext());storage=(android.content.SharedPreferences)field(prefs,"sp");saved=new HashMap<>(storage.getAll());
         prefs.setToolbarMode(1);prefs.setNightMode(false);prefs.resetMenuConfiguration();
+        prefs.setRestoreTabs(0);prefs.setHomeMode(0);
         activity=instrument.startActivitySync(new Intent(instrument.getTargetContext(),BrowserActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         main(()->{invoke("showHome",new Class[]{});return null;});
     }
@@ -49,7 +50,7 @@ public class BrowserToolbarParityUiTest {
         }e.commit();
     }
     private void snapshot(String name)throws Exception{
-        Thread.sleep(250);android.graphics.Bitmap b=instrument.getUiAutomation().takeScreenshot();
+        Thread.sleep(600);android.graphics.Bitmap b=instrument.getUiAutomation().takeScreenshot();
         try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(instrument.getTargetContext().getExternalFilesDir(null),name+".png"))){b.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}b.recycle();
     }
     @Test public void editorArrowAndScannerActOnCurrentTab()throws Exception{
@@ -132,8 +133,8 @@ public class BrowserToolbarParityUiTest {
             assertEquals("",tabs.current().url);
             assertTrue(activity.findViewById(R.id.browser_app_home).isShown());
             invoke("loadAddress",new Class[]{String.class},"https://home-button-fixture.invalid/");
-            assertTrue(activity.findViewById(R.id.browser_page_home).isShown());
-            activity.findViewById(R.id.browser_page_home).performClick();
+            assertFalse(activity.findViewById(R.id.browser_app_home).isShown());
+            activity.findViewById(R.id.browser_home).performClick();
             assertTrue((Boolean)invoke("isHomeVisible",new Class[]{}));
             return null;
         });
@@ -155,6 +156,98 @@ public class BrowserToolbarParityUiTest {
             ((EditText)activity.findViewById(R.id.browser_url_input)).setText("abc");activity.findViewById(R.id.browser_edit_clear).performClick();
             assertEquals("",((EditText)activity.findViewById(R.id.browser_url_input)).getText().toString());assertTrue(activity.findViewById(R.id.browser_url_input).hasFocus());return null;
         });}finally{main(()->{suggestion[0].destroy();return null;});}
+    }
+    @Test public void blockedPopupsRequireConsentEvenWithClickGesture()throws Exception{
+        main(()->{
+            storage.edit().remove("popups_enabled").commit();
+            assertFalse(prefs.popupsEnabled());
+            TabManager tabs=(TabManager)field(activity,"tabs");
+            WebView source=tabs.current().webView;
+            int count=tabs.size();
+            for(boolean gesture:new boolean[]{false,true}){
+                android.os.Message result=android.os.Message.obtain(new android.os.Handler(android.os.Looper.getMainLooper()));
+                WebView.WebViewTransport transport=source.new WebViewTransport();result.obj=transport;
+                assertTrue(source.getWebChromeClient().onCreateWindow(source,false,gesture,result));
+                assertEquals(count,tabs.size());assertSame(source,tabs.current().webView);
+                assertNotNull(field(activity,"popupPrompt"));
+                invoke("dismissPopupPrompt",new Class[]{});
+                assertNull(transport.getWebView());assertEquals(count,tabs.size());
+            }
+            return null;
+        });
+    }
+    @Test public void popupConsentCreatesExactlyOneTabAndSettingCanAllowDirectly()throws Exception{
+        main(()->{
+            prefs.setPopupsEnabled(false);
+            TabManager tabs=(TabManager)field(activity,"tabs");WebView source=tabs.current().webView;
+            int count=tabs.size();
+            android.os.Message result=android.os.Message.obtain(new android.os.Handler(android.os.Looper.getMainLooper()));
+            WebView.WebViewTransport transport=source.new WebViewTransport();result.obj=transport;
+            assertTrue(source.getWebChromeClient().onCreateWindow(source,false,true,result));
+            com.google.android.material.snackbar.Snackbar prompt=(com.google.android.material.snackbar.Snackbar)field(activity,"popupPrompt");
+            prompt.getView().findViewById(com.google.android.material.R.id.snackbar_action).performClick();
+            assertEquals(count+1,tabs.size());assertSame(tabs.current().webView,transport.getWebView());
+            invoke("dismissPopupPrompt",new Class[]{});assertSame(tabs.current().webView,transport.getWebView());
+            prefs.setPopupsEnabled(true);source=tabs.current().webView;
+            android.os.Message allowed=android.os.Message.obtain(new android.os.Handler(android.os.Looper.getMainLooper()));
+            WebView.WebViewTransport allowedTransport=source.new WebViewTransport();allowed.obj=allowedTransport;
+            assertTrue(source.getWebChromeClient().onCreateWindow(source,false,false,allowed));
+            assertEquals(count+2,tabs.size());assertSame(tabs.current().webView,allowedTransport.getWebView());
+            return null;
+        });
+    }
+    @Test public void switchingTabsCancelsPendingPopup()throws Exception{
+        main(()->{
+            prefs.setPopupsEnabled(false);
+            TabManager tabs=(TabManager)field(activity,"tabs");WebView source=tabs.current().webView;
+            android.os.Message result=android.os.Message.obtain(new android.os.Handler(android.os.Looper.getMainLooper()));
+            WebView.WebViewTransport transport=source.new WebViewTransport();result.obj=transport;
+            assertTrue(source.getWebChromeClient().onCreateWindow(source,false,false,result));
+            com.google.android.material.snackbar.Snackbar prompt=(com.google.android.material.snackbar.Snackbar)field(activity,"popupPrompt");
+            invoke("newTab",new Class[]{String.class},(Object)null);int count=tabs.size();
+            prompt.getView().findViewById(com.google.android.material.R.id.snackbar_action).performClick();
+            assertEquals(count,tabs.size());assertNull(transport.getWebView());return null;
+        });
+    }
+    @Test public void viaDialogKeepsValidationAndCancellationCallbacks()throws Exception{
+        final int[] cancelled={0},savedValues={0};
+        final EditText[] input={null};
+        android.app.AlertDialog dialog=main(()->{
+            input[0]=new EditText(activity);
+            android.app.AlertDialog shown=new ViaDialogBuilder(activity).setTitle("编辑名称")
+                    .setView(input[0]).setNegativeButton("取消",null).setPositiveButton("保存",null)
+                    .setOnCancelListener(d->cancelled[0]++).create();
+            shown.setOnShowListener(d->shown.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{
+                if(input[0].getText().length()==0){input[0].setError("请输入名称");return;}
+                savedValues[0]++;shown.dismiss();
+            }));shown.show();return shown;
+        });
+        try{main(()->{
+            dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).performClick();assertTrue(dialog.isShowing());assertEquals(0,savedValues[0]);
+            input[0].setText("示例");dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).performClick();assertFalse(dialog.isShowing());assertEquals(1,savedValues[0]);
+            dialog.show();dialog.cancel();return null;
+        });instrument.waitForIdleSync();assertEquals(1,cancelled[0]);}finally{main(()->{dialog.dismiss();return null;});}
+    }
+    @Test public void viaDialogRestoreAndChoicePreviews()throws Exception{
+        android.app.AlertDialog restore=main(()->new ViaDialogBuilder(activity).setTitle("恢复未关闭标签")
+                .setMessage("是否恢复上次未关闭的标签？").setNegativeButton("取消",null).setPositiveButton("恢复",null).show());
+        try{snapshot("via-restore-dialog");main(()->{
+            assertEquals(ViaUi.ACCENT,restore.getButton(android.app.AlertDialog.BUTTON_POSITIVE).getCurrentTextColor());
+            assertTrue(restore.getWindow().getAttributes().width<=ViaUi.dp(activity,350));return null;
+        });}finally{main(()->{restore.dismiss();return null;});}
+        final int[] picked={-1};
+        android.app.AlertDialog choice=main(()->new ViaDialogBuilder(activity).setTitle("弹出式窗口")
+                .setSingleChoiceItems(new String[]{"允许","阻止"},1,(d,w)->picked[0]=w).show());
+        try{snapshot("via-choice-dialog");main(()->{
+            assertEquals(1,choice.getListView().getCheckedItemPosition());
+            choice.getListView().performItemClick(choice.getListView().getChildAt(0),0,0);assertEquals(0,picked[0]);return null;
+        });}finally{main(()->{choice.dismiss();return null;});}
+        main(()->{prefs.setNightMode(true);return null;});
+        android.app.AlertDialog dark=main(()->new ViaDialogBuilder(activity).setTitle("恢复未关闭标签")
+                .setMessage("是否恢复上次未关闭的标签？").setNegativeButton("取消",null).setPositiveButton("恢复",null).show());
+        try{snapshot("via-restore-dialog-night");main(()->{
+            TextView message=dark.findViewById(android.R.id.message);assertEquals(0xFF999999,message.getCurrentTextColor());return null;
+        });}finally{main(()->{dark.dismiss();return null;});}
     }
     @Test public void portraitScannerGalleryResultReturnsToCurrentTab()throws Exception{
         String expected="https://qr-gallery-fixture.invalid/result";

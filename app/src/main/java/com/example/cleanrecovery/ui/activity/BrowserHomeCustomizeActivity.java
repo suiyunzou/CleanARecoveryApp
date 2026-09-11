@@ -1,5 +1,7 @@
 package com.example.cleanrecovery.ui.activity;
 
+import com.example.cleanrecovery.ui.browser.ViaDialogBuilder;
+
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Color;
@@ -422,12 +424,12 @@ public final class BrowserHomeCustomizeActivity extends Activity {
         box.addView(dialogNavRow("自定义 CSS", null, () -> showEditor("自定义 CSS", prefs.homeCustomCss(), value -> {
             prefs.setHomeCustomCss(value); updatePreview();
         })));
-        box.addView(dialogNavRow("清除图标", null, () -> new android.app.AlertDialog.Builder(this)
+        box.addView(dialogNavRow("清除图标", null, () -> new ViaDialogBuilder(this)
             .setTitle("清除图标").setMessage("清除缓存的站点图标？")
             .setNegativeButton("取消", null).setPositiveButton("确定", (dialog, which) -> {
                 previewWeb.clearCache(true); renderedHtml = null; updatePreview();
             }).show()));
-        box.addView(dialogNavRow("重置", null, () -> new android.app.AlertDialog.Builder(this)
+        box.addView(dialogNavRow("重置", null, () -> new ViaDialogBuilder(this)
             .setTitle("重置").setMessage("恢复默认主页定制？")
             .setNegativeButton("取消", null).setPositiveButton("确定", (dialog, which) -> resetAll()).show()));
 
@@ -645,7 +647,7 @@ public final class BrowserHomeCustomizeActivity extends Activity {
     @Override
     public void onBackPressed() {
         if (editor != null) {
-            new android.app.AlertDialog.Builder(this).setMessage("放弃未保存的修改？")
+            new ViaDialogBuilder(this).setMessage("放弃未保存的修改？")
                 .setNegativeButton("取消", null).setPositiveButton("放弃", (dialog, which) -> {
                     root.removeView(editor); editor = null;
                 }).show(); return;

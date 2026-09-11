@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="ViaDialogLight" parent="android:style/Theme.Material.Light.Dialog.Alert">
+        <item name="android:colorAccent">#6F8DE1</item>
+        <item name="android:colorControlActivated">#6F8DE1</item>
+        <item name="android:textColorPrimary">#212121</item>
+        <item name="android:textColorSecondary">#757575</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowMinWidthMajor">0dp</item>
+        <item name="android:windowMinWidthMinor">0dp</item>
+        <item name="android:listChoiceIndicatorSingle">@drawable/via_dialog_choice</item>
+        <item name="android:listChoiceIndicatorMultiple">@drawable/via_dialog_choice</item>
+        <item name="android:backgroundDimAmount">0.35</item>
+    </style>
+    <style name="ViaDialogDark" parent="android:style/Theme.Material.Dialog.Alert">
+        <item name="android:colorAccent">#6F8DE1</item>
+        <item name="android:colorControlActivated">#6F8DE1</item>
+        <item name="android:textColorPrimary">#CCCCCC</item>
+        <item name="android:textColorSecondary">#999999</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowMinWidthMajor">0dp</item>
+        <item name="android:windowMinWidthMinor">0dp</item>
+        <item name="android:listChoiceIndicatorSingle">@drawable/via_dialog_choice</item>
+        <item name="android:listChoiceIndicatorMultiple">@drawable/via_dialog_choice</item>
+        <item name="android:backgroundDimAmount">0.35</item>
+    </style>
+</resources>

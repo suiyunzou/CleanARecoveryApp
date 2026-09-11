@@ -154,7 +154,7 @@ public final class BrowserToolbarLayout {
         for (int id : new int[]{R.id.browser_nav_back, R.id.browser_nav_forward, R.id.browser_home,
                 R.id.browser_tabs, R.id.browser_menu, R.id.browser_site_info, R.id.browser_reload,
                 R.id.browser_search_toggle, R.id.browser_hide_bar, R.id.browser_edit_scan, R.id.browser_edit_search, R.id.browser_url_go,
-                R.id.browser_app_home, R.id.browser_page_home, R.id.browser_edit_clear}) {
+                R.id.browser_app_home, R.id.browser_edit_clear}) {
             ((android.widget.ImageView) root.findViewById(id)).setColorFilter(foreground);
         }
         ((TextView)root.findViewById(R.id.browser_url_input)).setTextColor(foreground);
