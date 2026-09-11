@@ -63,6 +63,7 @@ public final class ViaUi {
     }
 
     public static void renderSwitch(ImageView v, boolean on) {
+        v.setScaleType(ImageView.ScaleType.CENTER);
         v.setImageResource(on ? R.drawable.bg_via_toggle_on : R.drawable.bg_via_toggle);
     }
 
@@ -138,9 +139,10 @@ public final class ViaUi {
             row.setClickable(true);
             row.setBackgroundResource(R.drawable.bg_via_menu_cell);
             ImageView dot = new ImageView(a);
+            dot.setScaleType(ImageView.ScaleType.CENTER);
             dot.setImageResource(idx == selected
                     ? R.drawable.bg_via_radio_on : R.drawable.bg_via_radio);
-            LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(dp(a, 20), dp(a, 20));
+            LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(dp(a, 18), dp(a, 18));
             dotParams.rightMargin = dp(a, 18);
             row.addView(dot, dotParams);
             TextView label = text(a, options[idx], 16, TEXT, false);
@@ -220,7 +222,7 @@ public final class ViaUi {
             row.setBackgroundResource(R.drawable.bg_via_menu_cell);
             ImageView box = new ImageView(a);
             renderSwitch(box, checked[idx]);
-            LinearLayout.LayoutParams boxParams = new LinearLayout.LayoutParams(dp(a, 20), dp(a, 20));
+            LinearLayout.LayoutParams boxParams = new LinearLayout.LayoutParams(dp(a, 18), dp(a, 18));
             boxParams.rightMargin = dp(a, 18);
             row.addView(box, boxParams);
             row.addView(text(a, options[idx], 16, TEXT, false));
@@ -284,7 +286,7 @@ public final class ViaUi {
             row.setGravity(Gravity.CENTER_VERTICAL);
             row.setPadding(0, dp(activity, 14), 0, dp(activity, 4));
             ImageView box = switchView(activity, false);
-            row.addView(box, new LinearLayout.LayoutParams(dp(activity, 20), dp(activity, 20)));
+            row.addView(box, new LinearLayout.LayoutParams(dp(activity, 18), dp(activity, 18)));
             TextView label = text(activity, checkboxLabel, 15, TEXT_SUB, false);
             label.setPadding(dp(activity, 14), 0, 0, 0);
             row.addView(label);
@@ -450,7 +452,7 @@ public final class ViaUi {
                 checkState[0] = !checkState[0];
                 renderSwitch(box, checkState[0]);
             });
-            row.addView(box, new LinearLayout.LayoutParams(dp(a, 20), dp(a, 20)));
+            row.addView(box, new LinearLayout.LayoutParams(dp(a, 18), dp(a, 18)));
             TextView label = text(a, checkboxLabel, 15, 0xFF666666, false);
             label.setPadding(dp(a, 14), 0, 0, 0);
             row.addView(label);
@@ -517,7 +519,7 @@ public final class ViaUi {
         agreement.setGravity(Gravity.CENTER_VERTICAL);
         agreement.setPadding(0, dp(a, 14), 0, dp(a, 4));
         ImageView check = switchView(a, false);
-        agreement.addView(check, new LinearLayout.LayoutParams(dp(a, 20), dp(a, 20)));
+        agreement.addView(check, new LinearLayout.LayoutParams(dp(a, 18), dp(a, 18)));
         String terms = "使用协议", privacy = "隐私政策";
         String sentence = "请阅读并同意 " + terms + " 与 " + privacy;
         SpannableString legal = new SpannableString(sentence);

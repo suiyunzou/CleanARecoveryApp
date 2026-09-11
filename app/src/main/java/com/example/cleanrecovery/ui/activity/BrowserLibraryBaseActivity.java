@@ -1,5 +1,7 @@
 package com.example.cleanrecovery.ui.activity;
 
+import com.example.cleanrecovery.ui.browser.ViaDialogBuilder;
+
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ClipData;
@@ -79,6 +81,11 @@ abstract class BrowserLibraryBaseActivity extends Activity {
     private String bookmarkFolder = "";
     private int sortBy = SORT_NEWEST;
     private boolean showDetails = false;
+    /** 历史页多选编辑模式（对齐 Via：列表内勾选，底栏 全选/删除/完成）。 */
+    private boolean historyEditMode = false;
+    private final HashSet<Long> historySelected = new HashSet<>();
+    /** 当前渲染出的历史行 id（去重后），用于全选切换。 */
+    private final List<Long> historyRowIds = new ArrayList<>();
     private final SimpleDateFormat dayFmt = new SimpleDateFormat("yyyyMMdd", Locale.getDefault());
     private final Collator collator = Collator.getInstance(Locale.CHINA);
 
@@ -191,7 +198,14 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         tv.setGravity(Gravity.CENTER);
         tv.setTextColor(mode == target ? getColor(R.color.text_primary) : 0xff9e9e9e);
         tv.setTypeface(Typeface.DEFAULT, mode == target ? Typeface.BOLD : Typeface.NORMAL);
-        tv.setOnClickListener(v -> { if (mode != target) { mode = target; bookmarkFolder = ""; render(); } });
+        tv.setOnClickListener(v -> {
+            if (mode != target) {
+                mode = target;
+                bookmarkFolder = "";
+                exitHistoryEditMode();
+                render();
+            }
+        });
         tabBar.addView(tv, new LinearLayout.LayoutParams(dp(target == MODE_OFFLINE ? 92 : 58), -1));
     }
 
@@ -342,7 +356,7 @@ abstract class BrowserLibraryBaseActivity extends Activity {
                 getString(R.string.via_bk_copy_link),
                 getString(R.string.via_bk_share)
         };
-        new AlertDialog.Builder(this)
+        new ViaDialogBuilder(this)
                 .setTitle(TextUtils.isEmpty(e.title) ? e.url : e.title)
                 .setItems(items, (dialog, which) -> {
                     switch (which) {
@@ -370,7 +384,7 @@ abstract class BrowserLibraryBaseActivity extends Activity {
                 getString(R.string.via_add_to_home_fav),
                 getString(R.string.via_bk_delete)
         };
-        new AlertDialog.Builder(this)
+        new ViaDialogBuilder(this)
                 .setTitle(name)
                 .setItems(items, (dialog, which) -> {
                     switch (which) {
@@ -404,7 +418,7 @@ abstract class BrowserLibraryBaseActivity extends Activity {
                                     GlassToast.LENGTH_SHORT).show();
                             break;
                         case 4:
-                            new AlertDialog.Builder(this)
+                            new ViaDialogBuilder(this)
                                     .setTitle(getString(R.string.via_folder_delete_confirm, name))
                                     .setPositiveButton(android.R.string.ok, (d, w) -> {
                                         db.deleteFolderWithBookmarks(name);
@@ -461,6 +475,7 @@ abstract class BrowserLibraryBaseActivity extends Activity {
     // ===== 历史 / 离线页面（维持原有逻辑） =====
 
     private void renderHistory() {
+        historyRowIds.clear();
         List<BrowserDatabaseHelper.Entry> raw = db.listHistory();
         HashSet<String> seen = new HashSet<>();
         String today = dayFmt.format(new Date());
@@ -475,9 +490,29 @@ abstract class BrowserLibraryBaseActivity extends Activity {
             else if (d.equals(yesterday) && !yesterdayTitle) { addSection("昨天"); yesterdayTitle = true; }
             else if (!d.equals(today) && !d.equals(yesterday) && !olderTitle) { addSection("更早"); olderTitle = true; }
             String host = hostText(e.url);
+            // 多选模式（对齐 Via 编辑）：行尾勾选圈，点击切换选中，不打开页面
+            ImageView check = historyEditMode ? new ImageView(this) : null;
+            if (check != null) {
+                check.setScaleType(ImageView.ScaleType.CENTER);
+                check.setImageResource(historySelected.contains(e.id)
+                        ? R.drawable.bg_via_radio_on : R.drawable.bg_via_radio);
+            }
+            View.OnLongClickListener longClick = historyEditMode ? null
+                    : v -> { showEntryMenu(e.title, e.url, () -> { db.removeHistory(e.id); renderList(); }); return true; };
             addEntryRow("◷", 0xff333333,
-                    TextUtils.isEmpty(e.title) ? e.url : e.title, e.url.replaceFirst("^https?://", ""), v -> returnUrl(e.url),
-                    v -> { showEntryMenu(e.title, e.url, () -> { db.removeHistory(e.id); renderList(); }); return true; });
+                    TextUtils.isEmpty(e.title) ? e.url : e.title, e.url.replaceFirst("^https?://", ""),
+                    v -> {
+                        if (historyEditMode) {
+                            if (historySelected.contains(e.id)) historySelected.remove(e.id);
+                            else historySelected.add(e.id);
+                            if (check != null) check.setImageResource(historySelected.contains(e.id)
+                                    ? R.drawable.bg_via_radio_on : R.drawable.bg_via_radio);
+                            renderBottom();
+                        } else {
+                            returnUrl(e.url);
+                        }
+                    }, longClick, check);
+            historyRowIds.add(e.id);
             count++;
         }
         if (count == 0) addEmpty(R.string.via_history_empty);
@@ -512,7 +547,7 @@ abstract class BrowserLibraryBaseActivity extends Activity {
     /** VIA 长按菜单：打开 / 复制链接 / 删除。 */
     private void showEntryMenu(String title, String url, Runnable onDelete) {
         String[] items = {"打开", "复制链接", "删除"};
-        new android.app.AlertDialog.Builder(this)
+        new ViaDialogBuilder(this)
                 .setTitle(title == null || title.isEmpty() ? url : title)
                 .setItems(items, (dialog, which) -> {
                     if (which == 0) {
@@ -527,6 +562,11 @@ abstract class BrowserLibraryBaseActivity extends Activity {
     }
 
     private void addEntryRow(String icon, int iconColor, String titleText, String subText, View.OnClickListener click, View.OnLongClickListener longClick) {
+        addEntryRow(icon, iconColor, titleText, subText, click, longClick, null);
+    }
+
+    private void addEntryRow(String icon, int iconColor, String titleText, String subText,
+                             View.OnClickListener click, View.OnLongClickListener longClick, View trailing) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -567,6 +607,11 @@ abstract class BrowserLibraryBaseActivity extends Activity {
             texts.addView(sub, lp);
         }
         row.addView(texts, new LinearLayout.LayoutParams(0, -2, 1));
+        if (trailing != null) {
+            LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(dp(20), dp(20));
+            tp.setMargins(dp(8), 0, 0, 0);
+            row.addView(trailing, tp);
+        }
         listBox.addView(row, new LinearLayout.LayoutParams(-1, -2));
     }
 
@@ -587,9 +632,30 @@ abstract class BrowserLibraryBaseActivity extends Activity {
             addBottom("更多", v -> showBookmarkMore(), 1);
             addBottom("编辑", v -> GlassToast.makeText(this, "长按条目编辑或删除", GlassToast.LENGTH_SHORT).show(), 0);
         } else if (mode == MODE_HISTORY) {
-            addBottom("标签页", v -> finishWithLibraryAction(ACTION_OPEN_TABS), 1);
-            addBottom("清空", v -> confirmClearHistory(), 0);
-            addBottom("编辑", v -> editHistory(), 0);
+            if (historyEditMode) {
+                // 对齐 Via：编辑模式底栏为 全选/删除（左） + 完成（右），未选中时删除置灰
+                boolean all = !historyRowIds.isEmpty() && historySelected.containsAll(historyRowIds);
+                addBottom(all ? "全不选" : "全选", v -> {
+                    if (all) historySelected.clear();
+                    else historySelected.addAll(historyRowIds);
+                    renderList();
+                    renderBottom();
+                }, 1);
+                TextView del = addBottom("删除", v -> deleteSelectedHistory(), 0);
+                del.setAlpha(historySelected.isEmpty() ? 0.35f : 1f);
+                View spacer = new View(this);
+                bottomBar.addView(spacer, new LinearLayout.LayoutParams(0, 1, 3));
+                addBottom("完成", v -> exitHistoryEditMode(), 0);
+            } else {
+                addBottom("标签页", v -> finishWithLibraryAction(ACTION_OPEN_TABS), 1);
+                addBottom("清空", v -> showClearHistoryRangeDialog(), 0);
+                addBottom("编辑", v -> {
+                    historyEditMode = true;
+                    historySelected.clear();
+                    renderList();
+                    renderBottom();
+                }, 0);
+            }
         } else {
             addBottom("标签页", v -> finishWithLibraryAction(ACTION_OPEN_TABS), 1);
             addBottom("清空", v -> clearMissingOffline(), 0);
@@ -597,26 +663,94 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         }
     }
 
-    private void editHistory() {
-        List<BrowserDatabaseHelper.Entry> entries = new ArrayList<>();
-        for (BrowserDatabaseHelper.Entry entry : db.listHistory()) {
-            if (match(entry.title, entry.url)) entries.add(entry);
+    private void exitHistoryEditMode() {
+        if (!historyEditMode && historySelected.isEmpty()) return;
+        historyEditMode = false;
+        historySelected.clear();
+        renderList();
+        renderBottom();
+    }
+
+    private void deleteSelectedHistory() {
+        if (historySelected.isEmpty()) return;
+        for (Long id : new ArrayList<>(historySelected)) db.removeHistory(id);
+        historySelected.clear();
+        historyEditMode = false;
+        renderList();
+        renderBottom();
+    }
+
+    /** 清空（对齐 Via「清除浏览历史」）：时间范围列表（带条数）→ 二次确认后删除。 */
+    private void showClearHistoryRangeDialog() {
+        long now = System.currentTimeMillis();
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0);
+        cal.set(java.util.Calendar.MINUTE, 0);
+        cal.set(java.util.Calendar.SECOND, 0);
+        cal.set(java.util.Calendar.MILLISECOND, 0);
+        long todayStart = cal.getTimeInMillis();
+        long[] starts = {
+                now - 3600000L,          // 过去一小时
+                todayStart,              // 今天
+                todayStart - 86400000L,  // 今天和昨天
+                now - 7L * 86400000L,    // 过去 7 天
+                0L                       // 所有时间
+        };
+        String[] labels = {
+                getString(R.string.via_history_range_hour),
+                getString(R.string.via_history_range_today),
+                getString(R.string.via_history_range_today_yesterday),
+                getString(R.string.via_history_range_7days),
+                getString(R.string.via_history_range_all)
+        };
+        List<BrowserDatabaseHelper.Entry> all = db.listHistory();
+        // 对齐 Via：条数为 0 或与前一项相同的范围不展示；大范围排在前面
+        List<String> options = new ArrayList<>();
+        List<Long> picked = new ArrayList<>();
+        List<String> pickedLabels = new ArrayList<>();
+        int lastCount = 0;
+        for (int i = starts.length - 1; i >= 0; i--) {
+            int n = 0;
+            for (BrowserDatabaseHelper.Entry e : all) {
+                if (e.time >= starts[i]) n++;
+            }
+            if (n == 0 || n == lastCount) continue;
+            lastCount = n;
+            options.add(labels[i] + " (" + n + ")");
+            picked.add(starts[i]);
+            pickedLabels.add(labels[i]);
         }
-        String[] labels = new String[entries.size()];
-        boolean[] selected = new boolean[entries.size()];
-        for (int i = 0; i < entries.size(); i++) {
-            BrowserDatabaseHelper.Entry entry = entries.get(i);
-            labels[i] = TextUtils.isEmpty(entry.title) ? entry.url : entry.title;
-        }
-        new AlertDialog.Builder(this).setTitle("编辑历史记录")
-                .setMultiChoiceItems(labels, selected, (dialog, which, checked) -> selected[which] = checked)
+        android.app.AlertDialog dialog = new ViaDialogBuilder(this)
+                .setTitle(R.string.via_history_clear_browsing)
+                .setItems(options.toArray(new String[0]), (d, which) ->
+                        confirmClearHistoryRange(picked.get(which), pickedLabels.get(which)))
                 .setNegativeButton(android.R.string.cancel, null)
-                .setPositiveButton("删除", (dialog, which) -> {
-                    for (int i = 0; i < selected.length; i++) {
-                        if (selected[i]) db.removeHistory(entries.get(i).id);
-                    }
+                .create();
+        // 对齐 Via：弹窗锚定在底栏「清空」按钮上方，而非屏幕居中
+        dialog.show();
+        android.view.Window w = dialog.getWindow();
+        if (w != null) {
+            w.setGravity(Gravity.BOTTOM | Gravity.END);
+            android.view.WindowManager.LayoutParams lp = w.getAttributes();
+            lp.y = dp(56);
+            lp.x = dp(12);
+            lp.width = Math.min(dp(290),
+                    getResources().getDisplayMetrics().widthPixels - dp(24));
+            w.setAttributes(lp);
+        }
+    }
+
+    private void confirmClearHistoryRange(long sinceMs, String label) {
+        new ViaDialogBuilder(this)
+                .setTitle(R.string.via_history_clear_browsing)
+                .setMessage(getString(R.string.via_history_clear_confirm, label))
+                .setPositiveButton(android.R.string.ok, (d, w) -> {
+                    db.clearHistorySince(sinceMs);
+                    exitHistoryEditMode();
                     renderList();
-                }).show();
+                })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
     }
 
     /** 更多菜单（基准 _via_bkmore：添加书签/新建文件夹/排序方式/显示细节/导入书签/备份书签）。 */
@@ -629,7 +763,7 @@ abstract class BrowserLibraryBaseActivity extends Activity {
                 ? R.string.via_hide_details : R.string.via_show_details));
         items.add(getString(R.string.via_import_bookmarks));
         items.add(getString(R.string.via_backup_bookmarks));
-        new AlertDialog.Builder(this)
+        new ViaDialogBuilder(this)
                 .setItems(items.toArray(new String[0]), (dialog, which) -> {
                     switch (which) {
                         case 0: addBookmarkDialog(); break;
@@ -682,7 +816,7 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         folders.add("根目录");
         folders.addAll(db.listFolders());
         String[] options = folders.toArray(new String[0]);
-        new AlertDialog.Builder(this)
+        new ViaDialogBuilder(this)
                 .setTitle(R.string.via_pick_folder)
                 .setItems(options, (dialog, which) -> target.setText(options[which]))
                 .setNeutralButton(R.string.via_new_folder_dots, (d, w) ->
@@ -727,22 +861,51 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         startActivityForResult(it, REQ_IMPORT);
     }
 
+    /**
+     * 导入书签：解析 Netscape HTML，保留 <H3>/<DL> 文件夹层级。
+     * 文件夹落在层级名内（与 Via 一致）；重复文件夹自动合并到同名目录。
+     */
     private void handleImportResult(Intent data) {
         try {
             String html = readTextStream(getContentResolver().openInputStream(data.getData()));
             if (html == null) return;
             java.util.regex.Matcher m = java.util.regex.Pattern
-                    .compile("<a[^>]*href=\"([^\"]+)\"[^>]*>(.*?)</a>",
+                    .compile("<h3\\b[^>]*>(.*?)</h3>|<a\\b[^>]*?href=(?:\"([^\"]*)\"|'([^']*)')[^>]*>(.*?)</a>|<dl[^>]*>|</dl",
                             java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.DOTALL)
                     .matcher(html);
+            // ArrayDeque 不允许 null，用 "" 表示无标题层级（如顶层 <DL>）
+            java.util.ArrayDeque<String> folders = new java.util.ArrayDeque<>();
+            String pendingFolder = null;
             int count = 0;
             while (m.find()) {
-                String url = m.group(1).trim();
-                String title = m.group(2).replaceAll("<[^>]+>", "").trim();
-                if (url.isEmpty()) continue;
-                db.addBookmark(title.isEmpty() ? url : title, url,
-                        bookmarkFolder.isEmpty() ? "根目录" : bookmarkFolder);
-                count++;
+                String h3 = m.group(1);
+                if (h3 != null) {
+                    pendingFolder = stripTags(h3);
+                    continue;
+                }
+                String tag = m.group(0).toLowerCase(Locale.ROOT);
+                if (tag.startsWith("<dl")) {
+                    String folder = pendingFolder;
+                    pendingFolder = null;
+                    if (folder != null && !folder.isEmpty()) {
+                        db.addFolder(folder);
+                        folders.push(folder);
+                    } else {
+                        folders.push("");
+                    }
+                } else if (tag.startsWith("</dl")) {
+                    if (!folders.isEmpty()) folders.pop();
+                } else {
+                    String url = m.group(2) != null ? m.group(2) : m.group(3);
+                    String title = stripTags(m.group(4) == null ? "" : m.group(4));
+                    if (url == null || url.trim().isEmpty()) continue;
+                    String folder = "根目录";
+                    for (String f : folders) {
+                        if (f != null && !f.isEmpty()) { folder = f; break; }
+                    }
+                    db.addBookmark(title.isEmpty() ? url.trim() : title, url.trim(), folder);
+                    count++;
+                }
             }
             renderList();
             GlassToast.makeText(this, getString(R.string.via_bk_import_done, count),
@@ -752,6 +915,13 @@ abstract class BrowserLibraryBaseActivity extends Activity {
                     e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName()),
                     GlassToast.LENGTH_SHORT).show();
         }
+    }
+
+    /** 反转义 HTML 实体并去掉内嵌标签。 */
+    private String stripTags(String html) {
+        String text = html.replaceAll("<[^>]+>", "").trim();
+        return text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+                .replace("&quot;", "\"").replace("&#39;", "'").replace("&apos;", "'");
     }
 
     private String readTextStream(java.io.InputStream in) throws Exception {
@@ -833,7 +1003,7 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         }
     }
 
-    private void addBottom(String text, View.OnClickListener click, float weight) {
+    private TextView addBottom(String text, View.OnClickListener click, float weight) {
         TextView tv = new TextView(this);
         tv.setText(text);
         tv.setTextSize(14);
@@ -841,12 +1011,7 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         tv.setTextColor(getColor(R.color.text_secondary));
         tv.setOnClickListener(click);
         bottomBar.addView(tv, new LinearLayout.LayoutParams(weight > 0 ? 0 : dp(64), -1, weight));
-    }
-
-    private void confirmClearHistory() {
-        new AlertDialog.Builder(this).setTitle(R.string.via_history_clear)
-                .setPositiveButton(android.R.string.ok, (d, w) -> { db.clearHistory(); renderList(); })
-                .setNegativeButton(android.R.string.cancel, null).show();
+        return tv;
     }
 
     private void clearMissingOffline() {

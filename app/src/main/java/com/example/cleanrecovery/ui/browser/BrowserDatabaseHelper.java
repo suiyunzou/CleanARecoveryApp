@@ -415,6 +415,15 @@ public final class BrowserDatabaseHelper extends SQLiteOpenHelper {
         getWritableDatabase().delete(TABLE_HISTORY, null, null);
     }
 
+    /** 清除指定时间点起的浏览历史（对齐 Via「清除浏览历史」时间范围；sinceMs<=0 = 全部）。 */
+    public int clearHistorySince(long sinceMs) {
+        if (sinceMs <= 0) {
+            return getWritableDatabase().delete(TABLE_HISTORY, null, null);
+        }
+        return getWritableDatabase().delete(TABLE_HISTORY, "visit_time >= ?",
+                new String[]{String.valueOf(sinceMs)});
+    }
+
     public List<Entry> listHistory() {
         List<Entry> out = new ArrayList<>();
         Cursor c = getReadableDatabase().query(TABLE_HISTORY, null, null, null,

@@ -1,5 +1,7 @@
 package com.example.cleanrecovery.ui.activity;
 
+import com.example.cleanrecovery.ui.browser.ViaDialogBuilder;
+
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -172,6 +174,8 @@ public final class BrowserActivity extends Activity {
     private FrameLayout tabsButtonContainer;
     private EditText urlInput;
     private AddressSuggestPopup suggestPopup;
+    private Snackbar popupPrompt;
+    private Runnable cancelPopupRequest;
     private EditText homeSearch;
     private LinearLayout homeSearchEngineRow;
     private LinearLayout bottomSearchEngineRow;
@@ -319,7 +323,6 @@ public final class BrowserActivity extends Activity {
         siteInfoIcon.setOnClickListener(v -> onReaderIconClick());
         urlGoButton.setOnClickListener(v -> loadUrlFromInput());
         findViewById(R.id.browser_app_home).setOnClickListener(v -> returnToAppHome());
-        findViewById(R.id.browser_page_home).setOnClickListener(v -> returnToAppHome());
         findViewById(R.id.browser_edit_clear).setOnClickListener(v -> { urlInput.setText(""); urlInput.requestFocus(); });
         homeBarTitle.setOnClickListener(v -> focusAddressBar());
         hideBarIcon.setOnClickListener(v -> launchQrScanner());
@@ -497,7 +500,7 @@ public final class BrowserActivity extends Activity {
                 newTab("");
                 if (prefs.restoreTabs() == 2 && !session.isEmpty()) {
                     restorePromptPending = true;
-                    new android.app.AlertDialog.Builder(this)
+                    new ViaDialogBuilder(this)
                             .setTitle("恢复未关闭标签")
                             .setMessage("是否恢复上次未关闭的标签？")
                             .setNegativeButton("取消", (dialog, which) -> {
@@ -507,7 +510,15 @@ public final class BrowserActivity extends Activity {
                             .setOnCancelListener(dialog -> restorePromptPending = false)
                             .setPositiveButton("恢复", (dialog, which) -> {
                                 restorePromptPending = false;
-                                if (restoreSession(session)) closeAndDestroyTab(0);
+                                if (restoreSession(session)) {
+                                    closeAndDestroyTab(0);
+                                    // 关闭占位主页标签后强制刷新，避免显示内容与当前标签错位、角标计数滞后
+                                    if (tabs.current() != null) showTab(tabs.current());
+                                    updateTabBadge();
+                                } else {
+                                    // 会话内容已不可用（如均为内部页），与取消一致清理，避免下次再弹无效询问
+                                    prefs.setSessionTabs("");
+                                }
                             }).show();
                 }
             }
@@ -635,6 +646,7 @@ public final class BrowserActivity extends Activity {
     }
 
     private void showHome() {
+        dismissPopupPrompt();
         endSearchInput();
         if ((prefs.homeMode() == 1 || prefs.homeMode() == 3)
                 && !com.example.cleanrecovery.ui.browser.BrowserInternalUrls.isHome(prefs.homeUrl())) {
@@ -784,7 +796,7 @@ public final class BrowserActivity extends Activity {
                 boolean bookmarks = prefs.homeMode() == 2;
                 java.util.List<BrowserDatabaseHelper.Entry> entries = bookmarks ? dbHelper.listBookmarks() : dbHelper.listQuickLinks();
                 for (BrowserDatabaseHelper.Entry entry : entries) if (url.equals(entry.url)) {
-                    new AlertDialog.Builder(this).setTitle(R.string.via_home_remove).setMessage(entry.title + "\n" + entry.url)
+                    new ViaDialogBuilder(this).setTitle(R.string.via_home_remove).setMessage(entry.title + "\n" + entry.url)
                         .setPositiveButton(android.R.string.ok, (d, w) -> {
                             if (bookmarks) dbHelper.removeBookmark(entry.id); else dbHelper.removeQuickLink(entry.id);
                             renderHomeGrid();
@@ -993,7 +1005,7 @@ public final class BrowserActivity extends Activity {
 
         item.setOnClickListener(v -> loadUrlInCurrent(e.url));
         item.setOnLongClickListener(v -> {
-            new AlertDialog.Builder(this)
+            new ViaDialogBuilder(this)
                     .setTitle(R.string.via_home_remove)
                     .setMessage(e.title + "\n" + e.url)
                     .setPositiveButton(android.R.string.ok, (d, w) -> {
@@ -1021,7 +1033,7 @@ public final class BrowserActivity extends Activity {
         box.setPadding(48, 24, 48, 0);
         box.addView(titleInput);
         box.addView(urlInput2);
-        new AlertDialog.Builder(this)
+        new ViaDialogBuilder(this)
                 .setTitle(R.string.via_home_add)
                 .setView(box)
                 .setPositiveButton(android.R.string.ok, (d, w) -> {
@@ -1177,7 +1189,7 @@ public final class BrowserActivity extends Activity {
                     GlassToast.LENGTH_SHORT).show();
             return;
         }
-        new AlertDialog.Builder(this)
+        new ViaDialogBuilder(this)
                 .setTitle(backwards
                         ? R.string.via_back_history : R.string.via_forward_history)
                 .setItems(labels.toArray(new String[0]), (dialog, which) ->
@@ -1548,7 +1560,7 @@ public final class BrowserActivity extends Activity {
         }
         ScrollView scroll = new ScrollView(this);
         scroll.addView(box);
-        return new AlertDialog.Builder(sitePanelContext())
+        return new ViaDialogBuilder(sitePanelContext())
                 .setTitle("证书信息")
                 .setView(scroll)
                 .setPositiveButton(android.R.string.ok, null)
@@ -1614,7 +1626,7 @@ public final class BrowserActivity extends Activity {
         view.setPadding(dp(20), dp(12), dp(20), dp(12));
         ScrollView scroll = new ScrollView(this);
         scroll.addView(view);
-        AlertDialog.Builder builder = new AlertDialog.Builder(sitePanelContext())
+        AlertDialog.Builder builder = new ViaDialogBuilder(sitePanelContext())
                 .setTitle(hostFromUrl(url) + " 的 Cookies").setView(scroll);
         if (TextUtils.isEmpty(rawCookies)) builder.setPositiveButton(android.R.string.ok, null);
         else builder.setPositiveButton(android.R.string.copy, (d, w) -> {
@@ -1969,7 +1981,7 @@ public final class BrowserActivity extends Activity {
         input.setGravity(Gravity.TOP);
         input.setInputType(android.text.InputType.TYPE_CLASS_TEXT
                 | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
-        new AlertDialog.Builder(this)
+        new ViaDialogBuilder(this)
                 .setTitle(R.string.via_menu_scripts)
                 .setMessage(R.string.via_script_warning)
                 .setView(input)
@@ -2187,7 +2199,7 @@ public final class BrowserActivity extends Activity {
         String path = uri.getPath();
         if (!("https".equals(uri.getScheme()) || "http".equals(uri.getScheme()))
                 || path == null || !path.toLowerCase(java.util.Locale.ROOT).endsWith(".user.js")) return false;
-        AlertDialog loading = new AlertDialog.Builder(sitePanelContext()).setTitle("下载脚本")
+        AlertDialog loading = new ViaDialogBuilder(sitePanelContext()).setTitle("下载脚本")
                 .setMessage("正在读取脚本…").setNegativeButton(android.R.string.cancel, null).create();
         loading.show();
         new Thread(() -> {
@@ -2208,7 +2220,7 @@ public final class BrowserActivity extends Activity {
                 runOnUiThread(() -> {
                     if (!loading.isShowing() || isFinishing() || isDestroyed()) return;
                     loading.dismiss();
-                    new AlertDialog.Builder(sitePanelContext()).setTitle("下载脚本失败")
+                    new ViaDialogBuilder(sitePanelContext()).setTitle("下载脚本失败")
                             .setMessage(error.getMessage()).setNegativeButton(android.R.string.cancel, null)
                             .setPositiveButton("重试", (dialog, which) -> offerUserScript(url)).show();
                 });
@@ -2339,7 +2351,7 @@ public final class BrowserActivity extends Activity {
                 if (!prefs.passwordSaveHint() || store.ignoredHosts().contains(host)) return;
                 BrowserPasswordStore.Entry old = store.find(actual);
                 if (old != null && old.username.equals(username) && old.password.equals(password)) return;
-                new AlertDialog.Builder(BrowserActivity.this)
+                new ViaDialogBuilder(BrowserActivity.this)
                         .setTitle("保存密码？")
                         .setMessage(TextUtils.isEmpty(username) ? actual : username + "\n" + actual)
                         .setNeutralButton("永不", (dialog, which) -> store.ignore(host))
@@ -2430,7 +2442,7 @@ public final class BrowserActivity extends Activity {
         view.setPadding(32, 24, 32, 24);
         ScrollView scroll = new ScrollView(this);
         scroll.addView(view);
-        new AlertDialog.Builder(this)
+        new ViaDialogBuilder(this)
                 .setTitle(R.string.via_menu_network_log)
                 .setView(scroll)
                 .setPositiveButton(android.R.string.ok, null)
@@ -2481,7 +2493,7 @@ public final class BrowserActivity extends Activity {
                 || current.canGoBack() || current.canGoForward());
         boolean hasClosedTabs = hasRestorableClosedTab && !TextUtils.isEmpty(prefs.closedTabs()) && !"[]".equals(prefs.closedTabs());
         if (tabs.size() > 1 || hasPage || hasClosedTabs) {
-            new AlertDialog.Builder(sitePanelContext())
+            new ViaDialogBuilder(sitePanelContext())
                     .setTitle(R.string.via_incognito_close_title)
                     .setMessage(R.string.via_incognito_close_message)
                     .setNegativeButton(R.string.via_incognito_keep, (dialog, which) -> applyIncognitoMode(false))
@@ -2804,7 +2816,7 @@ public final class BrowserActivity extends Activity {
                 }
             });
             add.accept(R.string.via_menu_download, () -> confirmResourceDownload(log, url));
-            add.accept(R.string.via_sniffer_clear, () -> new AlertDialog.Builder(this)
+            add.accept(R.string.via_sniffer_clear, () -> new ViaDialogBuilder(this)
                     .setMessage(R.string.via_sniffer_clear_confirm)
                     .setNegativeButton(R.string.via_cancel, null)
                     .setPositiveButton(R.string.via_sniffer_clear, (dialog, which) -> {
@@ -2975,7 +2987,7 @@ public final class BrowserActivity extends Activity {
                 getString(R.string.via_site_custom_ua)
         };
         String[] values = {"", desktopUserAgent(), mobileUserAgent(), null};
-        new AlertDialog.Builder(this)
+        new ViaDialogBuilder(this)
                 .setTitle(R.string.via_menu_useragent)
                 .setItems(names, (dialog, which) -> {
                     if (which == values.length - 1) {
@@ -2994,7 +3006,7 @@ public final class BrowserActivity extends Activity {
         EditText input = new EditText(this);
         input.setSingleLine(false);
         input.setText(prefs.siteUserAgent(host));
-        new AlertDialog.Builder(this)
+        new ViaDialogBuilder(this)
                 .setTitle(R.string.via_site_custom_ua)
                 .setView(input)
                 .setPositiveButton(android.R.string.ok, (dialog, which) -> {
@@ -3058,7 +3070,7 @@ public final class BrowserActivity extends Activity {
                 "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
                 ""
         };
-        new AlertDialog.Builder(this)
+        new ViaDialogBuilder(this)
                 .setTitle(R.string.via_menu_useragent)
                 .setItems(names, (dialog, which) -> {
                     if (which == values.length - 1) {
@@ -3074,7 +3086,7 @@ public final class BrowserActivity extends Activity {
     private void showCustomUserAgentDialog() {
         EditText input = new EditText(this);
         input.setText(prefs.customUserAgent());
-        new AlertDialog.Builder(this)
+        new ViaDialogBuilder(this)
                 .setTitle(R.string.via_menu_useragent)
                 .setView(input)
                 .setPositiveButton(android.R.string.ok, (dialog, which) -> {
@@ -3183,7 +3195,7 @@ public final class BrowserActivity extends Activity {
         add.setContentDescription("新主题");
         add.setOnClickListener(v -> {
             if (!selected.isEmpty()) {
-                new AlertDialog.Builder(this).setTitle("确认删除").setMessage("删除选中的 " + selected.size() + " 个主题？")
+                new ViaDialogBuilder(this).setTitle("确认删除").setMessage("删除选中的 " + selected.size() + " 个主题？")
                         .setNegativeButton(R.string.via_cancel, null)
                         .setPositiveButton("删除", (confirm, button) -> {
                             for (String id : selected) prefs.aiStore().delete(id);
@@ -3412,7 +3424,7 @@ public final class BrowserActivity extends Activity {
                 if (!"system".equals(message.role)) { hasMessages = true; break; }
             }
             if (!hasMessages) { selectAiModel(); return; }
-            new AlertDialog.Builder(this)
+            new ViaDialogBuilder(this)
                 .setItems(new String[]{prefs.aiModel().isEmpty() ? "选择模型" : prefs.aiModel(), "导出聊天", "清空消息"}, (dialog, which) -> {
                     if (which == 0) selectAiModel();
                     else if (which == 1) {
@@ -3421,7 +3433,7 @@ public final class BrowserActivity extends Activity {
                                 .setType("text/plain").putExtra(Intent.EXTRA_TITLE,
                                         title.getText().toString().replaceAll("[\\\\/:*?\"<>|]", "_") + ".txt"), REQ_AI_EXPORT);
                     }
-                    else new AlertDialog.Builder(this).setTitle("确认清空")
+                    else new ViaDialogBuilder(this).setTitle("确认清空")
                             .setNegativeButton(R.string.via_cancel, null).setPositiveButton("清空", (confirm, button) -> {
                                 if (active[0] != null) { active[0].cancel(); finish[0].run(); }
                                 store.clear(topicId[0]); render[0].run();
@@ -3461,7 +3473,7 @@ public final class BrowserActivity extends Activity {
             startActivityForResult(new Intent(this, BrowserSettingsActivity.class)
                     .putExtra(BrowserSettingsActivity.EXTRA_OPEN_AI, true), REQ_SETTINGS);
         } else if (models.size() > 1) {
-            new AlertDialog.Builder(this).setTitle("选择模型")
+            new ViaDialogBuilder(this).setTitle("选择模型")
                     .setSingleChoiceItems(models.toArray(new String[0]), models.indexOf(prefs.aiModel()), (dialog, index) -> {
                         prefs.setAiModel(models.get(index)); dialog.dismiss();
                     }).show();
@@ -3501,7 +3513,7 @@ public final class BrowserActivity extends Activity {
                     clipboard.setPrimaryClip(ClipData.newPlainText("消息", aiMessageText(message.content, message.reasoning)));
                 }
                 else if (item.getItemId() == 2) showAiMessagePreview(message, markdown);
-                else if (item.getItemId() == 3) new AlertDialog.Builder(BrowserActivity.this).setTitle("删除")
+                else if (item.getItemId() == 3) new ViaDialogBuilder(BrowserActivity.this).setTitle("删除")
                         .setMessage("确认删除这条消息？").setNegativeButton(R.string.via_cancel, null)
                         .setPositiveButton(android.R.string.ok, (dialog, which) -> {
                             prefs.aiStore().deleteMessage(topicId, message.id); refresh.run();
@@ -3583,7 +3595,7 @@ public final class BrowserActivity extends Activity {
                 getString(R.string.via_share_copy_link),
                 getString(R.string.via_settings_system_share)
         };
-        new AlertDialog.Builder(this)
+        new ViaDialogBuilder(this)
                 .setTitle(R.string.via_menu_share)
                 .setItems(items, (dialog, which) -> {
                     if (which == 2) {
@@ -3719,7 +3731,7 @@ public final class BrowserActivity extends Activity {
                     int pad = getResources().getDimensionPixelSize(R.dimen.space_md);
                     sc.setPadding(pad, pad, pad, pad);
                     sc.addView(tv);
-                    new AlertDialog.Builder(this)
+                    new ViaDialogBuilder(this)
                             .setTitle(R.string.via_view_source_title)
                             .setView(sc)
                             .setPositiveButton(android.R.string.ok, null)
@@ -3805,7 +3817,7 @@ public final class BrowserActivity extends Activity {
         String[] options = new String[folders.size() + 1];
         for (int i = 0; i < folders.size(); i++) options[i] = folders.get(i);
         options[folders.size()] = "新建文件夹…";
-        new android.app.AlertDialog.Builder(this)
+        new ViaDialogBuilder(this)
                 .setTitle("选择目录")
                 .setItems(options, (dialog, which) -> {
                     if (which == folders.size()) {
@@ -4346,7 +4358,7 @@ public final class BrowserActivity extends Activity {
             ImageView icon = new ImageView(this);
             icon.setImageResource(R.drawable.ic_via_globe);
             icon.setColorFilter(0xff3c3c3c);
-            row.addView(icon, new LinearLayout.LayoutParams(dp(30), dp(30)));
+            row.addView(icon, new LinearLayout.LayoutParams(dp(20), dp(20)));
 
             TextView title = new TextView(this);
             String show = t.title != null && !t.title.trim().isEmpty()
@@ -4700,7 +4712,7 @@ public final class BrowserActivity extends Activity {
         if (flags.contains("page_info")) { labels.add("页面信息"); actions.add("page_info"); }
         if (flags.contains("mark_ad")) { labels.add("标记广告"); actions.add("mark_ad"); }
         if (actions.isEmpty()) return;
-        new AlertDialog.Builder(this)
+        new ViaDialogBuilder(this)
                 .setItems(labels.toArray(new String[0]), (d, w) ->
                         runLongPressAction(actions.get(w), linkUrl, imageUrl, linkText))
                 .show();
@@ -5040,6 +5052,7 @@ public final class BrowserActivity extends Activity {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 if (tab.webView != view) return;
+                if (tabs.current() == tab) dismissPopupPrompt();
                 state.documentGeneration++;
                 state.readerStatus = 0;
                 if (tabs.current() == tab && tab.webView == view) updateReaderIcon();
@@ -5278,11 +5291,11 @@ public final class BrowserActivity extends Activity {
             @Override
             public boolean onCreateWindow(WebView view, boolean isDialog,
                                           boolean isUserGesture, Message resultMsg) {
-                if (resultMsg == null || resultMsg.obj == null) return false;
-                if (!isUserGesture && !prefs.popupsEnabled()) {
-                    Snackbar.make(webContainer, R.string.via_popup_blocked, Snackbar.LENGTH_LONG)
-                            .setAction(R.string.via_allow_once, v -> openPopupTab(resultMsg))
-                            .show();
+                if (resultMsg == null || !(resultMsg.obj instanceof WebView.WebViewTransport)) return false;
+                if (isFinishing() || isDestroyed() || tabs.current() != tab || tab.webView != view) return false;
+                // 点击手势也可能来自广告覆盖层，不能绕过用户的弹窗阻止设置。
+                if (!prefs.popupsEnabled()) {
+                    showPopupConfirm(view, resultMsg);
                     return true;
                 }
                 openPopupTab(resultMsg);
@@ -5570,6 +5583,48 @@ public final class BrowserActivity extends Activity {
         }
     }
 
+    private void dismissPopupPrompt() {
+        if (cancelPopupRequest != null) cancelPopupRequest.run();
+        cancelPopupRequest = null;
+        if (popupPrompt != null) popupPrompt.dismiss();
+        popupPrompt = null;
+    }
+
+    private void showPopupConfirm(WebView source, Message resultMsg) {
+        dismissPopupPrompt();
+        TabManager.Tab owner = tabs.current();
+        TabState sourceState = getState(owner);
+        int generation = sourceState.documentGeneration;
+        java.util.concurrent.atomic.AtomicBoolean resolved = new java.util.concurrent.atomic.AtomicBoolean();
+        Runnable cancel = () -> {
+            if (resolved.compareAndSet(false, true)) {
+                ((WebView.WebViewTransport) resultMsg.obj).setWebView(null);
+                resultMsg.sendToTarget();
+            }
+        };
+        cancelPopupRequest = cancel;
+        Snackbar prompt = Snackbar.make(webContainer, R.string.via_popup_blocked, Snackbar.LENGTH_LONG);
+        popupPrompt = prompt;
+        prompt.setAction(R.string.via_allow_once, v -> {
+            if (isFinishing() || isDestroyed() || tabs.current() != owner
+                    || owner.webView != source || sourceState.documentGeneration != generation) {
+                cancel.run();
+                return;
+            }
+            if (resolved.compareAndSet(false, true)) openPopupTab(resultMsg);
+        });
+        prompt.addCallback(new Snackbar.Callback() {
+            @Override public void onDismissed(Snackbar bar, int event) {
+                cancel.run();
+                if (popupPrompt == bar) {
+                    popupPrompt = null;
+                    cancelPopupRequest = null;
+                }
+            }
+        });
+        prompt.show();
+    }
+
     /** 弹窗（target=_blank / window.open）→ 新建应用内标签承接，后续导航过同一套拦截链。 */
     private void openPopupTab(Message resultMsg) {
         TabManager.Tab tab = newTab(null);
@@ -5596,6 +5651,7 @@ public final class BrowserActivity extends Activity {
 
     /** 切换显示的标签 WebView。 */
     private void showTab(TabManager.Tab tab) {
+        dismissPopupPrompt();
         if (com.example.cleanrecovery.ui.browser.BrowserInternalUrls.isHome(tab.url)) tab.url = "";
         View displayed = webContainer.getChildCount() == 0 ? null : webContainer.getChildAt(0);
         if (displayed instanceof WebView && displayed != tab.webView) {
@@ -6294,6 +6350,7 @@ public final class BrowserActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        dismissPopupPrompt();
         if (aiChatDialog != null) aiChatDialog.dismiss();
         super.onDestroy();
         if (permissions != null) permissions.destroy();

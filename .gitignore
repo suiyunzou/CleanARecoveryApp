@@ -41,6 +41,8 @@
 **/docs/
 **/CLAUDE.md
 **/AGENTS.md
+# Share repository-wide agent instructions across clones and sessions.
+!/AGENTS.md
 *.apk
 *.aab
 *.log

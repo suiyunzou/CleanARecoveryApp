@@ -1,5 +1,7 @@
 package com.example.cleanrecovery.ui.activity;
 
+import com.example.cleanrecovery.ui.browser.ViaDialogBuilder;
+
 import android.app.AlertDialog;
 
 import android.app.Activity;
@@ -278,7 +280,7 @@ public final class BrowserSettingsActivity extends Activity {
         if (current == Page.SCRIPT_EDIT && savingScript) return;
         if (current == Page.SCRIPT_EDIT && !discardScriptChanges && scriptSource != null
                 && !scriptSource.getText().toString().equals(scriptOriginalSource)) {
-            new AlertDialog.Builder(scriptDialogContext()).setTitle("提示")
+            new ViaDialogBuilder(scriptDialogContext()).setTitle("提示")
                     .setMessage("修改的内容未保存，是否保存？")
                     .setPositiveButton("保存", (dialog, which) -> saveScriptSource(false))
                     .setNegativeButton("放弃修改", (dialog, which) -> {
@@ -287,7 +289,7 @@ public final class BrowserSettingsActivity extends Activity {
             return;
         }
         if (current == Page.AI_PROVIDER_EDIT && !discardAiProviderChanges && aiProviderChanged()) {
-            new AlertDialog.Builder(this).setTitle("提示").setMessage("修改的内容未保存，是否保存？")
+            new ViaDialogBuilder(this).setTitle("提示").setMessage("修改的内容未保存，是否保存？")
                     .setPositiveButton("保存", (dialog, which) -> saveAiProviderDraft())
                     .setNegativeButton(R.string.via_cancel, (dialog, which) -> {
                         discardAiProviderChanges = true; onBackPressed(); discardAiProviderChanges = false;
@@ -295,7 +297,7 @@ public final class BrowserSettingsActivity extends Activity {
             return;
         }
         if (current == Page.AI_PROMPT_EDIT && !discardAiPromptChanges && aiPromptChanged()) {
-            new AlertDialog.Builder(this).setTitle("提示").setMessage("修改的内容未保存，是否保存？")
+            new ViaDialogBuilder(this).setTitle("提示").setMessage("修改的内容未保存，是否保存？")
                     .setPositiveButton("保存", (dialog, which) -> saveAiPrompt())
                     .setNegativeButton(R.string.via_cancel, (dialog, which) -> {
                         discardAiPromptChanges = true; onBackPressed(); discardAiPromptChanges = false;
@@ -827,7 +829,7 @@ public final class BrowserSettingsActivity extends Activity {
         row.setBackgroundResource(R.drawable.bg_via_menu_cell);
         ImageView dot = new ImageView(this);
         dot.setImageResource(selected ? R.drawable.bg_via_radio_on : R.drawable.bg_via_radio);
-        row.addView(dot, new LinearLayout.LayoutParams(dp(20), dp(20)));
+        row.addView(dot, new LinearLayout.LayoutParams(dp(18), dp(18)));
         TextView t = new TextView(this);
         t.setText(label);
         t.setTextSize(16);
@@ -1036,7 +1038,7 @@ public final class BrowserSettingsActivity extends Activity {
                                 android.content.ClipData.newPlainText("规则订阅", s.url));
                         GlassToast.makeText(this, "链接已复制到剪贴板", GlassToast.LENGTH_SHORT).show();
                     } else {
-                        new android.app.AlertDialog.Builder(this)
+                        new ViaDialogBuilder(this)
                                 .setTitle("删除")
                                 .setMessage("确定删除 “" + (s.title == null ? s.url : s.title) + "” 吗？")
                                 .setNegativeButton("取消", null)
@@ -1281,7 +1283,7 @@ public final class BrowserSettingsActivity extends Activity {
         String key = permissionKey;
         String[] modes = {"allow", "block", "ask"};
         int[] selected = {Arrays.asList(modes).indexOf(prefs.permission(key, host))};
-        return new AlertDialog.Builder(this).setTitle(host)
+        return new ViaDialogBuilder(this).setTitle(host)
                 .setSingleChoiceItems(new String[]{"允许", "禁止", "优先询问"}, selected[0], (dialog, which) -> selected[0] = which)
                 .setNegativeButton("删除", (dialog, which) -> {
                     prefs.setPermissionException(key, host, null); render(Page.PERMISSION);
@@ -1325,7 +1327,7 @@ public final class BrowserSettingsActivity extends Activity {
     private void renderIgnoredPasswordSites() {
         titleView.setText("不保存密码的网站");
         for (String host : new BrowserPasswordStore(this).ignoredHosts()) {
-            addRow(navRow(host, null, () -> new android.app.AlertDialog.Builder(this)
+            addRow(navRow(host, null, () -> new ViaDialogBuilder(this)
                     .setMessage("要从列表中移除这个网站吗？")
                     .setNegativeButton("取消", null)
                     .setPositiveButton("移除", (d, w) -> {
@@ -1821,7 +1823,7 @@ public final class BrowserSettingsActivity extends Activity {
                         || current != Page.AI_PROVIDER_EDIT || aiProviderDraft != draft) return;
                 aiProviderValidationRequest = null;
                 if (aiProviderValidationDialog != null) aiProviderValidationDialog.dismiss();
-                aiProviderValidationDialog = new AlertDialog.Builder(this).setTitle(error == null ? "验证" : "验证失败")
+                aiProviderValidationDialog = new ViaDialogBuilder(this).setTitle(error == null ? "验证" : "验证失败")
                         .setMessage(error == null ? "验证成功" : error).setPositiveButton(android.R.string.ok, null).show();
             });
         }, "ai-validate").start();
@@ -2270,7 +2272,7 @@ public final class BrowserSettingsActivity extends Activity {
         addScriptRuleRows(name, true);
         addRow(section("高级"));
         addRow(navRow("编辑源代码", null, () -> open(Page.SCRIPT_EDIT)));
-        addRow(navRow("重置", null, () -> new AlertDialog.Builder(scriptDialogContext())
+        addRow(navRow("重置", null, () -> new ViaDialogBuilder(scriptDialogContext())
                 .setMessage("恢复脚本默认配置？")
                 .setNegativeButton(android.R.string.cancel, null)
                 .setPositiveButton("重置", (dialog, which) -> { prefs.resetScriptOverrides(name); render(Page.SCRIPT_CONFIG); }).show()));
@@ -2282,7 +2284,7 @@ public final class BrowserSettingsActivity extends Activity {
         int bytes=code.getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
         String size=bytes<1024?String.format(java.util.Locale.ROOT,"%.1f B",(double)bytes)
                 :android.text.format.Formatter.formatShortFileSize(this,bytes);
-        new AlertDialog.Builder(scriptDialogContext()).setTitle("脚本信息")
+        new ViaDialogBuilder(scriptDialogContext()).setTitle("脚本信息")
                 .setMessage("名称\n"+name+"\n版本\n"+(metadata.version.isEmpty()?"未知":metadata.version)
                         +"\n更新于\n"+scriptTime(prefs.scriptUpdatedAt(name))+"\n创建于\n"+scriptTime(prefs.scriptCreatedAt(name))+"\n大小\n"+size)
                 .setPositiveButton(android.R.string.ok,null).show();
@@ -2320,7 +2322,7 @@ public final class BrowserSettingsActivity extends Activity {
         LinearLayout field = new LinearLayout(this);
         field.setPadding(dp(20), dp(8), dp(20), 0);
         field.addView(input, new LinearLayout.LayoutParams(-1, -2));
-        AlertDialog.Builder dialog = new AlertDialog.Builder(scriptDialogContext())
+        AlertDialog.Builder dialog = new ViaDialogBuilder(scriptDialogContext())
                 .setTitle(index < 0 ? exclude ? "添加排除" : "添加匹配" : "编辑").setView(field)
                 .setNegativeButton(android.R.string.cancel, null).setPositiveButton("保存", null);
         if (index >= 0) dialog.setNeutralButton("删除", (d, w) -> { rules.remove(index); saveScriptRules(name, exclude, rules); });
@@ -2343,7 +2345,7 @@ public final class BrowserSettingsActivity extends Activity {
 
     private void renderScriptEdit() {
         titleView.setText(editScriptName == null ? "添加脚本" : "编辑脚本");
-        addRightAction("帮助", () -> new AlertDialog.Builder(scriptDialogContext())
+        addRightAction("帮助", () -> new ViaDialogBuilder(scriptDialogContext())
                 .setTitle("脚本帮助")
                 .setMessage("在脚本头中填写 @name 名称、@match 匹配网址和 @run-at 运行时机。\n\n长按代码可选择、复制、剪切和粘贴。修改后点击右上角保存。")
                 .setPositiveButton(android.R.string.ok, null).show());
@@ -2390,7 +2392,7 @@ public final class BrowserSettingsActivity extends Activity {
             return;
         }
         if (!replace && !name.equals(editScriptName) && prefs.scriptNames().contains(name)) {
-            new AlertDialog.Builder(scriptDialogContext()).setTitle("脚本已存在")
+            new ViaDialogBuilder(scriptDialogContext()).setTitle("脚本已存在")
                     .setMessage("是否替换“" + name + "”？")
                     .setNegativeButton(android.R.string.cancel, null)
                     .setPositiveButton("替换", (dialog, which) -> saveScriptSource(true)).show();
@@ -2819,7 +2821,7 @@ public final class BrowserSettingsActivity extends Activity {
 
     private void showCustomUaOptions(BrowserPrefs.CustomUaItem item) {
         String[] options = {"编辑", "删除"};
-        new android.app.AlertDialog.Builder(this)
+        new ViaDialogBuilder(this)
                 .setTitle(item.name)
                 .setItems(options, (dialog, which) -> {
                     if (which == 0) {
