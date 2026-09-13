@@ -106,7 +106,8 @@ public final class BrowserSnifferActivity extends Activity {
     private View newEntryView() {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.VERTICAL);
-        row.setPadding(dp(16), dp(18), dp(16), dp(10));
+        int gutter = getResources().getDimensionPixelSize(R.dimen.via_page_gutter);
+        row.setPadding(gutter, dp(18), gutter, dp(10));
         TextView head = new TextView(this);
         head.setId(android.R.id.text1);
         head.setSingleLine(true);

@@ -25,6 +25,8 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.PopupWindow;
+import com.example.cleanrecovery.ui.browser.BrowserPrefs;
 import com.example.cleanrecovery.ui.widget.GlassToast;
 
 import com.example.cleanrecovery.R;
@@ -52,6 +54,7 @@ import java.util.Locale;
 abstract class BrowserLibraryBaseActivity extends Activity {
     static final String EXTRA_LIBRARY_ACTION = "library_action";
     static final String ACTION_OPEN_TABS = "open_tabs";
+    static final String ACTION_OPEN_URLS = "open_urls";
     /** 新标签打开：BrowserActivity 新建 tab 并切换；后台打开：只建 tab 不切换。 */
     static final String ACTION_FOLDER_BG = "open_folder_bg";
     static final String ACTION_FOLDER_NEWTAB = "open_folder_newtab";
@@ -81,6 +84,12 @@ abstract class BrowserLibraryBaseActivity extends Activity {
     private String bookmarkFolder = "";
     private int sortBy = SORT_NEWEST;
     private boolean showDetails = false;
+    private boolean closedTabsMode;
+    private boolean tabSettingsMode;
+    private boolean bookmarkEditMode;
+    private final HashSet<String> bookmarkSelected = new HashSet<>();
+    private final List<String> bookmarkRowKeys = new ArrayList<>();
+    private PopupWindow bookmarkMorePopup;
     /** 历史页多选编辑模式（对齐 Via：列表内勾选，底栏 全选/删除/完成）。 */
     private boolean historyEditMode = false;
     private final HashSet<Long> historySelected = new HashSet<>();
@@ -101,10 +110,23 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         currentUrl = getIntent().getStringExtra("current_url");
         if (currentUrl == null) currentUrl = "";
         mode = initialMode();
+        if (savedInstanceState != null) {
+            mode = savedInstanceState.getInt("mode", mode);
+            bookmarkFolder = savedInstanceState.getString("folder", "");
+            closedTabsMode = savedInstanceState.getBoolean("closedTabs");
+            tabSettingsMode = savedInstanceState.getBoolean("tabSettings");
+            historyEditMode = savedInstanceState.getBoolean("historyEdit");
+            bookmarkEditMode = savedInstanceState.getBoolean("bookmarkEdit");
+            ArrayList<String> selected = savedInstanceState.getStringArrayList("bookmarkSelected");
+            if (selected != null) bookmarkSelected.addAll(selected);
+            long[] history = savedInstanceState.getLongArray("historySelected");
+            if (history != null) for (long id : history) historySelected.add(id);
+        }
         buildShell();
         render();
         String initialQuery = getIntent().getStringExtra("initial_query");
-        if (initialQuery != null) search.setText(initialQuery);
+        if (savedInstanceState != null) search.setText(savedInstanceState.getString("query", ""));
+        else if (initialQuery != null) search.setText(initialQuery);
     }
 
     private void buildShell() {
@@ -117,7 +139,7 @@ abstract class BrowserLibraryBaseActivity extends Activity {
             androidx.core.graphics.Insets bars = insets.getInsets(
                     androidx.core.view.WindowInsetsCompat.Type.systemBars()
                     | androidx.core.view.WindowInsetsCompat.Type.ime());
-            view.setPadding(bars.left, bars.top, bars.right, bars.bottom + dp(8));
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
             return insets;
         });
         setContentView(root, new LinearLayout.LayoutParams(-1, -1));
@@ -125,14 +147,14 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.HORIZONTAL);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        top.setPadding(0, dp(6), dp(8), dp(2));
-        root.addView(top, new LinearLayout.LayoutParams(-1, dp(56)));
+        top.setPadding(ViaUi.toolbarInset(this), dp(12), ViaUi.toolbarInset(this), dp(2));
+        root.addView(top, new LinearLayout.LayoutParams(-1, dp(66)));
 
         ImageButton back = new ImageButton(this);
         back.setImageResource(R.drawable.via_toolbar_back);
         back.setBackgroundResource(R.drawable.bg_via_toolbar_button);
         back.setPadding(dp(14), dp(14), dp(14), dp(14));
-        back.setOnClickListener(v -> finish());
+        back.setOnClickListener(v -> onBackPressed());
         top.addView(back, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
         tabBar = new LinearLayout(this);
@@ -140,8 +162,10 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         tabBar.setGravity(Gravity.CENTER_VERTICAL);
         top.addView(tabBar, new LinearLayout.LayoutParams(0, -1, 1));
 
+        View headerLine = new View(this); headerLine.setBackgroundColor(0xffeeeeee);
+        root.addView(headerLine, new LinearLayout.LayoutParams(-1, 1));
         search = new EditText(this);
-        search.setHint(R.string.via_search_hint_simple);
+        search.setHint("搜索");
         search.setSingleLine(true);
         search.setTextSize(14);
         search.setPadding(dp(16), 0, dp(16), 0);
@@ -150,21 +174,18 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         search.setHintTextColor(0xffb0b0b0);
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { query = s.toString().trim().toLowerCase(Locale.ROOT); renderList(); }
+            @Override public void onTextChanged(CharSequence s, int start, int before, int count) { query = s.toString().trim().toLowerCase(Locale.ROOT); renderList(); renderBottom(); }
             @Override public void afterTextChanged(Editable s) {}
         });
         LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(-1, dp(40));
-        sp.setMargins(dp(8), 0, dp(8), dp(14));
+        sp.setMargins(ViaUi.pageInset(this), dp(10), ViaUi.pageInset(this), dp(10));
         root.addView(search, sp);
-
-        View line = new View(this); line.setBackgroundColor(0xffeeeeee);
-        root.addView(line, new LinearLayout.LayoutParams(-1, 1));
 
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         listBox = new LinearLayout(this);
         listBox.setOrientation(LinearLayout.VERTICAL);
-        listBox.setPadding(0, dp(10), 0, dp(24));
+        listBox.setPadding(0, 0, 0, dp(24));
         scroll.addView(listBox, new ScrollView.LayoutParams(-1, -2));
         root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
 
@@ -172,12 +193,14 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         root.addView(bottomLine, new LinearLayout.LayoutParams(-1, 1));
         bottomBar = new LinearLayout(this);
         bottomBar.setGravity(Gravity.CENTER_VERTICAL);
-        bottomBar.setPadding(dp(8), 0, dp(8), 0);
+        bottomBar.setPadding(ViaUi.toolbarInset(this), 0, ViaUi.toolbarInset(this), 0);
         root.addView(bottomBar, new LinearLayout.LayoutParams(-1, dp(48)));
     }
 
     private void render() {
         renderTabs();
+        search.setVisibility(tabSettingsMode ? View.GONE : View.VISIBLE);
+        bottomBar.setVisibility(tabSettingsMode ? View.GONE : View.VISIBLE);
         search.setText("");
         query = "";
         renderList();
@@ -186,6 +209,12 @@ abstract class BrowserLibraryBaseActivity extends Activity {
 
     private void renderTabs() {
         tabBar.removeAllViews();
+        if (closedTabsMode) {
+            TextView title = rowText(tabSettingsMode ? "标签页设置" : "关闭的标签页");
+            title.setTextSize(18);
+            tabBar.addView(title);
+            return;
+        }
         addTab("书签", MODE_BOOKMARKS);
         addTab("历史", MODE_HISTORY);
         addTab("离线页面", MODE_OFFLINE);
@@ -197,22 +226,26 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         tv.setTextSize(16);
         tv.setGravity(Gravity.CENTER);
         tv.setTextColor(mode == target ? getColor(R.color.text_primary) : 0xff9e9e9e);
-        tv.setTypeface(Typeface.DEFAULT, mode == target ? Typeface.BOLD : Typeface.NORMAL);
+        tv.setTypeface(Typeface.DEFAULT, Typeface.NORMAL);
         tv.setOnClickListener(v -> {
             if (mode != target) {
                 mode = target;
                 bookmarkFolder = "";
+                bookmarkEditMode = false;
+                bookmarkSelected.clear();
                 exitHistoryEditMode();
                 render();
             }
         });
-        tabBar.addView(tv, new LinearLayout.LayoutParams(dp(target == MODE_OFFLINE ? 92 : 58), -1));
+        tabBar.addView(tv, new LinearLayout.LayoutParams(dp(target == MODE_OFFLINE ? 88 : 56), -1));
     }
 
     private void renderList() {
         if (listBox == null) return;
         listBox.removeAllViews();
-        if (mode == MODE_BOOKMARKS) renderBookmarks();
+        if (tabSettingsMode) renderClosedTabSettings();
+        else if (closedTabsMode) renderClosedTabs();
+        else if (mode == MODE_BOOKMARKS) renderBookmarks();
         else if (mode == MODE_HISTORY) renderHistory();
         else renderOffline();
     }
@@ -220,21 +253,22 @@ abstract class BrowserLibraryBaseActivity extends Activity {
     // ===== 书签：树形（文件夹行 + 书签行，钻入式） =====
 
     private void renderBookmarks() {
+        bookmarkRowKeys.clear();
         if (bookmarkFolder.isEmpty()) {
-            search.setHint(R.string.via_search_hint_simple);
+            search.setHint("搜索");
         } else {
             search.setHint(getString(R.string.via_search_hint_folder, bookmarkFolder));
         }
         List<BrowserDatabaseHelper.Entry> rows = sortBookmarks(db.listBookmarks());
         int shown = 0;
-        if (bookmarkFolder.isEmpty()) {
+        if (!bookmarkFolder.isEmpty()) addParentRow();
+        {
             for (String folder : sortFolders(db.listFolders())) {
+                if (!db.folderParent(folder).equals(bookmarkFolder)) continue;
                 if (!match(folder, "")) continue;
                 addFolderRow(folder);
                 shown++;
             }
-        } else {
-            addParentRow();
         }
         for (BrowserDatabaseHelper.Entry e : rows) {
             boolean inFolder = bookmarkFolder.isEmpty()
@@ -244,6 +278,222 @@ abstract class BrowserLibraryBaseActivity extends Activity {
             shown++;
         }
         if (shown == 0) addEmpty(R.string.via_bookmarks_empty);
+        bookmarkSelected.retainAll(bookmarkRowKeys);
+        if (sortBy == -1) applyBookmarkOrder();
+    }
+
+    private void bindBookmarkSelection(LinearLayout row, String key) {
+        bookmarkRowKeys.add(key);
+        row.setTag(key);
+        if (!bookmarkEditMode) return;
+        ImageView drag = new ImageView(this);
+        drag.setImageResource(R.drawable.ic_via_library_reorder);
+        drag.setColorFilter(0xff333333);
+        drag.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        drag.setContentDescription("排序");
+        drag.setPadding(dp(12), dp(12), dp(12), dp(12));
+        row.addView(drag, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        drag.setOnLongClickListener(v -> {
+            if (!query.isEmpty()) return false;
+            if (android.os.Build.VERSION.SDK_INT >= 24)
+                v.startDragAndDrop(ClipData.newPlainText("bookmark", key), new View.DragShadowBuilder(row), key, 0);
+            else v.startDrag(ClipData.newPlainText("bookmark", key), new View.DragShadowBuilder(row), key, 0);
+            return true;
+        });
+        row.setOnDragListener((v, event) -> {
+            if (!(event.getLocalState() instanceof String)) return false;
+            if (event.getAction() == android.view.DragEvent.ACTION_DROP) {
+                String from = (String) event.getLocalState();
+                if (bookmarkRowKeys.contains(from) && !from.equals(key)) {
+                    bookmarkRowKeys.remove(from);
+                    bookmarkRowKeys.add(bookmarkRowKeys.indexOf(key), from);
+                    sortBy = -1;
+                    getSharedPreferences("via_library", MODE_PRIVATE).edit()
+                            .putString("order:" + bookmarkFolder, new org.json.JSONArray(bookmarkRowKeys).toString()).apply();
+                    persistLibraryPrefs(); renderList(); renderBottom();
+                }
+            }
+            return true;
+        });
+        ImageView check = selectionIndicator(bookmarkSelected.contains(key));
+        LinearLayout.LayoutParams checkParams = new LinearLayout.LayoutParams(dp(16), dp(16));
+        checkParams.leftMargin = dp(18);
+        checkParams.rightMargin = dp(2);
+        row.addView(check, checkParams);
+        row.setOnClickListener(v -> {
+            if (!bookmarkSelected.remove(key)) bookmarkSelected.add(key);
+            updateSelectionIndicator(check, bookmarkSelected.contains(key));
+            renderBottom();
+        });
+        row.setOnLongClickListener(null);
+    }
+
+    private void applyBookmarkOrder() {
+        List<String> order = new ArrayList<>();
+        try {
+            org.json.JSONArray saved = new org.json.JSONArray(getSharedPreferences("via_library", MODE_PRIVATE)
+                    .getString("order:" + bookmarkFolder, "[]"));
+            for (int i = 0; i < saved.length(); i++) order.add(saved.getString(i));
+        } catch (org.json.JSONException ignored) { }
+        List<View> rows = new ArrayList<>();
+        for (int i = 0; i < listBox.getChildCount(); i++) {
+            View row = listBox.getChildAt(i);
+            if (row.getTag() instanceof String) rows.add(row);
+        }
+        rows.sort((a, b) -> Integer.compare(order.contains(a.getTag()) ? order.indexOf(a.getTag()) : Integer.MAX_VALUE,
+                order.contains(b.getTag()) ? order.indexOf(b.getTag()) : Integer.MAX_VALUE));
+        bookmarkRowKeys.clear();
+        for (View row : rows) { listBox.removeView(row); listBox.addView(row); bookmarkRowKeys.add((String) row.getTag()); }
+    }
+
+    private void renderBookmarkEditBottom() {
+        boolean all = !bookmarkRowKeys.isEmpty() && bookmarkSelected.containsAll(bookmarkRowKeys);
+        addBottom(all ? "全不选" : "全选", v -> {
+            if (all) bookmarkSelected.clear(); else bookmarkSelected.addAll(bookmarkRowKeys);
+            renderList(); renderBottom();
+        }, 0);
+        TextView move = addBottom("移动", v -> moveSelectedBookmarks(), 0);
+        TextView delete = addBottom(deleteLabel(bookmarkSelected.size()), v -> showLibraryConfirm("删除",
+                "你确定继续吗？", () -> {
+                    for (String key : new HashSet<>(bookmarkSelected)) {
+                        if (key.startsWith("f:")) db.deleteFolderWithBookmarks(key.substring(2));
+                        else db.removeBookmark(Long.parseLong(key.substring(2)));
+                    }
+                    bookmarkSelected.clear(); renderList(); renderBottom();
+                }), 0);
+        if (!bookmarkSelected.isEmpty()) delete.setTextColor(0xffd44343);
+        TextView open = addBottom("打开", v -> {
+            ArrayList<String> urls = new ArrayList<>();
+            for (BrowserDatabaseHelper.Entry e : selectedBookmarkEntries()) urls.add(e.url);
+            if (urls.isEmpty()) return;
+            Intent data = new Intent().putExtra(EXTRA_LIBRARY_ACTION, ACTION_OPEN_URLS);
+            data.putStringArrayListExtra("urls", urls);
+            setResult(RESULT_OK, data); finish();
+        }, 0);
+        for (TextView action : new TextView[]{move, delete, open}) {
+            action.setEnabled(!bookmarkSelected.isEmpty());
+        }
+        bottomBar.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
+        addBottom("完成", v -> { bookmarkEditMode = false; bookmarkSelected.clear(); renderList(); renderBottom(); }, 0);
+        // Five actions share the available width, including narrow screens and larger text.
+        for (int i = bottomBar.getChildCount() - 1; i >= 0; i--) {
+            View child = bottomBar.getChildAt(i);
+            if (!(child instanceof TextView)) { bottomBar.removeViewAt(i); continue; }
+            TextView action = (TextView) child;
+            action.setMinWidth(0);
+            action.setPadding(dp(4), 0, dp(4), 0);
+            action.setEllipsize(TextUtils.TruncateAt.END);
+            action.setContentDescription(action.getText());
+            action.setLayoutParams(new LinearLayout.LayoutParams(0, -1, 1));
+        }
+    }
+
+    private List<BrowserDatabaseHelper.Entry> selectedBookmarkEntries() {
+        List<BrowserDatabaseHelper.Entry> entries = new ArrayList<>();
+        for (BrowserDatabaseHelper.Entry e : sortBookmarks(db.listBookmarks())) {
+            boolean selected = bookmarkSelected.contains("b:" + e.id);
+            for (String key : bookmarkSelected) {
+                if (key.startsWith("f:") && db.isFolderWithin(e.folder, key.substring(2))) selected = true;
+            }
+            if (selected) entries.add(e);
+        }
+        return entries;
+    }
+
+    private void moveSelectedBookmarks() {
+        List<String> targets = new ArrayList<>();
+        targets.add("根目录");
+        for (String folder : db.listFolders()) {
+            boolean excluded = false;
+            for (String key : bookmarkSelected) {
+                if (key.startsWith("f:") && db.isFolderWithin(folder, key.substring(2))) excluded = true;
+            }
+            if (!excluded) targets.add(folder);
+        }
+        new ViaDialogBuilder(this).setTitle("选择文件夹")
+                .setItems(targets.toArray(new String[0]), (d, which) -> moveSelectionTo(targets.get(which)))
+                .setNeutralButton(R.string.via_new_folder, (d, w) -> ViaUi.inputDialog(this, "新建文件夹",
+                        new ViaUi.InputField("标题", ""), null, false, null, (values, check) -> {
+                            if (db.addFolder(values[0])) moveSelectionTo(values[0].trim());
+                        })).setNegativeButton(android.R.string.cancel, null).show();
+    }
+
+    private void moveSelectionTo(String folder) {
+        for (BrowserDatabaseHelper.Entry e : db.listBookmarks()) {
+            if (bookmarkSelected.contains("b:" + e.id)) db.updateBookmark(e.id, e.title, e.url, folder);
+        }
+        for (String key : bookmarkSelected) if (key.startsWith("f:")) db.moveFolder(key.substring(2), folder);
+        bookmarkSelected.clear(); renderList(); renderBottom();
+    }
+
+    private void renderClosedTabs() {
+        search.setHint("搜索");
+        int shown = 0;
+        try {
+            org.json.JSONArray tabs = new org.json.JSONArray(new BrowserPrefs(this).closedTabs().isEmpty()
+                    ? "[]" : new BrowserPrefs(this).closedTabs());
+            for (int i = 0; i < tabs.length(); i++) {
+                org.json.JSONObject tab = tabs.optJSONObject(i);
+                if (tab == null) continue;
+                String url = tab.optString("u"), title = tab.optString("t");
+                if (url.isEmpty() || !match(title, url)) continue;
+                final int index = i;
+                addEntryRow("", 0, title, url.replaceFirst("^https?://", ""),
+                        v -> openUrlResult(url, "open_newtab"),
+                        v -> { showEntryMenu(title, url, () -> {
+                            tabs.remove(index); new BrowserPrefs(this).setClosedTabs(tabs.toString()); renderList();
+                        }); return true; });
+                shown++;
+            }
+        } catch (org.json.JSONException ignored) { }
+        if (shown == 0) addEmpty(R.string.via_history_empty);
+    }
+
+    private void showClosedTabSettings() {
+        tabSettingsMode = true;
+        render();
+    }
+
+    private void renderClosedTabSettings() {
+        BrowserPrefs prefs = new BrowserPrefs(this);
+        String[] modes = {"禁用恢复", "总是恢复", "优先询问"};
+        TextView restore = rowText("启动时恢复未关闭标签\n" + modes[Math.max(0, Math.min(2, prefs.restoreTabs()))]);
+        restore.setSingleLine(false);
+        restore.setPadding(ViaUi.pageInset(this), dp(20), ViaUi.pageInset(this), dp(20));
+        restore.setOnClickListener(v -> ViaUi.radioDialog(this, "启动时恢复未关闭标签", modes, prefs.restoreTabs(), index -> {
+            prefs.setRestoreTabs(index); renderList();
+        }).show());
+        listBox.addView(restore, new LinearLayout.LayoutParams(-1, -2));
+        android.widget.Switch undo = new android.widget.Switch(this);
+        undo.setText("显示撤销关闭标签的提示\n如果开启了隐身模式，则不会显示提示");
+        undo.setTextSize(15);
+        undo.setPadding(ViaUi.pageInset(this), dp(20), ViaUi.pageInset(this), dp(20));
+        undo.setChecked(prefs.undoCloseToast());
+        undo.setOnCheckedChangeListener((button, checked) -> prefs.setUndoCloseToast(checked));
+        listBox.addView(undo, new LinearLayout.LayoutParams(-1, -2));
+    }
+
+    @Override protected void onSaveInstanceState(Bundle out) {
+        super.onSaveInstanceState(out);
+        out.putInt("mode", mode); out.putString("folder", bookmarkFolder);
+        out.putBoolean("closedTabs", closedTabsMode); out.putBoolean("tabSettings", tabSettingsMode);
+        out.putBoolean("historyEdit", historyEditMode); out.putBoolean("bookmarkEdit", bookmarkEditMode);
+        out.putStringArrayList("bookmarkSelected", new ArrayList<>(bookmarkSelected));
+        long[] ids = new long[historySelected.size()]; int i = 0;
+        for (long id : historySelected) ids[i++] = id;
+        out.putLongArray("historySelected", ids); out.putString("query", search.getText().toString());
+    }
+
+    @Override public void onBackPressed() {
+        if (tabSettingsMode) { tabSettingsMode = false; render(); return; }
+        if (bookmarkMorePopup != null && bookmarkMorePopup.isShowing()) { bookmarkMorePopup.dismiss(); return; }
+        if (historyEditMode) { exitHistoryEditMode(); return; }
+        if (bookmarkEditMode) { bookmarkEditMode = false; bookmarkSelected.clear(); renderList(); renderBottom(); return; }
+        if (closedTabsMode) { closedTabsMode = false; render(); return; }
+        if (mode == MODE_BOOKMARKS && !bookmarkFolder.isEmpty()) {
+            bookmarkFolder = db.folderParent(bookmarkFolder); renderList(); renderBottom(); return;
+        }
+        super.onBackPressed();
     }
 
     private List<BrowserDatabaseHelper.Entry> sortBookmarks(List<BrowserDatabaseHelper.Entry> in) {
@@ -268,36 +518,31 @@ abstract class BrowserLibraryBaseActivity extends Activity {
     /** 文件夹行（基准 73：描边文件夹图标 + 名称，无副标题）。 */
     private void addFolderRow(String name) {
         LinearLayout row = baseIconRow();
-        ImageView ic = new ImageView(this);
-        ic.setImageResource(R.drawable.ic_nav_folder);
-        ic.setColorFilter(0xff3c3c3c);
-        row.addView(ic, new LinearLayout.LayoutParams(dp(30), dp(34)));
+        addLibraryIcon(row, null);
         TextView tv = rowText(name);
+        tv.setPadding(0, 0, 0, 0);
         row.addView(tv, new LinearLayout.LayoutParams(0, -2, 1));
-        row.setOnClickListener(v -> { bookmarkFolder = name; renderList(); });
+        row.setOnClickListener(v -> { bookmarkFolder = name; renderList(); renderBottom(); });
         row.setOnLongClickListener(v -> { showFolderMenu(name); return true; });
+        bindBookmarkSelection(row, "f:" + name);
         listBox.addView(row, new LinearLayout.LayoutParams(-1, -2));
     }
 
     /** 文件夹内顶部的「..」返回行（基准 77）。 */
     private void addParentRow() {
         LinearLayout row = baseIconRow();
-        ImageView ic = new ImageView(this);
-        ic.setImageResource(R.drawable.ic_nav_folder);
-        ic.setColorFilter(0xff3c3c3c);
-        row.addView(ic, new LinearLayout.LayoutParams(dp(30), dp(34)));
-        row.addView(rowText(".."), new LinearLayout.LayoutParams(0, -2, 1));
-        row.setOnClickListener(v -> { bookmarkFolder = ""; renderList(); });
+        addLibraryIcon(row, null);
+        TextView parent = rowText("..");
+        parent.setPadding(0, 0, 0, 0);
+        row.addView(parent, new LinearLayout.LayoutParams(0, -2, 1));
+        row.setOnClickListener(v -> { bookmarkFolder = db.folderParent(bookmarkFolder); renderList(); renderBottom(); });
         listBox.addView(row, new LinearLayout.LayoutParams(-1, -2));
     }
 
-    /** 书签行（基准 74：描边星形 + 标题；显示细节时副标题为 URL）。 */
+    /** 网站图标优先，未缓存时使用 Via 细描边星形。 */
     private void addBookmarkRow(BrowserDatabaseHelper.Entry e) {
         LinearLayout row = baseIconRow();
-        ImageView ic = new ImageView(this);
-        ic.setImageResource(R.drawable.ic_via_star);
-        ic.setColorFilter(0xff3c3c3c);
-        row.addView(ic, new LinearLayout.LayoutParams(dp(30), dp(34)));
+        addLibraryIcon(row, e.url);
         LinearLayout texts = new LinearLayout(this);
         texts.setOrientation(LinearLayout.VERTICAL);
         texts.setGravity(Gravity.CENTER_VERTICAL);
@@ -322,6 +567,7 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         row.addView(texts, new LinearLayout.LayoutParams(0, -2, 1));
         row.setOnClickListener(v -> returnUrl(e.url));
         row.setOnLongClickListener(v -> { showBookmarkMenu(e); return true; });
+        bindBookmarkSelection(row, "b:" + e.id);
         listBox.addView(row, new LinearLayout.LayoutParams(-1, -2));
     }
 
@@ -329,9 +575,27 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(12), dp(12), dp(16), dp(12));
-        row.setMinimumHeight(dp(58));
+        row.setPadding(ViaUi.pageInset(this), dp(8), ViaUi.pageInset(this), dp(8));
+        row.setMinimumHeight(dp(54));
         return row;
+    }
+
+    private void addLibraryIcon(LinearLayout row, String url) {
+        ImageView icon = new ImageView(this);
+        icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        android.graphics.Bitmap favicon = url == null ? null
+                : com.example.cleanrecovery.ui.browser.BrowserFavicons.get(url);
+        if (favicon != null) {
+            icon.setImageBitmap(favicon);
+            // Via 网站图标约 18dp，保留原始颜色。
+            icon.setPadding(dp(3), dp(3), dp(3), dp(3));
+        } else {
+            icon.setImageResource(url == null ? R.drawable.ic_via_library_folder : R.drawable.ic_via_star);
+            icon.setColorFilter(0xff333333);
+        }
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(24), dp(24));
+        params.rightMargin = dp(14);
+        row.addView(icon, params);
     }
 
     private TextView rowText(String text) {
@@ -396,7 +660,7 @@ abstract class BrowserLibraryBaseActivity extends Activity {
                                     null, false, null,
                                     (values, check) -> {
                                         if (db.renameFolder(name, values[0].trim())) {
-                                            if (values[0].trim().equals(bookmarkFolder)) {
+                                            if (name.equals(bookmarkFolder)) {
                                                 bookmarkFolder = values[0].trim();
                                             }
                                             renderList();
@@ -491,12 +755,7 @@ abstract class BrowserLibraryBaseActivity extends Activity {
             else if (!d.equals(today) && !d.equals(yesterday) && !olderTitle) { addSection("更早"); olderTitle = true; }
             String host = hostText(e.url);
             // 多选模式（对齐 Via 编辑）：行尾勾选圈，点击切换选中，不打开页面
-            ImageView check = historyEditMode ? new ImageView(this) : null;
-            if (check != null) {
-                check.setScaleType(ImageView.ScaleType.CENTER);
-                check.setImageResource(historySelected.contains(e.id)
-                        ? R.drawable.bg_via_radio_on : R.drawable.bg_via_radio);
-            }
+            ImageView check = historyEditMode ? selectionIndicator(historySelected.contains(e.id)) : null;
             View.OnLongClickListener longClick = historyEditMode ? null
                     : v -> { showEntryMenu(e.title, e.url, () -> { db.removeHistory(e.id); renderList(); }); return true; };
             addEntryRow("◷", 0xff333333,
@@ -505,8 +764,7 @@ abstract class BrowserLibraryBaseActivity extends Activity {
                         if (historyEditMode) {
                             if (historySelected.contains(e.id)) historySelected.remove(e.id);
                             else historySelected.add(e.id);
-                            if (check != null) check.setImageResource(historySelected.contains(e.id)
-                                    ? R.drawable.bg_via_radio_on : R.drawable.bg_via_radio);
+                            if (check != null) updateSelectionIndicator(check, historySelected.contains(e.id));
                             renderBottom();
                         } else {
                             returnUrl(e.url);
@@ -516,6 +774,7 @@ abstract class BrowserLibraryBaseActivity extends Activity {
             count++;
         }
         if (count == 0) addEmpty(R.string.via_history_empty);
+        historySelected.retainAll(historyRowIds);
     }
 
     private void renderOffline() {
@@ -540,7 +799,7 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         tv.setText(text);
         tv.setTextSize(13);
         tv.setTextColor(0xff9e9e9e);
-        tv.setPadding(dp(8), dp(10), dp(8), dp(8));
+        tv.setPadding(ViaUi.pageInset(this), dp(10), ViaUi.pageInset(this), dp(8));
         listBox.addView(tv, new LinearLayout.LayoutParams(-1, -2));
     }
 
@@ -570,7 +829,7 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(8), dp(8), dp(12), dp(8));
+        row.setPadding(ViaUi.pageInset(this), dp(8), ViaUi.pageInset(this), dp(8));
         row.setMinimumHeight(dp(58));
         row.setOnClickListener(click);
         if (longClick != null) row.setOnLongClickListener(longClick);
@@ -583,7 +842,7 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         }
         ic.setScaleType(ImageView.ScaleType.FIT_CENTER);
         LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(20), dp(20));
-        iconParams.setMargins(dp(8), 0, dp(16), 0);
+        iconParams.setMargins(0, 0, dp(16), 0);
         row.addView(ic, iconParams);
         LinearLayout texts = new LinearLayout(this);
         texts.setOrientation(LinearLayout.VERTICAL);
@@ -608,8 +867,8 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         }
         row.addView(texts, new LinearLayout.LayoutParams(0, -2, 1));
         if (trailing != null) {
-            LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(dp(20), dp(20));
-            tp.setMargins(dp(8), 0, 0, 0);
+            LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(dp(16), dp(16));
+            tp.setMargins(dp(8), 0, dp(6), 0);
             row.addView(trailing, tp);
         }
         listBox.addView(row, new LinearLayout.LayoutParams(-1, -2));
@@ -628,9 +887,23 @@ abstract class BrowserLibraryBaseActivity extends Activity {
 
     private void renderBottom() {
         bottomBar.removeAllViews();
-        if (mode == MODE_BOOKMARKS) {
-            addBottom("更多", v -> showBookmarkMore(), 1);
-            addBottom("编辑", v -> GlassToast.makeText(this, "长按条目编辑或删除", GlassToast.LENGTH_SHORT).show(), 0);
+        if (closedTabsMode) {
+            addBottom("更多", v -> showClosedTabSettings(), 1);
+            addBottom("清空", v -> new ViaDialogBuilder(this).setTitle("清空关闭的标签页")
+                    .setMessage("确定清空关闭的标签页？")
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .setPositiveButton(android.R.string.ok, (d, w) -> {
+                        new BrowserPrefs(this).setClosedTabs(""); renderList();
+                    }).show(), 0);
+        } else if (mode == MODE_BOOKMARKS) {
+            if (bookmarkEditMode) renderBookmarkEditBottom();
+            else {
+                addBottom("更多", this::showBookmarkMore, 1);
+                TextView edit = addBottom("编辑", v -> {
+                    bookmarkEditMode = true; bookmarkSelected.clear(); renderList(); renderBottom();
+                }, 0);
+                edit.setEnabled(!bookmarkRowKeys.isEmpty());
+            }
         } else if (mode == MODE_HISTORY) {
             if (historyEditMode) {
                 // 对齐 Via：编辑模式底栏为 全选/删除（左） + 完成（右），未选中时删除置灰
@@ -640,21 +913,23 @@ abstract class BrowserLibraryBaseActivity extends Activity {
                     else historySelected.addAll(historyRowIds);
                     renderList();
                     renderBottom();
-                }, 1);
-                TextView del = addBottom("删除", v -> deleteSelectedHistory(), 0);
-                del.setAlpha(historySelected.isEmpty() ? 0.35f : 1f);
+                }, 0);
+                TextView del = addBottom(deleteLabel(historySelected.size()), v -> deleteSelectedHistory(), 0);
+                del.setEnabled(!historySelected.isEmpty());
+                if (!historySelected.isEmpty()) del.setTextColor(0xffd44343);
                 View spacer = new View(this);
                 bottomBar.addView(spacer, new LinearLayout.LayoutParams(0, 1, 3));
                 addBottom("完成", v -> exitHistoryEditMode(), 0);
             } else {
-                addBottom("标签页", v -> finishWithLibraryAction(ACTION_OPEN_TABS), 1);
-                addBottom("清空", v -> showClearHistoryRangeDialog(), 0);
-                addBottom("编辑", v -> {
+                addBottom("标签页", v -> { closedTabsMode = true; render(); }, 1);
+                addBottom("清空", this::showClearHistoryRangeDialog, 0);
+                TextView edit = addBottom("编辑", v -> {
                     historyEditMode = true;
                     historySelected.clear();
                     renderList();
                     renderBottom();
                 }, 0);
+                edit.setEnabled(!historyRowIds.isEmpty());
             }
         } else {
             addBottom("标签页", v -> finishWithLibraryAction(ACTION_OPEN_TABS), 1);
@@ -681,7 +956,7 @@ abstract class BrowserLibraryBaseActivity extends Activity {
     }
 
     /** 清空（对齐 Via「清除浏览历史」）：时间范围列表（带条数）→ 二次确认后删除。 */
-    private void showClearHistoryRangeDialog() {
+    private void showClearHistoryRangeDialog(View anchor) {
         long now = System.currentTimeMillis();
         java.util.Calendar cal = java.util.Calendar.getInstance();
         cal.set(java.util.Calendar.HOUR_OF_DAY, 0);
@@ -720,41 +995,21 @@ abstract class BrowserLibraryBaseActivity extends Activity {
             picked.add(starts[i]);
             pickedLabels.add(labels[i]);
         }
-        android.app.AlertDialog dialog = new ViaDialogBuilder(this)
-                .setTitle(R.string.via_history_clear_browsing)
-                .setItems(options.toArray(new String[0]), (d, which) ->
-                        confirmClearHistoryRange(picked.get(which), pickedLabels.get(which)))
-                .setNegativeButton(android.R.string.cancel, null)
-                .create();
-        // 对齐 Via：弹窗锚定在底栏「清空」按钮上方，而非屏幕居中
-        dialog.show();
-        android.view.Window w = dialog.getWindow();
-        if (w != null) {
-            w.setGravity(Gravity.BOTTOM | Gravity.END);
-            android.view.WindowManager.LayoutParams lp = w.getAttributes();
-            lp.y = dp(56);
-            lp.x = dp(12);
-            lp.width = Math.min(dp(290),
-                    getResources().getDisplayMetrics().widthPixels - dp(24));
-            w.setAttributes(lp);
-        }
+        showLibraryPopup(anchor, getString(R.string.via_history_clear_browsing), options,
+                index -> confirmClearHistoryRange(picked.get(index), pickedLabels.get(index)), true);
     }
 
     private void confirmClearHistoryRange(long sinceMs, String label) {
-        new ViaDialogBuilder(this)
-                .setTitle(R.string.via_history_clear_browsing)
-                .setMessage(getString(R.string.via_history_clear_confirm, label))
-                .setPositiveButton(android.R.string.ok, (d, w) -> {
+        showLibraryConfirm(getString(R.string.via_history_clear_browsing),
+                getString(R.string.via_history_clear_confirm, label), () -> {
                     db.clearHistorySince(sinceMs);
                     exitHistoryEditMode();
                     renderList();
-                })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+                });
     }
 
     /** 更多菜单（基准 _via_bkmore：添加书签/新建文件夹/排序方式/显示细节/导入书签/备份书签）。 */
-    private void showBookmarkMore() {
+    private void showBookmarkMore(View anchor) {
         List<String> items = new ArrayList<>();
         items.add(getString(R.string.via_menu_add_bookmark));
         items.add(getString(R.string.via_new_folder));
@@ -763,21 +1018,122 @@ abstract class BrowserLibraryBaseActivity extends Activity {
                 ? R.string.via_hide_details : R.string.via_show_details));
         items.add(getString(R.string.via_import_bookmarks));
         items.add(getString(R.string.via_backup_bookmarks));
-        new ViaDialogBuilder(this)
-                .setItems(items.toArray(new String[0]), (dialog, which) -> {
-                    switch (which) {
-                        case 0: addBookmarkDialog(); break;
-                        case 1: launchNewFolder(bookmarkFolder); break;
-                        case 2: pickSort(); break;
-                        case 3:
-                            showDetails = !showDetails;
-                            persistLibraryPrefs();
-                            renderList();
-                            break;
-                        case 4: importBookmarks(); break;
-                        case 5: backupBookmarks(); break;
-                    }
-                }).show();
+        showLibraryPopup(anchor, null, items, which -> {
+            switch (which) {
+                case 0: addBookmarkDialog(); break;
+                case 1: launchNewFolder(bookmarkFolder); break;
+                case 2: pickSort(); break;
+                case 3:
+                    showDetails = !showDetails; persistLibraryPrefs(); renderList(); break;
+                case 4: importBookmarks(); break;
+                case 5: backupBookmarks(); break;
+            }
+        }, false);
+    }
+
+    private void showLibraryPopup(View anchor, String title, List<String> items, ViaUi.OnPick pick, boolean alignEnd) {
+        LinearLayout menu = new LinearLayout(this);
+        menu.setOrientation(LinearLayout.VERTICAL);
+        menu.setPadding(0, dp(14), 0, dp(14));
+        GradientDrawable menuBackground = pill(Color.WHITE, 0xffe5e5e5, dp(1));
+        menuBackground.setCornerRadius(dp(18));
+        menu.setBackground(menuBackground);
+        int width = Math.min(dp(234), root.getWidth() - root.getPaddingLeft() - root.getPaddingRight() - 2 * ViaUi.pageInset(this));
+        bookmarkMorePopup = new PopupWindow(menu, width, -2, true);
+        bookmarkMorePopup.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
+        bookmarkMorePopup.setOutsideTouchable(true);
+        if (title != null) {
+            TextView heading = popupText(title, true);
+            menu.addView(heading, new LinearLayout.LayoutParams(-1, dp(44)));
+        }
+        for (int i = 0; i < items.size(); i++) {
+            final int which = i;
+            TextView item = popupText(items.get(i), false);
+            menu.addView(item, new LinearLayout.LayoutParams(-1, dp(44)));
+            item.setOnClickListener(v -> {
+                    bookmarkMorePopup.dismiss();
+                    pick.onPick(which);
+                });
+        }
+        menu.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+        int[] position = new int[2];
+        anchor.getLocationInWindow(position);
+        int left = alignEnd ? position[0] + anchor.getWidth() - width : root.getPaddingLeft() + ViaUi.pageInset(this);
+        int bottom = position[1] + (alignEnd ? anchor.getHeight() / 2 : 0);
+        bookmarkMorePopup.showAtLocation(root, Gravity.TOP | Gravity.LEFT,
+                Math.max(root.getPaddingLeft() + ViaUi.pageInset(this), left), Math.max(root.getPaddingTop(), bottom - menu.getMeasuredHeight()));
+    }
+
+    private TextView popupText(String text, boolean bold) {
+        TextView label = rowText(text);
+        label.setTextSize(14);
+        label.setTypeface(Typeface.DEFAULT, bold ? Typeface.BOLD : Typeface.NORMAL);
+        label.setTextColor(0xff222222);
+        label.setGravity(Gravity.CENTER_VERTICAL);
+        label.setPadding(dp(16), 0, dp(16), 0);
+        return label;
+    }
+
+    private String deleteLabel(int count) { return count == 0 ? "删除" : "删除(" + count + ")"; }
+
+    private ImageView selectionIndicator(boolean selected) {
+        ImageView view = new ImageView(this);
+        updateSelectionIndicator(view, selected);
+        return view;
+    }
+
+    private void updateSelectionIndicator(ImageView view, boolean selected) {
+        GradientDrawable circle = new GradientDrawable();
+        circle.setShape(GradientDrawable.OVAL);
+        circle.setColor(selected ? ViaUi.ACCENT : Color.TRANSPARENT);
+        if (!selected) circle.setStroke(dp(2), 0xffe5e5e5);
+        view.setImageDrawable(circle);
+    }
+
+    private android.app.Dialog libraryConfirmDialog;
+
+    private void showLibraryConfirm(String title, String message, Runnable confirm) {
+        android.app.Dialog dialog = new android.app.Dialog(this);
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE);
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(0, dp(12), 0, 0);
+        GradientDrawable cardBackground = pill(Color.WHITE, 0, 0);
+        cardBackground.setCornerRadius(dp(18));
+        card.setBackground(cardBackground);
+        TextView heading = popupText(title, true);
+        heading.setTextSize(16);
+        card.addView(heading, new LinearLayout.LayoutParams(-1, dp(40)));
+        View gap = new View(this); card.addView(gap, new LinearLayout.LayoutParams(1, dp(6)));
+        TextView body = popupText(message, false);
+        body.setSingleLine(false); body.setEllipsize(null);
+        body.setGravity(Gravity.TOP); body.setPadding(dp(16), dp(8), dp(16), 0);
+        body.setMinHeight(dp(76));
+        card.addView(body, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout buttons = new LinearLayout(this);
+        buttons.setGravity(Gravity.END);
+        buttons.setPadding(0, dp(12), 0, 0);
+        for (int i = 0; i < 2; i++) {
+            final boolean accept = i == 1;
+            TextView button = popupText(getString(accept ? android.R.string.ok : android.R.string.cancel), false);
+            button.setTextColor(ViaUi.ACCENT); button.setGravity(Gravity.CENTER);
+            button.setPadding(0, 0, 0, 0);
+            button.setOnClickListener(v -> { dialog.dismiss(); if (accept) confirm.run(); });
+            buttons.addView(button, new LinearLayout.LayoutParams(dp(60), dp(52)));
+        }
+        card.addView(buttons, new LinearLayout.LayoutParams(-1, -2));
+        dialog.setContentView(card);
+        libraryConfirmDialog = dialog;
+        dialog.show();
+        android.view.Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawableResource(android.R.color.transparent);
+            window.setDimAmount(.4f);
+            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            window.setGravity(Gravity.CENTER);
+            window.setLayout(Math.min(dp(338), root.getWidth() - dp(32)), -2);
+        }
     }
 
     /** 添加书签弹窗（基准 55：标题/地址/目录 + 添加到主页收藏 + 取消·确定）。 */
@@ -889,6 +1245,7 @@ abstract class BrowserLibraryBaseActivity extends Activity {
                     pendingFolder = null;
                     if (folder != null && !folder.isEmpty()) {
                         db.addFolder(folder);
+                        for (String parent : folders) if (!parent.isEmpty()) { db.moveFolder(folder, parent); break; }
                         folders.push(folder);
                     } else {
                         folders.push("");
@@ -939,13 +1296,7 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         StringBuilder sb = new StringBuilder();
         sb.append("<!DOCTYPE NETSCAPE-Bookmark-file-1>\n<META HTTP-EQUIV=\"Content-Type\" CONTENT=\"text/html; charset=UTF-8\">\n<TITLE>Bookmarks</TITLE>\n<H1>Bookmarks</H1>\n<DL><p>\n");
         for (String folder : db.listFolders()) {
-            sb.append("    <DT><H3>").append(esc(folder)).append("</H3>\n    <DL><p>\n");
-            for (BrowserDatabaseHelper.Entry e : sortBookmarks(db.listBookmarks())) {
-                if (!folder.equals(e.folder)) continue;
-                sb.append("        <DT><A HREF=\"").append(esc(e.url)).append("\">")
-                        .append(esc(e.title)).append("</A>\n");
-            }
-            sb.append("    </DL><p>\n");
+            if (db.folderParent(folder).isEmpty()) appendFolderBackup(sb, folder);
         }
         for (BrowserDatabaseHelper.Entry e : sortBookmarks(db.listBookmarks())) {
             if (!"根目录".equals(e.folder)) continue;
@@ -987,6 +1338,16 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
+    private void appendFolderBackup(StringBuilder out, String folder) {
+        out.append("<DT><H3>").append(esc(folder)).append("</H3>\n<DL><p>\n");
+        for (String child : db.listFolders()) if (db.folderParent(child).equals(folder)) appendFolderBackup(out, child);
+        for (BrowserDatabaseHelper.Entry e : sortBookmarks(db.listBookmarks())) {
+            if (folder.equals(e.folder)) out.append("<DT><A HREF=\"").append(esc(e.url)).append("\">")
+                    .append(esc(e.title)).append("</A>\n");
+        }
+        out.append("</DL><p>\n");
+    }
+
     private void persistLibraryPrefs() {
         getSharedPreferences("via_library", MODE_PRIVATE).edit()
                 .putInt("sort", sortBy)
@@ -1007,10 +1368,17 @@ abstract class BrowserLibraryBaseActivity extends Activity {
         TextView tv = new TextView(this);
         tv.setText(text);
         tv.setTextSize(14);
-        tv.setGravity(weight > 0 ? Gravity.CENTER_VERTICAL | Gravity.START : Gravity.CENTER);
-        tv.setTextColor(getColor(R.color.text_secondary));
+        tv.setGravity(Gravity.CENTER);
+        tv.setTypeface(Typeface.DEFAULT, Typeface.NORMAL);
+        tv.setSingleLine(true);
+        tv.setMinWidth(dp(60));
+        tv.setPadding(dp(16), 0, dp(16), 0);
+        tv.setTextColor(new android.content.res.ColorStateList(
+                new int[][]{new int[]{-android.R.attr.state_enabled}, new int[]{}},
+                new int[]{0xff888888, 0xff222222}));
         tv.setOnClickListener(click);
-        bottomBar.addView(tv, new LinearLayout.LayoutParams(weight > 0 ? 0 : dp(64), -1, weight));
+        bottomBar.addView(tv, new LinearLayout.LayoutParams(-2, -1));
+        if (weight > 0) bottomBar.addView(new View(this), new LinearLayout.LayoutParams(0, 1, weight));
         return tv;
     }
 

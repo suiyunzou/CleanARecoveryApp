@@ -55,6 +55,14 @@ public final class ViaUi {
         return (int) (v * c.getResources().getDisplayMetrics().density + 0.5f);
     }
 
+    public static int pageInset(Context context) {
+        return context.getResources().getDimensionPixelSize(R.dimen.via_page_gutter);
+    }
+
+    public static int toolbarInset(Context context) {
+        return context.getResources().getDimensionPixelSize(R.dimen.via_toolbar_gutter);
+    }
+
     /** VIA 圆形开关：on=实心蓝圆，off=灰描边圆。 */
     public static ImageView switchView(Context c, boolean on) {
         ImageView v = new ImageView(c);

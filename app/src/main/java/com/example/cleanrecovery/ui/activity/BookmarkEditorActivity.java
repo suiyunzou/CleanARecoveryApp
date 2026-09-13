@@ -18,6 +18,7 @@ import com.example.cleanrecovery.ui.widget.GlassToast;
 
 import com.example.cleanrecovery.R;
 import com.example.cleanrecovery.ui.browser.BrowserDatabaseHelper;
+import com.example.cleanrecovery.ui.browser.ViaUi;
 import com.example.cleanrecovery.ui.widget.SystemUiHelper;
 
 import java.util.ArrayList;
@@ -76,7 +77,7 @@ public final class BookmarkEditorActivity extends Activity {
         LinearLayout top = new LinearLayout(this);
         top.setOrientation(LinearLayout.HORIZONTAL);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        top.setPadding(dp(8), dp(6), dp(16), dp(6));
+        top.setPadding(ViaUi.toolbarInset(this), dp(6), ViaUi.toolbarInset(this), dp(6));
         root.addView(top, new LinearLayout.LayoutParams(-1, dp(56)));
 
         ImageButton back = new ImageButton(this);
@@ -100,13 +101,15 @@ public final class BookmarkEditorActivity extends Activity {
         done.setText(R.string.via_done);
         done.setTextSize(16);
         done.setTextColor(getColor(R.color.text_primary));
-        done.setPadding(dp(12), dp(8), dp(4), dp(8));
+        done.setPadding(dp(16), dp(8), dp(16), dp(8));
+        done.setMinHeight(dp(48));
+        done.setGravity(Gravity.CENTER);
         done.setOnClickListener(v -> onDone());
         top.addView(done, new LinearLayout.LayoutParams(-2, -2));
 
         LinearLayout form = new LinearLayout(this);
         form.setOrientation(LinearLayout.VERTICAL);
-        form.setPadding(dp(20), dp(18), dp(20), 0);
+        form.setPadding(ViaUi.pageInset(this), dp(18), ViaUi.pageInset(this), 0);
         root.addView(form, new LinearLayout.LayoutParams(-1, -2));
 
         titleInput = addInput(form, getString(R.string.via_bk_field_title),
@@ -146,7 +149,7 @@ public final class BookmarkEditorActivity extends Activity {
         row.setOnClickListener(v -> toggleDropdown());
 
         ImageView icon = new ImageView(this);
-        icon.setImageResource(R.drawable.ic_nav_folder);
+        icon.setImageResource(R.drawable.ic_via_library_folder);
         icon.setColorFilter(0xff3c3c3c);
         row.addView(icon, new LinearLayout.LayoutParams(dp(30), dp(30)));
 
@@ -196,7 +199,7 @@ public final class BookmarkEditorActivity extends Activity {
             row.setBackgroundResource(selected
                     ? R.drawable.bg_via_select_pill : R.drawable.bg_via_menu_cell);
             ImageView ic = new ImageView(this);
-            ic.setImageResource(R.drawable.ic_nav_folder);
+            ic.setImageResource(R.drawable.ic_via_library_folder);
             ic.setColorFilter(0xff3c3c3c);
             row.addView(ic, new LinearLayout.LayoutParams(dp(26), dp(26)));
             TextView tv = new TextView(this);
@@ -269,6 +272,7 @@ public final class BookmarkEditorActivity extends Activity {
                 GlassToast.makeText(this, R.string.via_bk_folder_exists, GlassToast.LENGTH_SHORT).show();
                 return;
             }
+            db.moveFolder(title, folder);
             Intent data = new Intent();
             data.putExtra(EXTRA_RESULT_NAME, title);
             setResult(RESULT_OK, data);

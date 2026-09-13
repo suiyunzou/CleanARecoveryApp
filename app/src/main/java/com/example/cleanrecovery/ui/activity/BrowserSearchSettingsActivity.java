@@ -82,7 +82,7 @@ public final class BrowserSearchSettingsActivity extends Activity {
 
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        top.setPadding(dp(1), 0, dp(1), 0);
+        top.setPadding(ViaUi.toolbarInset(this), 0, ViaUi.toolbarInset(this), 0);
         root.addView(top, new LinearLayout.LayoutParams(-1, dp(54) - 1));
 
         ImageView back = new ImageView(this);
@@ -270,7 +270,7 @@ public final class BrowserSearchSettingsActivity extends Activity {
                         ViewGroup.LayoutParams.WRAP_CONTENT));
                 row.setOrientation(LinearLayout.HORIZONTAL);
                 row.setGravity(Gravity.CENTER_VERTICAL);
-                row.setPadding(dp(16), dp(20), dp(16), dp(20));
+                row.setPadding(ViaUi.pageInset(BrowserSearchSettingsActivity.this), dp(20), ViaUi.pageInset(BrowserSearchSettingsActivity.this), dp(20));
                 row.setBackgroundResource(R.drawable.bg_via_menu_cell);
 
                 TextView t = new TextView(BrowserSearchSettingsActivity.this);
@@ -290,7 +290,7 @@ public final class BrowserSearchSettingsActivity extends Activity {
                 section.setTextSize(13);
                 section.setTextColor(getColor(R.color.via_accent));
                 section.setGravity(Gravity.CENTER_VERTICAL);
-                section.setPadding(dp(16), 0, dp(16), 0);
+                section.setPadding(ViaUi.pageInset(BrowserSearchSettingsActivity.this), 0, ViaUi.pageInset(BrowserSearchSettingsActivity.this), 0);
 
                 return new SectionHolder(section);
             } else {
@@ -299,7 +299,7 @@ public final class BrowserSearchSettingsActivity extends Activity {
                         ViewGroup.LayoutParams.WRAP_CONTENT));
                 row.setOrientation(LinearLayout.HORIZONTAL);
                 row.setGravity(Gravity.CENTER_VERTICAL);
-                row.setPadding(dp(16), dp(20), dp(16), dp(20));
+                row.setPadding(ViaUi.pageInset(BrowserSearchSettingsActivity.this), dp(20), ViaUi.pageInset(BrowserSearchSettingsActivity.this), dp(20));
                 row.setBackgroundResource(R.drawable.bg_via_menu_cell);
 
                 LinearLayout texts = new LinearLayout(BrowserSearchSettingsActivity.this);
@@ -419,7 +419,7 @@ public final class BrowserSearchSettingsActivity extends Activity {
     private void addEngineSelectRow(int engine) {
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(16), dp(20), dp(16), dp(20));
+        row.setPadding(ViaUi.pageInset(BrowserSearchSettingsActivity.this), dp(20), ViaUi.pageInset(BrowserSearchSettingsActivity.this), dp(20));
         row.setBackgroundResource(R.drawable.bg_via_menu_cell);
         ImageView radio = ViaUi.switchView(this, prefs.searchEngine() == engine);
         LinearLayout.LayoutParams radioParams = new LinearLayout.LayoutParams(dp(16), dp(16));
@@ -440,7 +440,7 @@ public final class BrowserSearchSettingsActivity extends Activity {
     private void addCustomEngineSelectRow(int index, BrowserPrefs.CustomSearchItem item) {
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(16), dp(20), dp(16), dp(20));
+        row.setPadding(ViaUi.pageInset(BrowserSearchSettingsActivity.this), dp(20), ViaUi.pageInset(BrowserSearchSettingsActivity.this), dp(20));
         row.setBackgroundResource(R.drawable.bg_via_menu_cell);
         boolean selected = prefs.searchEngine() == SearchEngines.CUSTOM
                 && prefs.selectedCustomSearch() == index;
@@ -516,7 +516,7 @@ public final class BrowserSearchSettingsActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(16), dp(20), dp(16), dp(20));
+        row.setPadding(ViaUi.pageInset(BrowserSearchSettingsActivity.this), dp(20), ViaUi.pageInset(BrowserSearchSettingsActivity.this), dp(20));
         row.setBackgroundResource(R.drawable.bg_via_menu_cell);
         row.setClickable(true);
         row.setFocusable(false);
@@ -549,7 +549,7 @@ public final class BrowserSearchSettingsActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(16), dp(20), dp(16), dp(20));
+        row.setPadding(ViaUi.pageInset(BrowserSearchSettingsActivity.this), dp(20), ViaUi.pageInset(BrowserSearchSettingsActivity.this), dp(20));
         row.setBackgroundResource(R.drawable.bg_via_menu_cell);
         row.setClickable(true);
         row.setFocusable(false);

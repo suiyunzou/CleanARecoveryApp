@@ -278,8 +278,8 @@ public final class BrowserDownloadsActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        int pad = dp(14);
-        row.setPadding(pad, dp(10), dp(16), dp(10));
+        int pad = getResources().getDimensionPixelSize(R.dimen.via_page_gutter);
+        row.setPadding(pad, dp(10), pad, dp(10));
         row.setMinimumHeight(dp(64));
 
         FrameLayout iconBox = new FrameLayout(this);
