@@ -172,7 +172,7 @@ public final class BrowserSettingsActivity extends Activity {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(1), 0, dp(1), 0);
+        bar.setPadding(ViaUi.toolbarInset(this), 0, ViaUi.toolbarInset(this), 0);
 
         ImageView back = new ImageView(this);
         back.setImageResource(R.drawable.ic_chevron_left);
@@ -390,7 +390,7 @@ public final class BrowserSettingsActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(16), dp(20), dp(16), dp(20));
+        row.setPadding(ViaUi.pageInset(this), dp(20), ViaUi.pageInset(this), dp(20));
         row.setClickable(true);
         row.setFocusable(false);
         row.setFocusableInTouchMode(false);
@@ -422,7 +422,7 @@ public final class BrowserSettingsActivity extends Activity {
         t.setText(label);
         t.setTextSize(14);
         t.setTextColor(0xFF6F8DE1);
-        t.setPadding(dp(16), dp(18), dp(16), dp(6));
+        t.setPadding(ViaUi.pageInset(this), dp(18), ViaUi.pageInset(this), dp(6));
         return t;
     }
 

@@ -95,7 +95,7 @@ public final class BrowserHomeCustomizeActivity extends Activity {
         LinearLayout topBar = new LinearLayout(this);
         topBar.setOrientation(LinearLayout.HORIZONTAL);
         topBar.setGravity(Gravity.CENTER_VERTICAL);
-        topBar.setPadding(dp(1), 0, dp(1), 0);
+        topBar.setPadding(ViaUi.toolbarInset(this), 0, ViaUi.toolbarInset(this), 0);
 
         ImageView back = new ImageView(this);
         back.setImageResource(R.drawable.ic_chevron_left);

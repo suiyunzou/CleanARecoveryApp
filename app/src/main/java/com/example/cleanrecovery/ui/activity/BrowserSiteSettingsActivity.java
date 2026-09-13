@@ -59,7 +59,7 @@ public final class BrowserSiteSettingsActivity extends Activity {
 
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
-        top.setPadding(0, 0, 8, 0);
+        top.setPadding(ViaUi.toolbarInset(this), 0, ViaUi.toolbarInset(this), 0);
         root.addView(top, new LinearLayout.LayoutParams(-1, dp(56)));
 
         ImageButton back = new ImageButton(this);
@@ -107,12 +107,14 @@ public final class BrowserSiteSettingsActivity extends Activity {
 
         LinearLayout enable = new LinearLayout(this);
         enable.setGravity(Gravity.CENTER_VERTICAL);
-        enable.setPadding(dp(4), dp(12), dp(12), dp(12));
+        enable.setPadding(ViaUi.pageInset(this), dp(12), ViaUi.pageInset(this), dp(12));
         TextView label = new TextView(this);
         label.setText("启用 \"" + host + "\" 的网站设定");
         label.setTextSize(15);
         label.setTextColor(prefs.nightMode()?ViaUi.textColor(this,ViaUi.TEXT):getColor(R.color.text_primary));
-        enable.addView(label, new LinearLayout.LayoutParams(0, dp(44), 1));
+        label.setMinHeight(dp(44));
+        label.setPadding(0, 0, dp(12), 0);
+        enable.addView(label, new LinearLayout.LayoutParams(0, -2, 1));
         Switch enableSwitch = new Switch(this);
         enableSwitch.setChecked(enabled);
         enableSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
@@ -182,7 +184,7 @@ public final class BrowserSiteSettingsActivity extends Activity {
         v.setText(text);
         v.setTextSize(13);
         v.setTextColor(getColor(R.color.via_accent));
-        v.setPadding(dp(4), dp(18), dp(4), dp(8));
+        v.setPadding(ViaUi.pageInset(this), dp(18), ViaUi.pageInset(this), dp(8));
         list.addView(v);
     }
 
@@ -194,7 +196,7 @@ public final class BrowserSiteSettingsActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.VERTICAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(4), dp(8), dp(4), dp(8));
+        row.setPadding(ViaUi.pageInset(this), dp(8), ViaUi.pageInset(this), dp(8));
         row.setEnabled(enabled);
         row.setClickable(enabled);
         if (enabled) row.setBackgroundResource(R.drawable.bg_via_toolbar_button);
@@ -210,7 +212,8 @@ public final class BrowserSiteSettingsActivity extends Activity {
         s.setTextColor(prefs.nightMode()?ViaUi.textColor(this,ViaUi.TEXT_SUB):0xff9e9e9e);
         row.addView(t);
         row.addView(s);
-        list.addView(row, new LinearLayout.LayoutParams(-1, dp(72)));
+        row.setMinimumHeight(dp(72));
+        list.addView(row, new LinearLayout.LayoutParams(-1, -2));
     }
 
     private String modeLabel(int mode, boolean fallbackOn) {

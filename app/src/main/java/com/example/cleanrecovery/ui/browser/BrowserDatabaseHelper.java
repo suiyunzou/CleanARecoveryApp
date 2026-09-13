@@ -21,7 +21,7 @@ import java.util.List;
 public final class BrowserDatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DB_NAME = "via_browser.db";
-    private static final int DB_VERSION = 5;
+    private static final int DB_VERSION = 6;
 
     public static final String TABLE_BOOKMARKS = "bookmarks";
     public static final String TABLE_HISTORY = "history";
@@ -53,6 +53,7 @@ public final class BrowserDatabaseHelper extends SQLiteOpenHelper {
         db.execSQL("CREATE TABLE IF NOT EXISTS " + TABLE_FOLDERS + " ("
                 + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
                 + "name TEXT NOT NULL UNIQUE,"
+                + "parent TEXT NOT NULL DEFAULT '',"
                 + "add_time INTEGER NOT NULL)");
         db.execSQL("CREATE TABLE " + TABLE_HISTORY + " ("
                 + "id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -117,6 +118,7 @@ public final class BrowserDatabaseHelper extends SQLiteOpenHelper {
                     + "file_path TEXT NOT NULL UNIQUE,"
                     + "add_time INTEGER NOT NULL)");
         }
+        if (oldV < 6) db.execSQL("ALTER TABLE " + TABLE_FOLDERS + " ADD COLUMN parent TEXT NOT NULL DEFAULT ''");
     }
 
     // ===== 快捷链接（主页九宫格） =====
@@ -241,8 +243,35 @@ public final class BrowserDatabaseHelper extends SQLiteOpenHelper {
                 SQLiteDatabase.CONFLICT_IGNORE) != -1;
     }
 
+    public String folderParent(String name) {
+        try (Cursor cursor = getReadableDatabase().query(TABLE_FOLDERS, new String[]{"parent"},
+                "name=?", new String[]{name}, null, null, null)) {
+            return cursor.moveToFirst() ? cursor.getString(0) : "";
+        }
+    }
+
+    public boolean isFolderWithin(String folder, String ancestor) {
+        java.util.HashSet<String> seen = new java.util.HashSet<>();
+        while (folder != null && !folder.isEmpty() && !folder.equals("根目录") && seen.add(folder)) {
+            if (folder.equals(ancestor)) return true;
+            folder = folderParent(folder);
+        }
+        return false;
+    }
+
+    public boolean moveFolder(String name, String parent) {
+        String target = parent == null || parent.equals("根目录") ? "" : parent;
+        if (isFolderWithin(target, name) || (!target.isEmpty() && !listFolders().contains(target))) return false;
+        ContentValues values = new ContentValues();
+        values.put("parent", target);
+        return getWritableDatabase().update(TABLE_FOLDERS, values, "name=?", new String[]{name}) > 0;
+    }
+
     public void removeFolder(String name) {
         SQLiteDatabase database = getWritableDatabase();
+        ContentValues children = new ContentValues();
+        children.put("parent", folderParent(name));
+        database.update(TABLE_FOLDERS, children, "parent=?", new String[]{name});
         database.delete(TABLE_FOLDERS, "name=?", new String[]{name});
         ContentValues cv = new ContentValues();
         cv.put("folder", "根目录");
@@ -264,6 +293,9 @@ public final class BrowserDatabaseHelper extends SQLiteOpenHelper {
                 cv.clear();
                 cv.put("folder", nn);
                 database.update(TABLE_BOOKMARKS, cv, "folder=?", new String[]{oldName});
+                cv.clear();
+                cv.put("parent", nn);
+                database.update(TABLE_FOLDERS, cv, "parent=?", new String[]{oldName});
             }
             return ok;
         } catch (Exception e) {
@@ -274,9 +306,18 @@ public final class BrowserDatabaseHelper extends SQLiteOpenHelper {
     /** 删除文件夹并连带删除其内书签（对齐真 Via：fg 文案明示连带删除）。 */
     public int deleteFolderWithBookmarks(String name) {
         SQLiteDatabase database = getWritableDatabase();
-        int n = database.delete(TABLE_BOOKMARKS, "folder=?", new String[]{name});
-        database.delete(TABLE_FOLDERS, "name=?", new String[]{name});
-        return n;
+        List<String> folders = new ArrayList<>();
+        for (String folder : listFolders()) if (isFolderWithin(folder, name)) folders.add(folder);
+        int count = 0;
+        database.beginTransaction();
+        try {
+            for (String folder : folders) {
+                count += database.delete(TABLE_BOOKMARKS, "folder=?", new String[]{folder});
+                database.delete(TABLE_FOLDERS, "name=?", new String[]{folder});
+            }
+            database.setTransactionSuccessful();
+        } finally { database.endTransaction(); }
+        return count;
     }
 
     public boolean addBookmark(String title, String url) {

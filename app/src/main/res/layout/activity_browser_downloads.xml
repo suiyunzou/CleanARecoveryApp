@@ -12,8 +12,8 @@
         android:layout_height="56dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="0dp"
-        android:paddingEnd="8dp">
+        android:paddingStart="@dimen/via_toolbar_gutter"
+        android:paddingEnd="@dimen/via_toolbar_gutter">
 
         <ImageButton
             android:id="@+id/dl_back"
@@ -41,9 +41,9 @@
         android:id="@+id/dl_search"
         android:layout_width="match_parent"
         android:layout_height="40dp"
-        android:layout_marginStart="12dp"
+        android:layout_marginStart="@dimen/via_page_gutter"
         android:layout_marginTop="2dp"
-        android:layout_marginEnd="12dp"
+        android:layout_marginEnd="@dimen/via_page_gutter"
         android:layout_marginBottom="10dp"
         android:background="@drawable/bg_via_search_pill_shape"
         android:hint="@string/via_search_hint_simple"
@@ -58,8 +58,8 @@
     <HorizontalScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
+        android:paddingStart="@dimen/via_page_gutter"
+        android:paddingEnd="@dimen/via_page_gutter"
         android:paddingBottom="8dp"
         android:scrollbars="none">
 
@@ -110,17 +110,20 @@
         android:layout_height="48dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="16dp">
+        android:paddingHorizontal="@dimen/via_toolbar_gutter">
 
         <TextView
             android:id="@+id/dl_new"
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center_vertical"
+            android:minWidth="60dp"
+            android:paddingHorizontal="16dp"
+            android:gravity="center"
             android:text="@string/via_dl_new"
             android:textColor="@color/text_secondary"
             android:textSize="14sp" />
+
+        <Space android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
 
         <TextView
             android:id="@+id/dl_edit"

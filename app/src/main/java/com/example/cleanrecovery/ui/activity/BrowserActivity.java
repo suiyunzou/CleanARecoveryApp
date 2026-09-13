@@ -6033,6 +6033,20 @@ public final class BrowserActivity extends Activity {
                 return;
             }
             String libraryAction = data.getStringExtra(BrowserLibraryBaseActivity.EXTRA_LIBRARY_ACTION);
+            if (BrowserLibraryBaseActivity.ACTION_OPEN_URLS.equals(libraryAction)) {
+                ArrayList<String> urls = data.getStringArrayListExtra("urls");
+                if (urls != null) {
+                    TabManager.Tab first = null;
+                    for (String url : urls) {
+                        if (TextUtils.isEmpty(url)) continue;
+                        TabManager.Tab tab = newTab(url);
+                        if (first == null) first = tab;
+                    }
+                    if (first != null) showTab(first);
+                    updateTabBadge();
+                }
+                return;
+            }
             if (BrowserLibraryBaseActivity.ACTION_OPEN_TABS.equals(libraryAction)) {
                 openTabs();
                 return;
@@ -6043,7 +6057,7 @@ public final class BrowserActivity extends Activity {
                 boolean switchFirst = BrowserLibraryBaseActivity.ACTION_FOLDER_NEWTAB.equals(libraryAction);
                 int opened = 0;
                 for (BrowserDatabaseHelper.Entry e : dbHelper.listBookmarks()) {
-                    if (!folder.equals(e.folder)) continue;
+                    if (!dbHelper.isFolderWithin(e.folder, folder)) continue;
                     TabManager.Tab t = newTab(e.url);
                     if (switchFirst && opened == 0) showTab(t);
                     opened++;

@@ -12,7 +12,8 @@
         android:layout_height="56dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingEnd="8dp">
+        android:paddingStart="@dimen/via_toolbar_gutter"
+        android:paddingEnd="@dimen/via_toolbar_gutter">
 
         <ImageButton
             android:id="@+id/sn_page_back"
@@ -49,6 +50,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="56dp"
+        android:paddingHorizontal="@dimen/via_page_gutter"
         android:gravity="center"
         android:text="@string/via_sniffer_page_note"
         android:textColor="@color/text_primary"
