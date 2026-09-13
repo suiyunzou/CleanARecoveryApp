@@ -173,8 +173,12 @@ public final class BrowserBackupManager {
 
     public static String settingsJson(Context context) throws Exception {
         SharedPreferences sp = context.getSharedPreferences(BrowserPrefs.PREF, Context.MODE_PRIVATE);
+        BrowserScriptDatabase scripts = BrowserScriptDatabase.getInstance(context);
+        scripts.migrate(sp);
+        Map<String, Object> settings = new java.util.LinkedHashMap<>(sp.getAll());
+        settings.putAll(scripts.backupSettings());
         JSONArray values = new JSONArray();
-        for (Map.Entry<String, ?> entry : sp.getAll().entrySet()) {
+        for (Map.Entry<String, ?> entry : settings.entrySet()) {
             Object value = entry.getValue();
             JSONObject item = new JSONObject().put("key", entry.getKey());
             if (value instanceof Boolean) item.put("type", "b").put("value", value);
@@ -208,7 +212,9 @@ public final class BrowserBackupManager {
                 default: edit.putString(key, item.optString("value")); break;
             }
         }
-        edit.apply();
+        if (!edit.commit()) throw new java.io.IOException("设置恢复写入失败");
+        BrowserScriptDatabase.getInstance(context).migrate(
+                context.getSharedPreferences(BrowserPrefs.PREF, Context.MODE_PRIVATE), true);
     }
 
     private static void put(ZipOutputStream zip, String name, String value) throws Exception {

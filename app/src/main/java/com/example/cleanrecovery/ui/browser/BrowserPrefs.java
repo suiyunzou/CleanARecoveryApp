@@ -286,13 +286,16 @@ public final class BrowserPrefs {
             for (String part : stored.split(",")) {
                 try {
                     int engine = Integer.parseInt(part.trim());
-                    if (!out.contains(engine)) out.add(engine);
+                    if (engine >= SearchEngines.YOUTUBE && engine <= SearchEngines.STARTPAGE
+                            && !out.contains(engine)) out.add(engine);
                 } catch (Exception ignored) { }
             }
         }
         for (int engine : DEFAULT_TOOLBAR_ENGINES) {
             if (!out.contains(engine)) out.add(engine);
         }
+        if (customSearchList().isEmpty()) out.remove((Integer) SearchEngines.CUSTOM);
+        else if (!out.contains(SearchEngines.CUSTOM)) out.add(0, SearchEngines.CUSTOM);
         return out;
     }
 
@@ -1542,76 +1545,62 @@ public final class BrowserPrefs {
     public void setVolumeKeyScroll(boolean v) { put("volume_scroll", v); }
 
     /** 脚本（名称 → {match, code}）。 */
+    private BrowserScriptDatabase scripts() {
+        BrowserScriptDatabase database = BrowserScriptDatabase.getInstance(appContextRef);
+        database.migrate(sp);
+        return database;
+    }
     public List<String> scriptNames() {
-        return new ArrayList<>(sp.getStringSet("script_names", new LinkedHashSet<String>()));
+        return scripts().names();
     }
-    public String scriptMatch(String name) { return s("script_match_override_" + name, s("script_match_" + name, "*")); }
-    public void setScriptMatchOverride(String name, String rules) { put("script_match_override_" + name, rules); }
-    public String scriptRunAtOverride(String name) { return s("script_run_override_" + name, ""); }
-    public void setScriptRunAtOverride(String name, String value) { put("script_run_override_" + name, value); }
+    public String scriptMatch(String name) { return scripts().value(name, "match_override", scripts().value(name, "match_rules", "*")); }
+    public void setScriptMatchOverride(String name, String rules) { scripts().set(name, "match_override", rules); }
+    public String scriptRunAtOverride(String name) { return scripts().value(name, "run_override", ""); }
+    public void setScriptRunAtOverride(String name, String value) { scripts().set(name, "run_override", value); }
     public String scriptExcludes(String name) {
-        return s("script_exclude_override_" + name, android.text.TextUtils.join("\n", BrowserUserScripts.parse(scriptCode(name)).excludes));
+        return scripts().value(name, "exclude_override", android.text.TextUtils.join("\n", BrowserUserScripts.parse(scriptCode(name)).excludes));
     }
-    public void setScriptExcludes(String name, String value) { put("script_exclude_override_" + name, value); }
+    public void setScriptExcludes(String name, String value) { scripts().set(name, "exclude_override", value); }
     public void resetScriptOverrides(String name) {
-        sp.edit().remove("script_match_override_" + name).remove("script_run_override_" + name)
-                .remove("script_exclude_override_" + name)
-                .putString("script_match_" + name, BrowserUserScripts.parse(scriptCode(name)).matchText()).apply();
+        for (String key : new String[]{"match_override", "run_override", "exclude_override"}) scripts().set(name, key, null);
+        scripts().set(name, "match_rules", BrowserUserScripts.parse(scriptCode(name)).matchText());
     }
     public String scriptExecutionCode(String name) {
-        String code = sp.contains("script_match_override_" + name)
+        String code = scripts().value(name, "match_override", null) != null
                 ? BrowserUserScripts.withMatchRules(scriptCode(name), scriptMatch(name)) : scriptCode(name);
         if (!scriptRunAtOverride(name).isEmpty()) code = BrowserUserScripts.withMetadataRules(code, "run-at", "run-at", scriptRunAtOverride(name));
-        if (sp.contains("script_exclude_override_" + name)) code = BrowserUserScripts.withMetadataRules(code, "exclude|exclude-match", "exclude", scriptExcludes(name));
+        if (scripts().value(name, "exclude_override", null) != null) code = BrowserUserScripts.withMetadataRules(code, "exclude|exclude-match", "exclude", scriptExcludes(name));
         return code;
     }
-    public String scriptCode(String name) { return s("script_code_" + name, ""); }
-    public long scriptCreatedAt(String name) { return sp.getLong("script_created_"+name,0); }
-    public long scriptUpdatedAt(String name) { return sp.getLong("script_updated_"+name,0); }
+    public String scriptCode(String name) { return scripts().source(name); }
+    public long scriptCreatedAt(String name) { return Long.parseLong(scripts().value(name, "created_at", "0")); }
+    public long scriptUpdatedAt(String name) { return Long.parseLong(scripts().value(name, "updated_at", "0")); }
     public String scriptStorageId(String name) {
         synchronized (BrowserPrefs.class) {
-            String id = s("script_id_" + name, "");
-            if (id.isEmpty()) { id = java.util.UUID.randomUUID().toString(); put("script_id_" + name, id); }
+            String id = scripts().value(name, "script_id", "");
+            if (id.isEmpty()) { id = java.util.UUID.randomUUID().toString(); scripts().set(name, "script_id", id); }
             return id;
         }
     }
 
     public void preserveScriptIdentity(String oldName, String newName) {
         if (oldName != null && !oldName.equals(newName)) {
-            put("script_id_" + newName, scriptStorageId(oldName));
-            sp.edit().putLong("script_created_"+newName,scriptCreatedAt(oldName)).apply();
-            if (sp.contains("script_match_override_" + oldName))
-                setScriptMatchOverride(newName, scriptMatch(oldName));
-            for (String prefix : new String[]{"script_run_override_", "script_exclude_override_"})
-                if (sp.contains(prefix + oldName)) put(prefix + newName, s(prefix + oldName, ""));
-            sp.edit().remove("script_id_" + oldName).apply();
+            scripts().transferIdentity(oldName, newName);
         }
     }
     public void saveScript(String name, String match, String code) {
-        java.util.Set<String> set = new LinkedHashSet<>(sp.getStringSet("script_names", new LinkedHashSet<String>()));
-        long now=System.currentTimeMillis();
-        long created=sp.contains("script_created_"+name)?scriptCreatedAt(name):(set.contains(name)?0:now);
-        set.add(name);
-        sp.edit().putStringSet("script_names", set)
-                .putLong("script_created_"+name,created).putLong("script_updated_"+name,now)
-                .putString("script_match_" + name, match)
-                .putString("script_code_" + name, code).apply();
+        scripts().save(name, match, code);
     }
     public void removeScript(String name) {
-        String id = s("script_id_" + name, "");
+        String id = scripts().value(name, "script_id", "");
         if (!id.isEmpty()) appContextRef.getSharedPreferences("via_script_values", Context.MODE_PRIVATE).edit().remove(id).apply();
-        java.util.Set<String> set = new LinkedHashSet<>(sp.getStringSet("script_names", new LinkedHashSet<String>()));
-        set.remove(name);
-        sp.edit().putStringSet("script_names", set).remove("script_match_" + name)
-                .remove("script_created_"+name).remove("script_updated_"+name)
-                .remove("script_run_override_" + name).remove("script_exclude_override_" + name)
-                .remove("script_match_override_" + name).remove("script_code_" + name).remove("script_enabled_" + name).remove("script_id_" + name).apply();
+        scripts().remove(name);
     }
 
     public boolean scriptsEnabled() { return b("scripts_enabled", true); }
     public void setScriptsEnabled(boolean enabled) { put("scripts_enabled", enabled); }
-    public boolean isScriptEnabled(String name) { return b("script_enabled_" + name, true); }
-    public void setScriptEnabled(String name, boolean v) { put("script_enabled_" + name, v); }
+    public boolean isScriptEnabled(String name) { return !"0".equals(scripts().value(name, "enabled", "1")); }
+    public void setScriptEnabled(String name, boolean v) { scripts().set(name, "enabled", v ? "1" : "0"); }
 
     /** 隐私-不出售或分享数据。 */
     public boolean doNotSell() { return b("do_not_sell", false); }

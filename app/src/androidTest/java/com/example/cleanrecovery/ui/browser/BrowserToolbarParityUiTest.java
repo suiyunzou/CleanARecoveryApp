@@ -278,5 +278,179 @@ public class BrowserToolbarParityUiTest {
     }
     private View findDescription(View v,String text){if(text.contentEquals(v.getContentDescription()==null?"":v.getContentDescription()))return v;if(v instanceof ViewGroup)for(int i=0;i<((ViewGroup)v).getChildCount();i++){View found=findDescription(((ViewGroup)v).getChildAt(i),text);if(found!=null)return found;}return null;}
     private void findGrids(View v,List<RecyclerView> result){if(v instanceof RecyclerView){result.add((RecyclerView)v);return;}if(v instanceof ViewGroup)for(int i=0;i<((ViewGroup)v).getChildCount();i++)findGrids(((ViewGroup)v).getChildAt(i),result);}
+    @Test public void searchToolbarScrollsSettingsWithEnginesAndKeepsDefault() throws Exception {
+        prefs.setSearchEngine(SearchEngines.GOOGLE);
+        prefs.setSearchToolbarEnabled(true);
+        prefs.setSearchToolbarOrder(Arrays.asList(SearchEngines.BAIDU, SearchEngines.GOOGLE,
+                SearchEngines.BING, SearchEngines.YAHOO, SearchEngines.STARTPAGE, SearchEngines.DUCKDUCKGO));
+        prefs.setSearchToolbarDisabledEngines(new HashSet<>(Arrays.asList(SearchEngines.YAHOO)));
+        TabManager.Tab tab = main(() -> ((TabManager) field(activity, "tabs")).current());
+        WebView original = main(() -> tab.webView);
+        WebView recording = main(() -> new WebView(activity) {
+            @Override public void loadUrl(String url) { }
+            @Override public void loadUrl(String url, Map<String, String> headers) { }
+        });
+        try {
+            main(() -> {
+                tab.webView = recording;
+                invoke("hideHome", new Class[]{});
+                tab.url = "https://www.google.com/search?q=hello%20world";
+                invoke("updateSearchToolbar", new Class[]{String.class}, tab.url);
+                ViewGroup chips = activity.findViewById(R.id.browser_search_toolbar_chips);
+                assertNull(findText(chips, "雅虎"));
+                assertEquals("百度", ((TextView) chips.getChildAt(0)).getText().toString());
+                assertTrue(findText(chips, "谷歌").isSelected());
+                findText(chips, "百度").performClick();
+                assertEquals(SearchEngines.GOOGLE, prefs.searchEngine());
+                assertEquals("https://www.baidu.com/s?wd=hello+world", tab.url);
+                assertTrue(findText(chips, "百度").isSelected());
+                View settings = activity.findViewById(R.id.browser_search_toolbar_settings);
+                assertTrue(settings instanceof ImageView);
+                assertEquals("搜索设置", settings.getContentDescription());
+                ViewGroup toolbar = activity.findViewById(R.id.browser_search_toolbar_container);
+                int width = Math.round(320 * activity.getResources().getDisplayMetrics().density);
+                toolbar.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                        View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+                toolbar.layout(0, 0, width, toolbar.getMeasuredHeight());
+                ViewGroup settingsRow = (ViewGroup) settings.getParent();
+                android.widget.HorizontalScrollView scroller = activity.findViewById(R.id.browser_search_toolbar_scroll);
+                assertSame(chips, settingsRow);
+                assertSame(scroller, settingsRow.getParent());
+                assertTrue(settings.getRight() > scroller.getWidth());
+                scroller.scrollTo(settingsRow.getWidth(), 0);
+                assertEquals(scroller.getWidth() - settingsRow.getPaddingRight(), settings.getRight() - scroller.getScrollX());
+                assertTrue(settingsRow.getPaddingRight() >= ViaUi.toolbarInset(activity));
+                scroller.scrollTo(0, 0);
+                toolbar.requestLayout();
+                return null;
+            });
+            snapshot("search-toolbar-scroll-start");
+            Rect scrollBounds = main(() -> {
+                Rect bounds = new Rect();
+                activity.findViewById(R.id.browser_search_toolbar_scroll).getGlobalVisibleRect(bounds);
+                return bounds;
+            });
+            int settingsBefore = main(() -> {
+                int[] location = new int[2];
+                activity.findViewById(R.id.browser_search_toolbar_settings).getLocationOnScreen(location);
+                return location[0];
+            });
+            swipeSearchToolbar(scrollBounds, true);
+            main(() -> {
+                android.widget.HorizontalScrollView scroller = activity.findViewById(R.id.browser_search_toolbar_scroll);
+                assertTrue("A real horizontal gesture must scroll the toolbar", scroller.getScrollX() > 0);
+                int[] location = new int[2];
+                View settings = activity.findViewById(R.id.browser_search_toolbar_settings);
+                settings.getLocationOnScreen(location);
+                assertEquals(settingsBefore - scroller.getScrollX(), location[0]);
+                assertTrue(location[0] + settings.getWidth() <= scrollBounds.right - ViaUi.toolbarInset(activity));
+                android.util.Log.i("SearchToolbarTest", "gesture scrollPx=" + scroller.getScrollX()
+                        + ", settingsX=" + settingsBefore + "->" + location[0]);
+                return null;
+            });
+            snapshot("search-toolbar-scroll-end");
+            swipeSearchToolbar(scrollBounds, false);
+            main(() -> {
+                assertEquals(0, ((android.widget.HorizontalScrollView) activity.findViewById(R.id.browser_search_toolbar_scroll)).getScrollX());
+                return null;
+            });
+            swipeSearchToolbar(scrollBounds, true);
+            final Intent[] launched = new Intent[1];
+            android.app.Instrumentation.ActivityMonitor monitor = new android.app.Instrumentation.ActivityMonitor() {
+                @Override public android.app.Instrumentation.ActivityResult onStartActivity(Intent intent) {
+                    if (intent.getComponent() != null && intent.getComponent().getClassName().endsWith("BrowserSearchSettingsActivity")) {
+                        launched[0] = intent;
+                        return new android.app.Instrumentation.ActivityResult(Activity.RESULT_CANCELED, null);
+                    }
+                    return null;
+                }
+            };
+            instrument.addMonitor(monitor);
+            try {
+                Rect settingsBounds = main(() -> {
+                    Rect bounds = new Rect();
+                    activity.findViewById(R.id.browser_search_toolbar_settings).getGlobalVisibleRect(bounds);
+                    return bounds;
+                });
+                long down = android.os.SystemClock.uptimeMillis();
+                searchTouch(down, android.view.MotionEvent.ACTION_DOWN, settingsBounds.centerX(), settingsBounds.centerY());
+                searchTouch(down, android.view.MotionEvent.ACTION_UP, settingsBounds.centerX(), settingsBounds.centerY());
+                instrument.waitForIdleSync();
+                assertNotNull(launched[0]);
+                assertNull(launched[0].getStringExtra("page"));
+            } finally { instrument.removeMonitor(monitor); }
+            main(() -> {
+                prefs.setSearchToolbarEnabled(false);
+                invoke("updateSearchToolbar", new Class[]{String.class}, tab.url);
+                assertEquals(View.GONE, activity.findViewById(R.id.browser_search_toolbar_container).getVisibility());
+                return null;
+            });
+        } finally { main(() -> { tab.webView = original; recording.destroy(); return null; }); }
+    }
+
+    private void swipeSearchToolbar(Rect bounds, boolean towardEnd) throws Exception {
+        float start = bounds.left + bounds.width() * (towardEnd ? .85f : .15f);
+        float end = bounds.left + bounds.width() * (towardEnd ? .15f : .85f);
+        long down = android.os.SystemClock.uptimeMillis();
+        searchTouch(down, android.view.MotionEvent.ACTION_DOWN, start, bounds.centerY());
+        for (int i = 1; i <= 24; i++) {
+            Thread.sleep(16);
+            searchTouch(down, android.view.MotionEvent.ACTION_MOVE, start + (end - start) * i / 24, bounds.centerY());
+        }
+        searchTouch(down, android.view.MotionEvent.ACTION_UP, end, bounds.centerY());
+        Thread.sleep(400);
+        instrument.waitForIdleSync();
+    }
+
+    private void searchTouch(long down, int action, float x, float y) {
+        android.view.MotionEvent event = android.view.MotionEvent.obtain(down,
+                android.os.SystemClock.uptimeMillis(), action, x, y, 0);
+        event.setSource(android.view.InputDevice.SOURCE_TOUCHSCREEN);
+        try { assertTrue(instrument.getUiAutomation().injectInputEvent(event, true)); }
+        finally { event.recycle(); }
+    }
+
+    @Test public void searchToolbarSettingsUseCompactRowsAndPersistToggles() throws Exception {
+        prefs.setSearchEngine(SearchEngines.GOOGLE);
+        prefs.setSearchToolbarEnabled(true);
+        prefs.setSearchToolbarOrder(Arrays.asList(SearchEngines.GOOGLE, SearchEngines.BAIDU,
+                SearchEngines.BING, SearchEngines.YAHOO, SearchEngines.STARTPAGE, SearchEngines.DUCKDUCKGO));
+        prefs.setSearchToolbarDisabledEngines(Collections.emptySet());
+        Activity settings = instrument.startActivitySync(new Intent(instrument.getTargetContext(),
+                com.example.cleanrecovery.ui.activity.BrowserSearchSettingsActivity.class)
+                .putExtra("page", "toolbar").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        try {
+            instrument.waitForIdleSync();
+            main(() -> {
+                View root = settings.getWindow().getDecorView();
+                TextView section = (TextView) findText(root, "搜索引擎");
+                assertTrue(section.getTypeface().isBold());
+                View drag = findDescription(root, "拖动排序：百度");
+                assertNotNull(drag);
+                ViewGroup row = (ViewGroup) drag.getParent();
+                float density = settings.getResources().getDisplayMetrics().density;
+                assertEquals(62, Math.round(row.getHeight() / density));
+                row.performClick();
+                assertTrue(new BrowserPrefs(settings).searchToolbarDisabledEngines().contains(SearchEngines.BAIDU));
+                findDescription(root, "谷歌，默认引擎").performClick();
+                assertFalse(prefs.searchToolbarDisabledEngines().contains(SearchEngines.GOOGLE));
+                ((View) findText(root, "启用搜索工具栏").getParent()).performClick();
+                assertFalse(new BrowserPrefs(settings).searchToolbarEnabled());
+                return null;
+            });
+            snapshot("search-toolbar-settings-parity");
+        } finally { main(() -> { settings.finish(); return null; }); }
+    }
+
+    @Test public void customSearchToolbarEntryMatchesSettingsWithoutReordering() {
+        prefs.setSearchEngine(SearchEngines.GOOGLE);
+        prefs.addCustomSearch("测试搜索", "https://search-fixture.invalid/?q=");
+        prefs.setSearchToolbarOrder(Collections.emptyList());
+        prefs.setSearchToolbarDisabledEngines(Collections.emptySet());
+        assertTrue(prefs.searchToolbarOrder().contains(SearchEngines.CUSTOM));
+        assertTrue(prefs.searchToolbarEngines().contains(SearchEngines.CUSTOM));
+        assertEquals("测试搜索", prefs.customSearchTitle());
+    }
+
     private View findText(View v,String text){if(v instanceof TextView&&text.contentEquals(((TextView)v).getText()))return v;if(v instanceof ViewGroup)for(int i=0;i<((ViewGroup)v).getChildCount();i++){View found=findText(((ViewGroup)v).getChildAt(i),text);if(found!=null)return found;}return null;}
 }
