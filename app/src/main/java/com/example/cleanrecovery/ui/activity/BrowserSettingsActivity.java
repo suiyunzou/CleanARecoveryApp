@@ -76,6 +76,8 @@ public final class BrowserSettingsActivity extends Activity {
     public static final String EXTRA_NEW_SCRIPT = "new_script";
     public static final String EXTRA_SCRIPT_URL = "script_url";
     public static final String EXTRA_SCRIPT_SOURCE = "script_source";
+    public static final String EXTRA_SCRIPT_DRAFT = "script_draft";
+    private String scriptDraftToken;
 
     private enum Page {
         ROOT, GENERAL, SYNC, WEBDAV, UA, DESKTOP_UA, ADBLOCK, ADBLOCK_CUSTOM, ADBLOCK_SUBS,
@@ -240,6 +242,11 @@ public final class BrowserSettingsActivity extends Activity {
             collectInputs(listContainer, inputs);
             ArrayList<String> drafts = savedInstanceState.getStringArrayList("drafts");
             if (drafts != null) for (int i = 0; i < Math.min(drafts.size(), inputs.size()); i++) inputs.get(i).setText(drafts.get(i));
+            scriptDraftToken = savedInstanceState.getString("script_draft_token");
+            if (current == Page.SCRIPT_EDIT && scriptDraftToken != null) {
+                try { scriptSource.setText(com.example.cleanrecovery.ui.browser.BrowserScriptDraftStore.read(this, scriptDraftToken)); }
+                catch (java.io.IOException error) { scriptSource.setError("草稿读取失败，请重新导入脚本"); }
+            }
             int focused = savedInstanceState.getInt("focused_input", -1);
             if (focused >= 0 && focused < inputs.size()) inputs.get(focused).requestFocus();
             scroll.post(() -> scroll.scrollTo(0, savedInstanceState.getInt("settings_scroll")));
@@ -263,6 +270,13 @@ public final class BrowserSettingsActivity extends Activity {
         } else {
             open(Page.ROOT);
         }
+    }
+
+    private void clearScriptDrafts() {
+        com.example.cleanrecovery.ui.browser.BrowserScriptDraftStore.delete(this, scriptDraftToken);
+        com.example.cleanrecovery.ui.browser.BrowserScriptDraftStore.delete(this, getIntent().getStringExtra(EXTRA_SCRIPT_DRAFT));
+        scriptDraftToken = null;
+        getIntent().removeExtra(EXTRA_SCRIPT_DRAFT);
     }
 
     private int dp(float v) {
@@ -306,6 +320,7 @@ public final class BrowserSettingsActivity extends Activity {
         }
         if (stack.size() > 1) {
             if (current == Page.SCRIPT_EDIT) {
+                clearScriptDrafts();
                 getIntent().removeExtra(EXTRA_SCRIPT_SOURCE);
                 getIntent().removeExtra(EXTRA_SCRIPT_URL);
                 getIntent().removeExtra(EXTRA_NEW_SCRIPT);
@@ -1910,6 +1925,7 @@ public final class BrowserSettingsActivity extends Activity {
     }
 
     @Override protected void onDestroy() {
+        if (isFinishing()) clearScriptDrafts();
         if (scriptRevealAnimator != null) scriptRevealAnimator.cancel();
         if (aiProviderValidationRequest != null) aiProviderValidationRequest.cancel();
         if (aiProviderValidationDialog != null) aiProviderValidationDialog.dismiss();
@@ -2037,7 +2053,16 @@ public final class BrowserSettingsActivity extends Activity {
         collectInputs(listContainer, inputs);
         ArrayList<String> drafts = new ArrayList<>();
         for (int i = 0; i < inputs.size(); i++) {
-            drafts.add(inputs.get(i).getText().toString());
+            if (current == Page.SCRIPT_EDIT && inputs.get(i) == scriptSource) {
+                try {
+                    scriptDraftToken = com.example.cleanrecovery.ui.browser.BrowserScriptDraftStore.write(this,
+                            scriptDraftToken, scriptSource.getText().toString());
+                    out.putString("script_draft_token", scriptDraftToken);
+                } catch (java.io.IOException error) {
+                    android.util.Log.e("ScriptDraft", "Unable to persist script draft", error);
+                }
+                drafts.add(scriptOriginalSource.length() < 16000 ? scriptOriginalSource : "");
+            } else drafts.add(inputs.get(i).getText().toString());
             if (inputs.get(i).hasFocus()) out.putInt("focused_input", i);
         }
         out.putStringArrayList("drafts", drafts);
@@ -2354,8 +2379,19 @@ public final class BrowserSettingsActivity extends Activity {
                 ? "// ==UserScript==\n// @name         New Userscript\n// @namespace    https://github.com/suiyunzou/CleanARecoveryApp\n// @version      0.1\n// @description  Describe what this script does\n// @author       You\n// @run-at       document-end\n// @match        https://*/*\n// @grant        none\n// ==/UserScript==\n\n(function() {\n    'use strict';\n\n    // Your code here...\n})();"
                 : prefs.scriptCode(editScriptName);
         scriptSource = new EditText(scriptDialogContext());
+        scriptSource.setSaveEnabled(false);
         if (editScriptName == null) {
             String downloaded = getIntent().getStringExtra(EXTRA_SCRIPT_SOURCE);
+            String draft = getIntent().getStringExtra(EXTRA_SCRIPT_DRAFT);
+            if (draft != null) {
+                try { downloaded = com.example.cleanrecovery.ui.browser.BrowserScriptDraftStore.read(this, draft); }
+                catch (java.io.IOException error) {
+                    downloaded = "";
+                    new ViaDialogBuilder(scriptDialogContext()).setTitle("脚本读取失败")
+                            .setMessage("安装草稿已不可用，请返回网页重新安装。")
+                            .setPositiveButton(android.R.string.ok, null).show();
+                }
+            }
             String pageUrl = getIntent().getStringExtra(EXTRA_SCRIPT_URL);
             if (downloaded != null) scriptOriginalSource = downloaded;
             else if (pageUrl != null && Uri.parse(pageUrl).getHost() != null) {

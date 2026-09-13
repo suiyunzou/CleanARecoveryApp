@@ -288,6 +288,7 @@ public final class BrowserSearchSettingsActivity extends Activity {
                 section.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(34)));
                 section.setText("搜索引擎");
                 section.setTextSize(13);
+                section.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
                 section.setTextColor(getColor(R.color.via_accent));
                 section.setGravity(Gravity.CENTER_VERTICAL);
                 section.setPadding(ViaUi.pageInset(BrowserSearchSettingsActivity.this), 0, ViaUi.pageInset(BrowserSearchSettingsActivity.this), 0);
@@ -319,9 +320,9 @@ public final class BrowserSearchSettingsActivity extends Activity {
                 row.addView(texts, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1.0f));
 
                 ImageView dragHandle = new ImageView(BrowserSearchSettingsActivity.this);
-                dragHandle.setImageResource(R.drawable.ic_drag_handle);
+                dragHandle.setImageResource(R.drawable.ic_via_library_reorder);
                 dragHandle.setPadding(dp(8), dp(8), dp(8), dp(8));
-                dragHandle.setColorFilter(0xFF888888);
+                dragHandle.setColorFilter(0xFF333333);
                 LinearLayout.LayoutParams lpDrag = new LinearLayout.LayoutParams(dp(40), dp(40));
                 lpDrag.rightMargin = dp(16);
                 row.addView(dragHandle, lpDrag);
@@ -351,12 +352,18 @@ public final class BrowserSearchSettingsActivity extends Activity {
                 int engine = engines.get(position - 2);
                 holder.title.setText(searchEngineLabel(engine));
                 boolean isDefault = (engine == defaultEngine);
+                holder.dragHandle.setContentDescription("拖动排序：" + searchEngineLabel(engine));
+                // Via's ordinary row is 62dp; the default subtitle adds its natural height.
+                holder.itemView.setPadding(ViaUi.pageInset(BrowserSearchSettingsActivity.this), dp(11),
+                        ViaUi.pageInset(BrowserSearchSettingsActivity.this), dp(11));
+                holder.itemView.setMinimumHeight(dp(isDefault ? 78 : 62));
+                holder.sw.setContentDescription(searchEngineLabel(engine) + (isDefault ? "，默认引擎" : "，显示在搜索工具栏"));
 
                 if (isDefault) {
                     holder.subtitle.setText("默认");
                     holder.subtitle.setVisibility(View.VISIBLE);
                     ViaUi.renderSwitch(holder.sw, true);
-                    holder.sw.setAlpha(0.6f);
+                    holder.sw.setAlpha(1.0f);
                     holder.itemView.setOnClickListener(null);
                     holder.sw.setOnClickListener(null);
                 } else {

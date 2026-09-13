@@ -74,6 +74,7 @@ import com.example.cleanrecovery.ui.browser.BrowserWebView;
 import com.example.cleanrecovery.ui.browser.BrowserReader;
 import com.example.cleanrecovery.ui.browser.BrowserPasswordStore;
 import com.example.cleanrecovery.ui.browser.BrowserUserScripts;
+import com.example.cleanrecovery.ui.browser.BrowserScriptDraftStore;
 import com.example.cleanrecovery.ui.browser.BrowserAiClient;
 import com.example.cleanrecovery.ui.browser.BrowserAiStore;
 import com.example.cleanrecovery.ui.browser.BrowserAiMarkdown;
@@ -1070,16 +1071,23 @@ public final class BrowserActivity extends Activity {
 
     private void loadUrlInCurrentKeepingSearchSwitcher(String url) {
         if (url == null || url.isEmpty()) return;
+        int requestedEngine = activeSearchEngine;
+        String requestedQuery = lastSearchQuery;
         hasRestorableClosedTab = false;
         hideHome();
         addressBarEditing = false;
-        applyToolbarMode();
         TabManager.Tab cur = tabs.current();
         if (cur == null) newTab(url);
         else {
             urlInput.setText(url);
             navigateToPage(cur, url, false);
         }
+        // Refresh against the destination, not the previous engine's URL.
+        activeSearchEngine = requestedEngine;
+        lastSearchQuery = requestedQuery;
+        showSearchEngineSwitcher = true;
+        applyToolbarMode();
+        updateSearchToolbar(url);
     }
 
     /** 在当前标签加载 URL 并隐藏主页。 */
@@ -2207,14 +2215,22 @@ public final class BrowserActivity extends Activity {
                 String code = BrowserUserScripts.download(url);
                 if (!code.contains("// ==UserScript==") || BrowserUserScripts.parse(code).name.isEmpty())
                     throw new java.io.IOException("文件不是有效的 Userscript 脚本");
+                String draft = BrowserScriptDraftStore.write(this, null, code);
                 runOnUiThread(() -> {
-                    if (!loading.isShowing() || isFinishing() || isDestroyed()) return;
+                    if (!loading.isShowing() || isFinishing() || isDestroyed()) {
+                        BrowserScriptDraftStore.delete(this, draft); return;
+                    }
                     loading.dismiss();
                     scriptsBeforeEditing = scriptConfiguration();
-                    startActivityForResult(new Intent(this, BrowserSettingsActivity.class)
+                    try { startActivityForResult(new Intent(this, BrowserSettingsActivity.class)
                             .putExtra(BrowserSettingsActivity.EXTRA_OPEN_SCRIPTS, true)
                             .putExtra(BrowserSettingsActivity.EXTRA_NEW_SCRIPT, true)
-                            .putExtra(BrowserSettingsActivity.EXTRA_SCRIPT_SOURCE, code), REQ_SCRIPT_SETTINGS);
+                            .putExtra(BrowserSettingsActivity.EXTRA_SCRIPT_DRAFT, draft), REQ_SCRIPT_SETTINGS);
+                    } catch (RuntimeException error) {
+                        BrowserScriptDraftStore.delete(this, draft);
+                        new ViaDialogBuilder(sitePanelContext()).setTitle("无法打开脚本安装页")
+                                .setMessage(error.getMessage()).setPositiveButton(android.R.string.ok, null).show();
+                    }
                 });
             } catch (Exception error) {
                 runOnUiThread(() -> {
@@ -4211,6 +4227,7 @@ public final class BrowserActivity extends Activity {
     private void rebuildSearchEngineRow() {
         updateSearchHints();
         if (searchToolbarChips == null || prefs == null) return;
+        ImageView settings = findViewById(R.id.browser_search_toolbar_settings);
         searchToolbarChips.removeAllViews();
         List<Integer> engines = prefs.searchToolbarEngines();
         if (engines == null || engines.isEmpty()) {
@@ -4227,14 +4244,15 @@ public final class BrowserActivity extends Activity {
         int accentColor = androidx.core.content.ContextCompat.getColor(this, R.color.via_accent);
 
         for (int engine : engines) {
-            TextView chip = addSearchToolbarChip(SearchEngines.label(engine),
+            if (engine == SearchEngines.CUSTOM && prefs.customSearchList().isEmpty()) continue;
+            TextView chip = addSearchToolbarChip(engine == SearchEngines.CUSTOM
+                            ? prefs.customSearchTitle() : SearchEngines.label(engine),
                     engine == activeSearchEngine, night, accentColor);
 
             final int targetEngine = engine;
             chip.setOnClickListener(v -> {
                 if (targetEngine == activeSearchEngine) return;
                 activeSearchEngine = targetEngine;
-                prefs.setSearchEngine(targetEngine);
                 updateSearchHints();
                 rebuildSearchEngineRow();
                 if (!TextUtils.isEmpty(lastSearchQuery)) {
@@ -4245,10 +4263,10 @@ public final class BrowserActivity extends Activity {
                 }
             });
         }
-        TextView settings = addSearchToolbarChip(getString(R.string.via_menu_settings),
-                false, night, accentColor);
+        searchToolbarChips.addView(settings, new LinearLayout.LayoutParams(dp(48), -1));
+        settings.setColorFilter(night ? 0xFFCCCCCC : 0xFF333333);
         settings.setOnClickListener(v -> startActivityForResult(
-                new Intent(this, BrowserSearchSettingsActivity.class).putExtra("page", "toolbar"), REQ_SETTINGS));
+                new Intent(this, BrowserSearchSettingsActivity.class), REQ_SETTINGS));
     }
 
     private TextView addSearchToolbarChip(String title, boolean selected, boolean night, int accentColor) {
@@ -4257,16 +4275,18 @@ public final class BrowserActivity extends Activity {
         chip.setTextSize(13);
         chip.setGravity(Gravity.CENTER);
         chip.setSingleLine(true);
+        chip.setSelected(selected);
+        chip.setMinWidth(dp(48));
         chip.setTextColor(selected ? accentColor : (night ? 0xFFCCCCCC : 0xFF3C4043));
         GradientDrawable bg = new GradientDrawable();
         bg.setCornerRadius(dp(16));
         bg.setColor(night ? 0xFF2B2B2B : Color.WHITE);
-        bg.setStroke(dp(1), selected ? accentColor : (night ? 0xFF444444 : 0xFFDADCE0));
+        bg.setStroke(dp(1), selected ? accentColor : (night ? 0xFF444444 : 0xFFE5E5E5));
         chip.setBackground(bg);
-        chip.setPadding(dp(14), 0, dp(14), 0);
+        chip.setPadding(dp(12), 0, dp(12), 0);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, dp(28));
-        lp.setMargins(0, 0, dp(6), 0);
+        lp.setMargins(0, 0, dp(8), 0);
         searchToolbarChips.addView(chip, lp);
         return chip;
     }
