@@ -297,7 +297,7 @@
     <string name="universal_download_title">下载</string>
     <string name="about_universal_download_desc">保存支持网站的视频和音乐</string>
     <string name="universal_download_url_label">粘贴视频或音乐链接</string>
-    <string name="universal_download_url_hint">支持 YouTube、B站、抖音、Twitter 等主流站点</string>
+    <string name="universal_download_url_hint">粘贴视频、音频链接或分享文案，每行一个</string>
     <string name="universal_download_url_empty">请先输入网址</string>
     <string name="universal_download_action">下载</string>
     <string name="universal_download_select_quality">请选择画质</string>
@@ -311,7 +311,7 @@
     <string name="universal_download_downloading">正在下载…</string>
     <string name="universal_download_failed">下载失败：%1$s</string>
     <string name="universal_download_done_with_path">下载完成，已保存到：%1$s</string>
-    <string name="universal_download_supported_sites">基于 yt-dlp 风格提取器 · 支持 B站、抖音、TikTok 及直链媒体</string>
+    <string name="universal_download_supported_sites">YouTube / B站 / 抖音 / 微博 / X / SoundCloud</string>
     <string name="universal_download_pause">暂停</string>
     <string name="universal_download_resume">继续</string>
     <string name="universal_download_cancel">取消</string>

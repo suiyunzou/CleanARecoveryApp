@@ -8,7 +8,8 @@ android {
 
     defaultConfig {
         applicationId "com.example.cleanrecovery.musicapp"
-        minSdk 23
+        // The bundled yt-dlp Python/QuickJS runtime requires Android 7.0 or newer.
+        minSdk 24
         targetSdk 35
         versionCode providers.gradleProperty("releaseVersionCode").getOrElse("3").toInteger()
         versionName providers.gradleProperty("releaseVersionName").getOrElse("0.1.2")
@@ -55,6 +56,8 @@ android {
 }
 
 dependencies {
+    implementation "io.github.junkfood02.youtubedl-android:library:0.18.1"
+    implementation "io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1"
     implementation "androidx.core:core:1.13.1"
     implementation "androidx.appcompat:appcompat:1.6.1"
     implementation "androidx.recyclerview:recyclerview:1.3.2"

@@ -339,7 +339,7 @@
     <string name="universal_download_title">Download</string>
     <string name="about_universal_download_desc">Download videos and music from any website</string>
     <string name="universal_download_url_label">Paste a video or music link</string>
-    <string name="universal_download_url_hint">Supports YouTube, Bilibili, Douyin, Twitter and more</string>
+    <string name="universal_download_url_hint">Paste video/audio links or shared text, one per line</string>
     <string name="universal_download_url_empty">Please enter a URL first</string>
     <string name="universal_download_action">Download</string>
     <string name="universal_download_select_quality">Please select a quality option</string>
@@ -353,7 +353,7 @@
     <string name="universal_download_downloading">Downloading…</string>
     <string name="universal_download_failed">Download failed: %1$s</string>
     <string name="universal_download_done_with_path">Download complete. Saved to: %1$s</string>
-    <string name="universal_download_supported_sites">Powered by yt-dlp-style extractors · Supports Bilibili, Douyin, TikTok and direct media links</string>
+    <string name="universal_download_supported_sites">YouTube / Bilibili / Douyin / Weibo / X / SoundCloud</string>
     <string name="universal_download_pause">Pause</string>
     <string name="universal_download_resume">Resume</string>
     <string name="universal_download_cancel">Cancel</string>
