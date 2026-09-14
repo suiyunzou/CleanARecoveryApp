@@ -1,0 +1,41 @@
+Bundled Android downloader
+
+Android wrapper / Python / FFmpeg / QuickJS: youtubedl-android 0.18.1
+Source: https://github.com/yausername/youtubedl-android/tree/0.18.1
+Maven artifacts: io.github.junkfood02.youtubedl-android:library:0.18.1
+                 io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1
+Wrapper license: GPL-3.0 (LICENSE.youtubedl-android)
+Native component build instructions and upstream notices:
+https://github.com/yausername/youtubedl-android/blob/0.18.1/BUILD_PYTHON.md
+https://github.com/yausername/youtubedl-android/blob/0.18.1/BUILD_FFMPEG.md
+
+Packaged yt-dlp script: 2026.08.19, official release, unmodified
+Source: https://github.com/yt-dlp/yt-dlp/tree/2026.08.19
+Binary: https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp
+SHA-256: 1fa6733c37ea6fb51c99ad8fe785e7b7e5f3246c9b980230329d4fb72ed8d4d6
+License: Unlicense (LICENSE.yt-dlp); included dependencies retain their licenses.
+The script includes yt-dlp-ejs; upstream source and notices:
+https://github.com/yt-dlp/ejs
+
+Synthetic test media is generated locally from FFmpeg testsrc2 and sine filters;
+no third-party video content is bundled with the application or tests.
+
+Douyin extraction plugin (ytdlp/douyin.py):
+Adapted from https://github.com/IvanaGyro/yt-dlp/commit/73d89b8
+Candidate PR: https://github.com/IvanaGyro/yt-dlp/pull/2
+ABogus author: JohnserfSeed, https://github.com/Johnserf-Seed/f2/blob/main/f2/utils/abogus.py
+License: Apache-2.0 (LICENSE.f2)
+SM3 source: https://github.com/py-gmssl/py-gmssl
+Copyright (c) 2022 Nemo; MIT (LICENSE.py-gmssl)
+Changes: standalone plugin subclass, corrected ambiguous API failure message,
+stable resolution/codec format IDs, validation of same-quality CDN alternatives.
+Share-link support: v.douyin.com redirects, iesdouyin.com share pages, modal_id URLs.
+The official yt-dlp zipapp remains unmodified. Plugin source is included in assets.
+
+Watermark-source selection: app-owned code; prefers Douyin playback addresses over
+watermarked save addresses and uses separate format IDs for watermark-free sources.
+Bilibili optional TV adapter (bilibili.py): API behaviour references (no code copied):
+https://github.com/Naptie/BiliDownload (accept_quality/accept_watermark mapping)
+https://github.com/Jared-02/BBDown/blob/main/BBDown.Core/Parser.cs (TV playback request)
+TV failure preserves the official web extraction. Labels describe platform source
+watermarks, not creator logos burned into the original frames.

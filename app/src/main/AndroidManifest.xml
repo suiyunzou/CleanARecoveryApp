@@ -95,7 +95,14 @@
         <activity android:name="com.example.cleanrecovery.music.ui.PlaylistDetailActivity" android:exported="false" />
         <activity android:name="com.example.cleanrecovery.music.ui.DownloadActivity" android:exported="false" />
         <activity android:name="com.example.cleanrecovery.music.ui.MusicLoginActivity" android:exported="false" />
-        <activity android:name="com.example.cleanrecovery.ui.activity.UniversalDownloadActivity" android:exported="true" />
+        <activity android:name="com.example.cleanrecovery.ui.activity.UniversalDownloadActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+        <service android:name=".download.YtDlpDownloadService" android:exported="false" android:foregroundServiceType="dataSync" />
         <activity
             android:name="com.example.cleanrecovery.ui.activity.BrowserActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"

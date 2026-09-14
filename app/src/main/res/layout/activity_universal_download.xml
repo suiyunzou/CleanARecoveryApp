@@ -47,55 +47,83 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="@dimen/space_xl">
+            android:padding="16dp">
 
             <!-- URL input card -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@drawable/bg_card"
-                android:elevation="@dimen/elevation_card"
+                android:background="@drawable/bg_download_card"
+                android:elevation="0dp"
                 android:orientation="vertical"
                 android:padding="@dimen/space_lg">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/universal_download_url_label"
+                    android:text="链接"
                     android:textColor="@color/text_primary"
                     android:textSize="@dimen/text_section"
                     android:textStyle="bold" />
 
-                <TextView
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_xs"
-                    android:text="@string/universal_download_url_hint"
-                    android:textColor="@color/text_muted"
-                    android:textSize="@dimen/text_caption" />
-
-                <EditText
-                    android:id="@+id/universal_url_input"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_md"
+                    android:layout_marginTop="12dp"
                     android:background="@drawable/bg_input_field"
-                    android:hint="https://..."
-                    android:inputType="textUri"
-                    android:maxLines="3"
-                    android:minHeight="48dp"
-                    android:padding="@dimen/space_md"
-                    android:textColor="@color/text_primary"
-                    android:textColorHint="@color/text_muted"
-                    android:textSize="@dimen/text_body" />
+                    android:gravity="top"
+                    android:orientation="horizontal">
+
+                    <EditText
+                        android:id="@+id/universal_url_input"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:background="@android:color/transparent"
+                        android:hint="粘贴链接或分享文案"
+                        android:gravity="top|start"
+                        android:inputType="textUri"
+                        android:singleLine="true"
+                        android:scrollHorizontally="true"
+                        android:maxLines="1"
+                        android:minHeight="48dp"
+                        android:padding="12dp"
+                        android:textColor="@color/text_primary"
+                        android:textColorHint="@color/text_muted"
+                        android:textSize="@dimen/text_body" />
+
+                    <LinearLayout
+                        android:layout_width="48dp"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+                        <ImageButton
+                            android:id="@+id/universal_paste_button"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:background="?android:attr/selectableItemBackgroundBorderless"
+                            android:padding="14dp"
+                            android:src="@drawable/ic_download_paste"
+                            android:tint="@color/text_secondary"
+                            android:contentDescription="粘贴链接" />
+                        <ImageButton
+                            android:id="@+id/universal_clear_button"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:background="?android:attr/selectableItemBackgroundBorderless"
+                            android:padding="14dp"
+                            android:src="@drawable/ic_close"
+                            android:tint="@color/text_secondary"
+                            android:contentDescription="清空输入" />
+                    </LinearLayout>
+                </LinearLayout>
 
                 <Button
                     android:id="@+id/universal_download_button"
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
-                    android:layout_marginTop="@dimen/space_lg"
+                    android:layout_marginTop="8dp"
                     android:background="@drawable/bg_button_primary"
-                    android:backgroundTint="@color/brand_accent"
+                    android:backgroundTint="@color/text_primary"
                     android:text="@string/universal_download_action"
                     android:textAllCaps="false"
                     android:textColor="@color/surface_card"
@@ -109,8 +137,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/space_md"
-                android:background="@drawable/bg_card"
-                android:elevation="@dimen/elevation_card"
+                android:background="@drawable/bg_download_card"
+                android:elevation="0dp"
                 android:orientation="vertical"
                 android:padding="@dimen/space_lg"
                 android:visibility="gone">
@@ -159,9 +187,9 @@
                     android:id="@+id/universal_start_download_button"
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
-                    android:layout_marginTop="@dimen/space_lg"
+                    android:layout_marginTop="8dp"
                     android:background="@drawable/bg_button_primary"
-                    android:backgroundTint="@color/brand_primary"
+                    android:backgroundTint="@color/text_primary"
                     android:text="@string/universal_download_start"
                     android:textAllCaps="false"
                     android:textColor="@color/surface_card"
@@ -175,8 +203,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/space_md"
-                android:background="@drawable/bg_card"
-                android:elevation="@dimen/elevation_card"
+                android:background="@drawable/bg_download_card"
+                android:elevation="0dp"
                 android:orientation="vertical"
                 android:padding="@dimen/space_lg"
                 android:visibility="gone">
@@ -239,44 +267,32 @@
                     android:orientation="horizontal"
                     android:visibility="gone">
 
-                    <Button
+                    <ImageButton
                         android:id="@+id/universal_pause_button"
-                        android:layout_width="0dp"
+                        android:layout_width="48dp"
                         android:layout_height="48dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_button_secondary"
-                        android:text="@string/universal_download_pause"
-                        android:textAllCaps="false"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="@dimen/text_body" />
+                        android:padding="14dp"
+                        android:background="?android:attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_pause"
+                        android:tint="@color/text_secondary"
+                        android:contentDescription="暂停下载" />
 
                     <View
                         android:layout_width="@dimen/space_sm"
                         android:layout_height="0dp" />
 
-                    <Button
+                    <ImageButton
                         android:id="@+id/universal_cancel_button"
-                        android:layout_width="0dp"
+                        android:layout_width="48dp"
                         android:layout_height="48dp"
-                        android:layout_weight="1"
-                        android:background="@drawable/bg_button_secondary"
-                        android:text="@string/universal_download_cancel"
-                        android:textAllCaps="false"
-                        android:textColor="@color/accent_red"
-                        android:textSize="@dimen/text_body" />
+                        android:padding="14dp"
+                        android:background="?android:attr/selectableItemBackgroundBorderless"
+                        android:src="@drawable/ic_close"
+                        android:tint="@color/text_secondary"
+                        android:contentDescription="取消下载" />
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Supported sites hint -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/space_xl"
-                android:layout_marginBottom="@dimen/space_xl"
-                android:gravity="center"
-                android:text="@string/universal_download_supported_sites"
-                android:textColor="@color/text_muted"
-                android:textSize="@dimen/text_micro" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>
