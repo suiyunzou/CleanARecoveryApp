@@ -28,6 +28,8 @@ jobs:
         run: node --test .github/scripts/auto-integrate.test.cjs
       - name: Test bundled downloader source selection
         run: python3 app/src/test/python/test_download_sources.py
+      - name: Test release asset validation
+        run: python3 .github/scripts/test_release_assets.py
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -65,27 +67,29 @@ jobs:
           '-Dorg.gradle.jvmargs=-Xmx2048m -XX:+UseSerialGC -Dfile.encoding=UTF-8'
           -PexternalServiceTests=false
           -PreleaseVersionCode="$VERSION_CODE" -PreleaseVersionName="$VERSION_NAME"
-      - name: Verify and prepare APK
+      - name: Verify and prepare universal and ABI APKs
         env:
           VERSION_CODE: ${{ steps.version.outputs.code }}
         shell: bash
         run: |
           set -euo pipefail
           tools=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
-          apk=app/build/outputs/apk/release/app-release.apk
-          "$tools/apksigner" verify --print-certs "$apk" | tee "$RUNNER_TEMP/signature.txt"
-          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
-            grep -qi '13ee018cfba46568d7082ee8fccea3192b3eac4339b6f2703fa90d500cc2164b' "$RUNNER_TEMP/signature.txt"
-          fi
-          "$tools/aapt" dump badging "$apk" > "$RUNNER_TEMP/badging.txt"
-          head -1 "$RUNNER_TEMP/badging.txt" | grep "versionCode='$VERSION_CODE'"
-          mkdir -p release
-          cp "$apk" "release/CleanARecovery-$VERSION_CODE.apk"
-          (cd release && sha256sum *.apk > SHA256SUMS.txt)
+          for variant in universal arm64-v8a armeabi-v7a x86_64 x86; do
+            apk="app/build/outputs/apk/release/app-$variant-release.apk"
+            if [ "$variant" = universal ]; then apk=app/build/outputs/apk/release/app-release.apk; fi
+            "$tools/apksigner" verify --print-certs "$apk" | tee "$RUNNER_TEMP/signature.txt"
+            if [ "$GITHUB_EVENT_NAME" != pull_request ]; then
+              grep -qi '13ee018cfba46568d7082ee8fccea3192b3eac4339b6f2703fa90d500cc2164b' "$RUNNER_TEMP/signature.txt"
+            fi
+            "$tools/aapt" dump badging "$apk" > "$RUNNER_TEMP/badging.txt"
+            head -1 "$RUNNER_TEMP/badging.txt" | grep "versionCode='$VERSION_CODE'" | grep "name='com.example.cleanrecovery.musicapp'"
+          done
+          python3 .github/scripts/release-assets.py prepare --apk-dir app/build/outputs/apk/release --output release --code "$VERSION_CODE"
       - uses: actions/upload-artifact@v4
         with:
           name: release-${{ github.run_id }}
           path: release/*
+          compression-level: 0 # APKs are already compressed; avoid recompressing five packages.
           if-no-files-found: error
           retention-days: 14
       - name: Upload test reports
@@ -134,6 +138,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@v4
         with:
           name: release-${{ github.run_id }}
@@ -162,7 +169,7 @@ jobs:
               exit 0
             fi
           else
-            printf '浏览体验与功能更新。\n\n下载下方 APK 安装，已有用户可在应用设置中检查更新。\n\n版本号：%s\n源码提交：%s\n' "$VERSION_CODE" "$GITHUB_SHA" > notes.txt
+            printf '浏览体验与功能更新。\n\n下载说明：\n- arm64-v8a：64 位 ARM 手机。\n- armeabi-v7a：32 位 ARM 设备。\n- x86_64 / x86：对应架构的模拟器或设备。\n- 无架构后缀：通用备用包，兼容旧版应用内更新。\n\n新版应用内更新自动选择设备支持的架构。所有安装包保留对应架构原有功能，32 位包不含 Mihomo 内核。\n\n版本号：%s\n源码提交：%s\n' "$VERSION_CODE" "$GITHUB_SHA" > notes.txt
             gh release create "$tag" --target "$GITHUB_SHA" --title "枢 $VERSION_NAME" --notes-file notes.txt --draft
           fi
           gh release upload "$tag" release/* --clobber
@@ -170,21 +177,7 @@ jobs:
           gh api "repos/$GH_REPO/releases?per_page=100" > releases.json
           release_id=$(python3 -c 'import json,os; print(next(r["id"] for r in json.load(open("releases.json")) if r["tag_name"]=="v"+os.environ["VERSION_NAME"]))')
           gh api "repos/$GH_REPO/releases/$release_id" > metadata.json
-          python3 - <<'PY'
-          import json, os, re, urllib.parse
-          obj = json.load(open('metadata.json'))
-          name = 'CleanARecovery-' + os.environ['VERSION_CODE'] + '.apk'
-          asset = next(a for a in obj['assets'] if a['name'] == name)
-          assert asset['state'] == 'uploaded' and re.fullmatch(r'sha256:[0-9a-fA-F]{64}', asset.get('digest') or '')
-          assert 0 < asset['size'] <= 300 * 1024 * 1024
-          obj['draft'] = False
-          base = 'https://github.com/' + os.environ['GH_REPO'] + '/releases'
-          tag_path = urllib.parse.quote(obj['tag_name'], safe='')
-          obj['html_url'] = base + '/tag/' + tag_path
-          for item in obj['assets']:
-              item['browser_download_url'] = base + '/download/' + tag_path + '/' + urllib.parse.quote(item['name'], safe='')
-          with open('update.json', 'w', encoding='utf-8') as f:
-              json.dump(obj, f, ensure_ascii=False)
-          PY
+          python3 .github/scripts/release-assets.py manifest --metadata metadata.json --release-dir release \
+            --code "$VERSION_CODE" --repository "$GH_REPO" --version-name "$VERSION_NAME" --output update.json
           gh release upload "$tag" update.json --clobber
           gh release edit "$tag" --draft=false --latest

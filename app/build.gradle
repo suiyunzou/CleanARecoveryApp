@@ -38,6 +38,24 @@ android {
         }
     }
 
+    // Compile once, package one native runtime per device. Keep the historical
+    // universal filename for local tooling and older in-app update clients.
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'arm64-v8a', 'armeabi-v7a', 'x86_64', 'x86'
+            universalApk true
+        }
+    }
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            if (output.getFilter(com.android.build.OutputFile.ABI) == null) {
+                output.outputFileName = "app-${variant.name}.apk"
+            }
+        }
+    }
+
     testOptions {
         unitTests {
             // 让 android.util.Log 等 Android 框架方法在单元测试中返回默认值而非抛异常

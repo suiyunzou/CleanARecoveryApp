@@ -33,6 +33,7 @@
 # Generated output and local tooling are never source files.
 **/build/
 **/.gradle/
+**/__pycache__/
 **/.idea/
 **/.cursor/
 **/.claude/

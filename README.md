@@ -105,7 +105,21 @@ sh gradlew :app:assembleRelease --console=plain
 
 - **开发分支**：推送后自动构建 Release APK 并运行测试，构建产物保留 14 天。
 - **Pull Request**：构建用于验证，不读取发布签名密钥，产物不作为用户更新包。
-- **main**：构建和测试成功后发布 GitHub Release，包含 APK、SHA-256 校验文件及应用更新清单。
+- **main**：构建和测试成功后发布 GitHub Release，包含四种架构 APK、通用备用 APK、SHA-256 校验文件及应用更新清单。
+
+### 选择安装包
+
+| 文件名 | 适用设备 |
+| --- | --- |
+| `CleanARecovery-<版本号>-arm64-v8a.apk` | 64 位 ARM 手机 |
+| `CleanARecovery-<版本号>-armeabi-v7a.apk` | 32 位 ARM 设备 |
+| `CleanARecovery-<版本号>-x86_64.apk` | 64 位 x86 模拟器或设备 |
+| `CleanARecovery-<版本号>-x86.apk` | 32 位 x86 模拟器或设备 |
+| `CleanARecovery-<版本号>.apk` | 通用备用包；不确定架构或使用旧版更新客户端时选择 |
+
+各架构包只省去其他 CPU 架构的二进制文件，保留本架构的 yt-dlp、Python、FFmpeg 和原有资源。Mihomo 内核沿用现有的 ARM64/x86_64 支持范围，32 位包不含该内核。新版应用内更新按设备支持的架构优先选择安装包，缺失时回退通用包；旧版客户端仍能通过原文件名升级。首次从旧版应用内更新时仍下载通用包，升级后才自动选择小包。
+
+本地 `assembleRelease` 同时生成 `app-<架构>-release.apk` 和 `app-release.apk`（通用包），各包沿用相同的版本号与签名。CI 对五个 APK 分别检查签名、版本和架构，并确认分架构包内容与通用包的对应部分一致；全部上传且哈希校验通过后才公开 Release。
 
 给用户安装的版本以 [Releases](https://github.com/suiyunzou/CleanARecoveryApp/releases) 为准。
 
