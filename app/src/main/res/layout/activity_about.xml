@@ -248,6 +248,31 @@
             android:orientation="vertical">
 
             <LinearLayout
+                android:id="@+id/settings_experimental_row"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_row_hairline_bottom"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:minHeight="54dp"
+                android:orientation="horizontal"
+                android:paddingStart="@dimen/space_lg"
+                android:paddingEnd="@dimen/space_lg"
+                android:paddingTop="15dp"
+                android:paddingBottom="15dp">
+                <ImageView android:layout_width="20dp" android:layout_height="20dp"
+                    android:layout_marginEnd="12dp" android:src="@drawable/ic_via_gamepad"
+                    android:contentDescription="@null" android:importantForAccessibility="no" />
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:text="趣味性实验"
+                    android:textColor="@color/text_primary" android:textSize="14.5sp" />
+                <ImageView android:layout_width="14dp" android:layout_height="14dp"
+                    android:alpha="0.45" android:src="@drawable/ic_chevron_right"
+                    android:contentDescription="@null" android:importantForAccessibility="no" />
+            </LinearLayout>
+
+            <LinearLayout
                 android:id="@+id/settings_startup_row"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
