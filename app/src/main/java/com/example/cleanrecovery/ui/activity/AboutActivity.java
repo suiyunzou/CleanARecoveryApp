@@ -40,6 +40,8 @@ public final class AboutActivity extends Activity {
         super.onCreate(savedInstanceState);
         SystemUiHelper.apply(this);
         setContentView(R.layout.activity_about);
+        findViewById(R.id.settings_experimental_row).setOnClickListener(v -> startActivity(
+                new Intent(this, com.example.cleanrecovery.experimental.ExperimentalLabActivity.class)));
         findViewById(R.id.settings_about_row).setOnClickListener(v -> startActivity(new Intent(this, AppAboutActivity.class)));
         com.example.cleanrecovery.ui.widget.AppBottomNavBinder.bind(this,
                 com.example.cleanrecovery.ui.widget.AppBottomNavBinder.Tab.SETTINGS);

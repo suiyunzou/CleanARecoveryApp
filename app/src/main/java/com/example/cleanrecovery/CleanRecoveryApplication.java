@@ -7,6 +7,7 @@ public final class CleanRecoveryApplication extends Application {
     @Override public void onCreate() {
         super.onCreate();
         GlassToast.initialize(this);
+        com.example.cleanrecovery.experimental.TiltGlassController.initialize(this);
         com.example.cleanrecovery.update.AutomaticUpdateChecks.initialize(this);
     }
 }

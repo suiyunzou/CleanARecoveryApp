@@ -38,6 +38,11 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:requestLegacyExternalStorage="true"
         android:theme="@style/AppTheme">
+        <activity android:name=".experimental.ExperimentalLabActivity" android:exported="false" />
+        <service android:name=".experimental.ItemWatchService" android:exported="false" android:foregroundServiceType="specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="User-started item movement and ambient light monitoring while the screen is off" />
+        </service>
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
