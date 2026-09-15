@@ -15,6 +15,17 @@ public class GitHubUpdatesTest {
         return new JSONObject().put("tag_name","v0.1.2").put("body","修复与改进").put("assets",new JSONArray().put(asset));
     }
     @Test public void selectsVersionCodeAndPreservesReleaseNotes()throws Exception{GitHubUpdates.Release r=GitHubUpdates.parse(release().toString());assertNotNull(r);assertEquals(3,r.code);assertEquals("修复与改进",r.notes);assertEquals(64,r.sha256.length());assertEquals(GitHubUpdates.RELEASES+"/tag/v0.1.2",r.pageUrl());}
+    @Test public void selectsActualDeviceArchitecture()throws Exception{
+        JSONObject obj=release();
+        JSONArray assets=obj.getJSONArray("assets");
+        for(String abi:new String[]{"arm64-v8a","armeabi-v7a","x86_64","x86"}){
+            JSONObject candidate=new JSONObject(assets.getJSONObject(0).toString());
+            String name="CleanARecovery-3-"+abi+".apk";
+            candidate.put("name",name).put("browser_download_url",GitHubUpdates.RELEASES+"/download/v0.1.2/"+name);
+            assets.put(candidate);
+        }
+        assertTrue(GitHubUpdates.parse(obj.toString()).url.endsWith("-"+android.os.Build.SUPPORTED_ABIS[0]+".apk"));
+    }
     @Test public void rejectsDraftPrereleaseMissingDigestAndWrongDownloadOrigin()throws Exception{
         assertNull(GitHubUpdates.parse(release().put("draft",true).toString()));assertNull(GitHubUpdates.parse(release().put("prerelease",true).toString()));
         JSONObject obj=release();obj.getJSONArray("assets").getJSONObject(0).remove("digest");assertNull(GitHubUpdates.parse(obj.toString()));

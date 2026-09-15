@@ -25,17 +25,34 @@ public final class GitHubUpdates {
     public static long installedCode(Context c)throws PackageManager.NameNotFoundException{return code(c.getPackageManager().getPackageInfo(c.getPackageName(),0));}
     private static long code(PackageInfo p){return android.os.Build.VERSION.SDK_INT>=28?p.getLongVersionCode():p.versionCode;}
     public static Release parse(String json)throws Exception {
+        return parse(json, android.os.Build.SUPPORTED_ABIS);
+    }
+    // Package-private seam: use the same device preference order in JVM tests.
+    static Release parse(String json,String[] supportedAbis)throws Exception {
         JSONObject obj=new JSONObject(json);
         if(obj.optBoolean("draft")||obj.optBoolean("prerelease"))return null;
         JSONArray assets=obj.optJSONArray("assets"); if(assets==null)return null;
         Release selected=null;
+        int selectedRank=Integer.MAX_VALUE;
         for(int i=0;i<assets.length();i++){
             JSONObject a=assets.getJSONObject(i);
-            java.util.regex.Matcher m=java.util.regex.Pattern.compile("CleanARecovery-([1-9][0-9]*)\\.apk").matcher(a.optString("name"));
+            java.util.regex.Matcher m=java.util.regex.Pattern.compile("CleanARecovery-([1-9][0-9]*)(?:-(arm64-v8a|armeabi-v7a|x86_64|x86))?\\.apk").matcher(a.optString("name"));
             if(!m.matches()||!"uploaded".equals(a.optString("state")))continue;
-            long version=Long.parseLong(m.group(1)),size=a.optLong("size");String url=a.optString("browser_download_url"),sha=a.optString("digest");
+            String abi=m.group(2);
+            int rank=supportedAbis==null?0:supportedAbis.length;
+            if(abi!=null){
+                rank=-1;
+                if(supportedAbis!=null)for(int j=0;j<supportedAbis.length;j++)if(abi.equals(supportedAbis[j])){rank=j;break;}
+                if(rank<0)continue;
+            }
+            long version;
+            try{version=Long.parseLong(m.group(1));}catch(NumberFormatException invalidVersion){continue;}
+            long size=a.optLong("size");String url=a.optString("browser_download_url"),sha=a.optString("digest");
             if(!url.startsWith(RELEASES+"/download/")||!sha.matches("sha256:[0-9a-fA-F]{64}")||size<=0||size>MAX_APK)continue;
-            if(selected==null||version>selected.code)selected=new Release(version,size,obj.optString("tag_name"),obj.optString("body"),url,sha.substring(7));
+            if(selected==null||version>selected.code||(version==selected.code&&rank<selectedRank)){
+                selected=new Release(version,size,obj.optString("tag_name"),obj.optString("body"),url,sha.substring(7));
+                selectedRank=rank;
+            }
         }
         return selected;
     }
