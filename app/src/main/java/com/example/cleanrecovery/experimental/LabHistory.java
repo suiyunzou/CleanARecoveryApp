@@ -15,7 +15,7 @@ public final class LabHistory {
     public static synchronized void add(Context context, String message) {
         JSONArray old = read(context), next = new JSONArray();
         try {
-            next.put(new JSONObject().put("time", System.currentTimeMillis()).put("message", message));
+            next.put(new JSONObject().put("time", System.currentTimeMillis()).put("message", message).put("type", WatchTimelineView.kind(message)));
             for (int i=0; i<Math.min(199, old.length()); i++) next.put(old.get(i));
             context.getSharedPreferences("experimental_history", 0).edit()
                     .putString("events", next.toString()).apply();

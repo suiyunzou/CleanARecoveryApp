@@ -12,14 +12,19 @@ public final class AcousticEngine {
     }
     private final AudioManager manager;
     private final Listener listener;
-    private volatile boolean stopped;
+    private volatile boolean stopped,recalibrate;
+    private final long gestureInterval;
     private volatile String reason = "实验已停止";
     private final AudioManager.OnAudioFocusChangeListener focus = change -> {
         if (change < 0) stop("音频被其他应用占用，实验已停止");
     };
     public AcousticEngine(Context context, Listener listener) {
-        manager = context.getSystemService(AudioManager.class); this.listener=listener;
+        this(context,listener,700);
     }
+    public AcousticEngine(Context context, Listener listener,long gestureInterval) {
+        manager=context.getSystemService(AudioManager.class); this.listener=listener; this.gestureInterval=gestureInterval;
+    }
+    public void recalibrate() { recalibrate=true; }
     public void start() { new Thread(this::run, "AcousticExperiment").start(); }
     public boolean isStopping() { return stopped; }
     public void stop(String message) { reason=message; stopped=true; }
@@ -58,7 +63,7 @@ public final class AcousticEngine {
             if (stopped) return;
             record.startRecording(); track.play();
             short[] buffer = new short[AcousticDetector.SIZE];
-            AcousticDetector detector = new AcousticDetector();
+            AcousticDetector detector = new AcousticDetector(gestureInterval);
             long start=SystemClock.elapsedRealtime();
             while (!stopped) {
                 if (SystemClock.elapsedRealtime()-start > 5*60*1000) { reason="本轮已达 5 分钟，实验已停止"; break; }
@@ -78,6 +83,10 @@ public final class AcousticEngine {
                 if (routed==null || routed.getType()!=AudioDeviceInfo.TYPE_BUILTIN_SPEAKER
                         || input==null || input.getType()!=AudioDeviceInfo.TYPE_BUILTIN_MIC)
                     throw new IllegalStateException("音频路由改变，请断开耳机或蓝牙后重试");
+                if(manager.getMode()!=AudioManager.MODE_NORMAL) throw new IllegalStateException("通话或其他音频模式占用，检测已停止");
+                if(android.os.Build.VERSION.SDK_INT>=29 && record.getActiveRecordingConfiguration()!=null
+                        && record.getActiveRecordingConfiguration().isClientSilenced()) throw new IllegalStateException("麦克风被系统静音");
+                if(recalibrate) { detector=new AcousticDetector(gestureInterval); recalibrate=false; }
                 listener.onResult(detector.accept(buffer, SystemClock.elapsedRealtime()));
             }
         } catch (Exception e) { if (!stopped) reason="无法检测："+e.getMessage(); }

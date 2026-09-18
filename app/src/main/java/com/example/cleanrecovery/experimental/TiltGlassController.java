@@ -23,6 +23,7 @@ public final class TiltGlassController implements Application.ActivityLifecycleC
     private final TiltGlassModel model=new TiltGlassModel();
     private final float[] gravity={0,0,9.81f};
     private final float[] orientation=new float[9];
+    private float[] defaultReadingNormal;
     private WeakReference<Activity> active=new WeakReference<>(null);
     private boolean listening,hasSample;
     private long lastSampleMs,lastDiscovery;
@@ -61,7 +62,7 @@ public final class TiltGlassController implements Application.ActivityLifecycleC
         return true;
     }
     @Override public void onSharedPreferenceChanged(SharedPreferences p,String key) {
-        if(!"enabled".equals(key) && !"strength".equals(key)) model.reset();
+        if(!"enabled".equals(key) && !"strength".equals(key)) { model.reset(); defaultReadingNormal=null; }
         updateListening();
     }
     private void updateListening() {
@@ -83,12 +84,24 @@ public final class TiltGlassController implements Application.ActivityLifecycleC
             if(!listening || activity==null) return;
             long now=SystemClock.elapsedRealtime();
             int rotation=activity.getWindowManager().getDefaultDisplay().getRotation();
+            int mode=prefs.baselineMode();
+            boolean custom=mode==TiltGlassPrefs.CUSTOM;
             boolean useOrientation=sensor.getType()==Sensor.TYPE_ROTATION_VECTOR
-                    && (!prefs.calibrated() || prefs.hasOrientationReference());
-            float[] vector=useOrientation ? TiltGlassModel.relativeNormal(orientation,prefs.orientationReference()) : gravity;
-            float[] reference=useOrientation ? new float[]{0,0,9.81f} : prefs.reference();
+                    && (!custom || prefs.hasOrientationReference());
+            if(useOrientation && hasSample && mode==TiltGlassPrefs.READING && defaultReadingNormal==null) {
+                float[] screenUp=rotation==Surface.ROTATION_90 ? new float[]{1,0,0}
+                        : rotation==Surface.ROTATION_180 ? new float[]{0,-1,0}
+                        : rotation==Surface.ROTATION_270 ? new float[]{-1,0,0} : new float[]{0,1,0};
+                defaultReadingNormal=TiltGlassModel.readingNormal(orientation,screenUp,prefs.readingAngle());
+            }
+            float[] normal=custom ? prefs.orientationReference()
+                    : mode==TiltGlassPrefs.HORIZONTAL ? new float[]{0,0,1} : defaultReadingNormal;
+            float[] vector=useOrientation && normal!=null ? TiltGlassModel.relativeNormal(orientation,normal) : gravity;
+            float[] screenVector=remap(vector,rotation);
+            float[] reference=useOrientation ? new float[]{0,0,9.81f}
+                    : custom ? remap(prefs.reference(),rotation) : prefs.reference();
             TiltGlassModel.Tilt target=hasSample && now-lastSampleMs<1500
-                    ? TiltGlassModel.direction(remap(vector,rotation),remap(reference,rotation))
+                    ? TiltGlassModel.direction(screenVector,reference)
                     : new TiltGlassModel.Tilt(0,0);
             current=model.smooth(target,now);
             if(now-lastDiscovery>=250) { discover(); lastDiscovery=now; }
