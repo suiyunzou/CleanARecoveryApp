@@ -2,6 +2,24 @@ package com.example.cleanrecovery.experimental;
 
 /** Gravity relative to a reference posture, expressed in current screen coordinates. */
 public final class TiltGlassModel {
+    public static final float DEFAULT_READING_DEGREES=45;
+    public static float[] readingGravity(float degrees) {
+        double angle=Math.toRadians(degrees);
+        return new float[]{0,(float)(9.81*Math.sin(angle)),(float)(9.81*Math.cos(angle))};
+    }
+    /** Keep the initial heading, but set the screen inclination to the reading default. */
+    public static float[] readingNormal(float[] matrix,float[] screenUp,float degrees) {
+        float x=matrix[2], y=matrix[5];
+        double horizontal=Math.hypot(x,y);
+        if(horizontal<.1) {
+            x=-(matrix[0]*screenUp[0]+matrix[1]*screenUp[1]);
+            y=-(matrix[3]*screenUp[0]+matrix[4]*screenUp[1]);
+            horizontal=Math.hypot(x,y);
+        }
+        if(horizontal<.001) { x=0; y=-1; horizontal=1; }
+        double angle=Math.toRadians(degrees);
+        return new float[]{(float)(x/horizontal*Math.sin(angle)),(float)(y/horizontal*Math.sin(angle)),(float)Math.cos(angle)};
+    }
     public static final class Tilt {
         public final float x, y;
         public Tilt(float x, float y) { this.x=x; this.y=y; }

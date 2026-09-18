@@ -24,9 +24,10 @@ import java.util.*;
 public final class ExperimentalLabActivity extends Activity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private LinearLayout content;
-    private TextView title, watchStatus, watchButton, history, acousticStatus, acousticButton, gestureCount;
+    private TextView title, watchStatus, watchButton, acousticStatus, acousticButton, gestureCount;
     private TextView tiltStatus, tiltButton;
     private SignalView signal;
+    private WatchTimelineView history;
     private AcousticEngine engine;
     private boolean visible;
     private boolean pendingAcoustic, pendingWatch, recalibrate;
@@ -72,6 +73,7 @@ public final class ExperimentalLabActivity extends Activity {
         ScrollView scroll=new ScrollView(this); scroll.setFillViewport(true);
         content=new LinearLayout(this); content.setOrientation(1); content.setPadding(0,0,0,dp(24));
         scroll.addView(content); root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        if(state!=null) exportSnapshot=state.getString("export_snapshot");
         setContentView(root); showPage(state==null ? 0 : state.getInt("page",0));
     }
     private void showPage(int next) {
@@ -80,6 +82,8 @@ public final class ExperimentalLabActivity extends Activity {
         title.setText(page==0 ? "趣味性实验" : page==1 ? "物品守护" : page==2 ? "声波隔空手势" : "倾斜渐进玻璃");
         if (page==0) {
             section("探索手机的另一面");
+            row(R.drawable.ic_via_pulse,"挥手快门","独立拍照 · 限时熄屏待命",() -> startActivity(new Intent(this,WaveShutterActivity.class)));
+            row(R.drawable.ic_type_image,"后置自拍助手","离线找脸 · 语音与震动引导",() -> startActivity(new Intent(this,RearSelfieActivity.class)));
             row(R.drawable.ic_via_shield,"物品守护","记录移动、转动与光线变化",() -> showPage(1));
             row(R.drawable.ic_via_pulse,"声波隔空手势","用手掌靠近、远离，推动光球",() -> showPage(2));
             row(R.drawable.ic_via_rotate,"倾斜渐进玻璃","全应用 · 随倾斜逐渐虚化",() -> showPage(3));
@@ -89,7 +93,7 @@ public final class ExperimentalLabActivity extends Activity {
             signal=new SignalView(); content.addView(signal,new LinearLayout.LayoutParams(-1,dp(120)));
             watchButton=action("开始守护",() -> toggleWatch());
             section("事件时间线");
-            history=paragraph("暂无记录",13,ViaUi.TEXT_SUB); lastHistory=""; renderHistory();
+            history=new WatchTimelineView(this); content.addView(history,new LinearLayout.LayoutParams(-1,-2)); lastHistory=""; renderHistory();
             row(R.drawable.ic_via_share2,"导出记录",null,this::exportHistory);
             row(R.drawable.ic_via_history2,"清空记录",null,() -> new ViaDialogBuilder(this).setTitle("清空事件记录？")
                     .setMessage("仅清除此设备上的守护历史，正在运行的守护会继续记录。")
@@ -124,12 +128,31 @@ public final class ExperimentalLabActivity extends Activity {
                 dialog.setOnDismissListener(d -> { if(!isFinishing() && page==3) showPage(3); });
                 dialog.show();
             });
-            row(R.drawable.ic_via_phone,"以当前握持姿态为基准",prefs.calibrated() ? "已使用自定义基准" : "当前基准：屏幕朝上平放",() -> {
+            row(R.drawable.ic_via_phone,"基准姿态",prefs.baselineLabel(),() -> {
+                android.app.Dialog dialog=ViaUi.radioDialog(this,"基准姿态",
+                        new String[]{"水平基准 · 屏幕朝上平放（0°）","角度基准 · "+prefs.readingAngle()+"°",
+                                prefs.calibrated()?"自定义 · 使用已保存姿态":"自定义 · 以当前姿态校准"},prefs.baselineMode(),choice -> {
+                            if(choice==TiltGlassPrefs.CUSTOM && !prefs.calibrated()) {
+                                if(!TiltGlassController.get().calibrate()) {
+                                    new ViaDialogBuilder(this).setTitle("暂时无法校准").setMessage("请先开启全局效果，并等待姿态传感器就绪。")
+                                            .setPositiveButton("知道了",null).show();
+                                    return;
+                                }
+                            } else prefs.setBaselineMode(choice);
+                            showPage(3);
+                        });
+                dialog.show();
+            });
+            row(R.drawable.ic_via_phone,"起始角度",prefs.readingAngle()+"° · 0° 平放，90° 竖直",() -> {
+                android.app.Dialog dialog=ViaUi.sliderDialog(this,prefs.readingAngle(),0,90,"°",prefs::setReadingAngle);
+                dialog.setOnDismissListener(d -> { if(!isFinishing() && page==3) showPage(3); });
+                dialog.show();
+            });
+            row(R.drawable.ic_via_refresh,"以当前握持姿态为基准","重新校准并保存自定义姿态",() -> {
                 if(TiltGlassController.get().calibrate()) showPage(3);
                 else new ViaDialogBuilder(this).setTitle("暂时无法校准").setMessage("请先开启全局效果，并等待姿态传感器就绪。")
                         .setPositiveButton("知道了",null).show();
             });
-            row(R.drawable.ic_via_refresh,"恢复水平基准","屏幕朝上平放时保持清晰",() -> { prefs.resetReference(); showPage(3); });
             section("四向联动");
             paragraph("向左倾斜 → 从左向右推进\n向右倾斜 → 从右向左推进\n前 / 后倾斜 → 从上 / 下边缘推进\n斜向倾斜 → 从对应角落推进\n90°及以上 → 全屏虚化",14,ViaUi.TEXT);
         }
@@ -219,9 +242,20 @@ public final class ExperimentalLabActivity extends Activity {
         new ViaDialogBuilder(this).setTitle("使用说明").setMessage(page==1
                 ? "把手机与物品放在一起，点击开始后保持静止 3 秒。记录移动、转动、恢复静止和明显变亮的时间。\n\n支持熄屏运行，最长 8 小时，会持续耗电。通知栏可停止；系统强制结束或重启后不会自动恢复。只保留最近 200 条本地记录，不推断是谁或移动距离。"
                 : page==2 ? "利用扬声器发声和麦克风接收的频移估计靠近、远离。光球随识别结果移动。\n\n仅支持前台实验，最长 5 分钟。环境运动和反射可能误触发；不测距离，不识别左右。不同手机高频响应不同，必须在真机验证。信号弱时不要持续提高音量，可停止实验。"
-                : page==3 ? "效果应用到本应用页面和应用内弹窗，保留原有点击、滑动和输入。虚化从倾斜侧向另一侧推进，相对基准达到 90° 后整屏虚化，继续翻转不会突然变清晰。转回基准姿态时逐渐恢复。\n\n可将日常握持姿态设为基准，减小自然手抖的影响。优先使用旋转矢量检测竖直握持时的左右转动；仅有重力传感器时，这种转动无法识别。已有基准可重新校准以启用完整方向检测。传感器只在前台使用；关闭开关会移除所有效果。透出的是页面自身的实时内容，不检测眼睛或真实视野边界。\n\n需要 Android 12+ 和硬件加速。独立 SurfaceView 视频画面、系统权限窗和输入法不属于这个合成层。该效果是 Android 实现，并非苹果系统材质。"
+                : page==3 ? "效果应用到本应用页面和应用内弹窗，保留原有点击、滑动和输入。虚化从倾斜侧向另一侧推进，相对基准达到 90° 后整屏虚化，继续翻转不会突然变清晰。转回基准姿态时逐渐恢复。\n\n可选择水平（0°）、角度基准（拖动条可调 0°–90°）或自定义基准。调节起始角度会切换到角度基准。切换选项不会删除已保存的自定义姿态。新用户默认以屏幕与水平面呈 45° 为握持基准（平放为 0°，竖直为 90°），不是要求低头 45°。这是初始参考角度；可将自己舒适的握持姿态设为基准。偏离基准 3° 内保持清晰，偏离 90° 时全屏虚化。优先使用旋转矢量检测竖直握持时的左右转动；仅有重力传感器时，这种转动无法识别。已有基准可重新校准以启用完整方向检测。传感器只在前台使用；关闭开关会移除所有效果。透出的是页面自身的实时内容，不检测眼睛或真实视野边界。\n\n需要 Android 12+ 和硬件加速。独立 SurfaceView 视频画面、系统权限窗和输入法不属于这个合成层。该效果是 Android 实现，并非苹果系统材质。"
                 : "物品守护：利用加速度和光线记录物品变化。\n\n声波隔空手势：利用高频声波的频移让光球移动。\n\n倾斜渐进玻璃：让整个应用随手机倾斜变化，在详情页可关闭和校准。\n\n均使用当前手机硬件，硬件不足时会提示；事件记录可在设备本地清除。")
                 .setPositiveButton("知道了",null).show();
+    }
+    private String exportSnapshot;
+    @Override protected void onActivityResult(int request,int result,Intent data) {
+        super.onActivityResult(request,result,data);
+        if(request==74 && result==RESULT_OK && data!=null && data.getData()!=null) {
+            try(java.io.OutputStream out=getContentResolver().openOutputStream(data.getData())) {
+                if(out==null) throw new java.io.IOException();
+                out.write((exportSnapshot==null?historyText():exportSnapshot).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                Toast.makeText(this,"记录已保存",Toast.LENGTH_SHORT).show();
+            } catch(Exception e) { Toast.makeText(this,"保存失败，请重新选择位置",Toast.LENGTH_LONG).show(); }
+        }
     }
     private String historyText() {
         JSONArray array=LabHistory.read(this); StringBuilder result=new StringBuilder();
@@ -234,11 +268,20 @@ public final class ExperimentalLabActivity extends Activity {
         return result.length()==0 ? "暂无记录" : result.toString();
     }
     private void renderHistory() {
-        String value=historyText(); if(!value.equals(lastHistory)) { history.setText(value); lastHistory=value; }
+        JSONArray events=LabHistory.read(this); String value=events.toString();
+        if(!value.equals(lastHistory)) { history.setEvents(events); lastHistory=value; }
     }
     private void exportHistory() {
-        Intent send=new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,historyText());
-        startActivity(Intent.createChooser(send,"导出守护记录"));
+        ViaUi.listDialog(this,"导出守护记录",new String[]{"分享文本","保存为 TXT 文件"},choice -> {
+            if(choice==0) {
+                Intent send=new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT,historyText());
+                startActivity(Intent.createChooser(send,"导出守护记录"));
+            } else {
+                exportSnapshot=historyText();
+                startActivityForResult(new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+                        .setType("text/plain").putExtra(Intent.EXTRA_TITLE,"守护记录-"+System.currentTimeMillis()+".txt"),74);
+            }
+        }).show();
     }
     private TextView text(String value,int size,int color) {
         TextView t=new TextView(this); t.setText(value); t.setTextSize(size); t.setTextColor(ViaUi.textColor(this,color)); return t;
@@ -275,7 +318,7 @@ public final class ExperimentalLabActivity extends Activity {
         if(pendingWatch) { pendingWatch=false; if(page==1) startWatch(); }
     }
     @Override protected void onPause() { visible=false; handler.removeCallbacks(refresh); stopAcoustic("离开页面，实验已停止"); super.onPause(); }
-    @Override protected void onSaveInstanceState(Bundle state) { state.putInt("page",page); super.onSaveInstanceState(state); }
+    @Override protected void onSaveInstanceState(Bundle state) { state.putInt("page",page); state.putString("export_snapshot",exportSnapshot); super.onSaveInstanceState(state); }
     @Override public void onBackPressed() { if(page!=0) showPage(0); else super.onBackPressed(); }
 
     private final class SignalView extends View {

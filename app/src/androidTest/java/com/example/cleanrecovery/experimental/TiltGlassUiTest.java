@@ -150,6 +150,66 @@ public class TiltGlassUiTest {
             snapshot("tilt-controls").recycle();
         } finally { main(() -> { lab.finish(); return null; }); }
     }
+    @Test public void baselineOptionsPreserveCalibrationAndLegacyPreferences() throws Exception {
+        main(() -> {
+            SharedPreferences store=context.getSharedPreferences(TiltGlassPrefs.NAME,0);
+            store.edit().clear().putBoolean("enabled",false).commit();
+            TiltGlassPrefs prefs=new TiltGlassPrefs(context);
+            assertEquals(TiltGlassPrefs.READING,prefs.baselineMode()); assertEquals(45,prefs.readingAngle());
+            // Existing versions saved these keys before mode selection existed.
+            store.edit().putBoolean("calibrated",true).putFloat("x",0).putFloat("y",9.81f).putFloat("z",0).commit();
+            assertEquals(TiltGlassPrefs.CUSTOM,prefs.baselineMode());
+            prefs.setBaselineMode(TiltGlassPrefs.HORIZONTAL);
+            assertArrayEquals(new float[]{0,0,9.81f},prefs.reference(),.001f);
+            prefs.setReadingAngle(60); assertEquals(TiltGlassPrefs.READING,prefs.baselineMode());
+            prefs.setBaselineMode(TiltGlassPrefs.CUSTOM);
+            assertArrayEquals(new float[]{0,9.81f,0},prefs.reference(),.001f);
+            assertEquals(60,new TiltGlassPrefs(context).readingAngle());
+            return null;
+        });
+    }
+    private SeekBar seekBar(View root) {
+        if(root instanceof SeekBar) return (SeekBar)root;
+        if(root instanceof ViewGroup) for(int i=0;i<((ViewGroup)root).getChildCount();i++) {
+            SeekBar found=seekBar(((ViewGroup)root).getChildAt(i)); if(found!=null) return found;
+        }
+        return null;
+    }
+    @Test public void angleSliderChangesBaselineAndHorizontalOptionRemainsAvailable() throws Exception {
+        Activity lab=launch(ExperimentalLabActivity.class);
+        try {
+            main(() -> { new TiltGlassPrefs(context).setReadingAngle(45); return null; });
+            click(lab,"倾斜渐进玻璃"); click(lab,"起始角度"); SystemClock.sleep(300);
+            main(() -> {
+                SeekBar seek=null;
+                for(View root:android.view.inspector.WindowInspector.getGlobalWindowViews()) {
+                    SeekBar found=seekBar(root); if(found!=null) seek=found;
+                }
+                assertNotNull(seek); assertEquals(90,seek.getMax());
+                for(int value:new int[]{90,0,60}) {
+                    float x=seek.getPaddingLeft()+(seek.getWidth()-seek.getPaddingLeft()-seek.getPaddingRight())*value/90f;
+                    long time=SystemClock.uptimeMillis();
+                    MotionEvent down=MotionEvent.obtain(time,time,MotionEvent.ACTION_DOWN,x,seek.getHeight()/2f,0);
+                    MotionEvent up=MotionEvent.obtain(time,time+40,MotionEvent.ACTION_UP,x,seek.getHeight()/2f,0);
+                    seek.dispatchTouchEvent(down); seek.dispatchTouchEvent(up); down.recycle(); up.recycle();
+                    assertEquals(value,new TiltGlassPrefs(context).readingAngle());
+                }
+                return null;
+            });
+            snapshot("tilt-angle-slider").recycle();
+            instrument.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK); SystemClock.sleep(200);
+            click(lab,"基准姿态"); SystemClock.sleep(200);
+            main(() -> {
+                View option=null;
+                for(View root:android.view.inspector.WindowInspector.getGlobalWindowViews()) {
+                    View found=text(root,"水平基准 · 屏幕朝上平放（0°）"); if(found!=null) option=found;
+                }
+                assertNotNull(option); while(!option.isClickable()) option=(View)option.getParent(); option.performClick();
+                assertEquals(TiltGlassPrefs.HORIZONTAL,new TiltGlassPrefs(context).baselineMode());
+                assertEquals(60,new TiltGlassPrefs(context).readingAngle()); return null;
+            });
+        } finally { main(() -> { lab.finish(); return null; }); }
+    }
     @Test public void screenRotationRemapsGravity() {
         float[] g={2,3,9};
         assertArrayEquals(new float[]{2,3,9},TiltGlassController.remap(g,Surface.ROTATION_0),.001f);

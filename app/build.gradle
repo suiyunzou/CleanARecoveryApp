@@ -74,6 +74,10 @@ android {
 }
 
 dependencies {
+    implementation "com.google.mlkit:face-detection:16.1.7"
+    implementation "androidx.camera:camera-camera2:1.4.2"
+    implementation "androidx.camera:camera-lifecycle:1.4.2"
+    implementation "androidx.camera:camera-view:1.4.2"
     implementation "io.github.junkfood02.youtubedl-android:library:0.18.1"
     implementation "io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1"
     implementation "androidx.core:core:1.13.1"

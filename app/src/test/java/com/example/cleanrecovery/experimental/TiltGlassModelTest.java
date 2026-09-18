@@ -42,6 +42,29 @@ public class TiltGlassModelTest {
         assertEquals(1,TiltGlassModel.direction(TiltGlassModel.relativeNormal(turned,normal),flat).amount(),.0001f);
         for(int i=6;i<9;i++) assertEquals(upright[i],turned[i],0);
     }
+    private float[] posture(double degrees,double yaw) {
+        double a=Math.toRadians(degrees),b=Math.toRadians(yaw);
+        float c=(float)Math.cos(a),s=(float)Math.sin(a),u=(float)Math.cos(b),v=(float)Math.sin(b);
+        return new float[]{u,-v*c,v*s,v,u*c,-u*s,0,s,c};
+    }
+    @Test public void selectedInclinationIsClearRegardlessOfInitialCompassHeading() {
+        for(int angle:new int[]{0,15,45,60,90}) for(int yaw:new int[]{0,90,180,270}) {
+            float[] matrix=posture(angle,yaw);
+            float[] reference=TiltGlassModel.readingNormal(matrix,new float[]{0,1,0},angle);
+            assertEquals(0,TiltGlassModel.direction(TiltGlassModel.relativeNormal(matrix,reference),flat).amount(),.001f);
+        }
+    }
+    @Test public void fullBlurIsRelativeToSelectedAngleRatherThanHorizontal() {
+        float[] reference=TiltGlassModel.readingNormal(posture(45,0),new float[]{0,1,0},45);
+        assertEquals(42/87f,TiltGlassModel.direction(TiltGlassModel.relativeNormal(posture(90,0),reference),flat).amount(),.001f);
+        assertEquals(1,TiltGlassModel.direction(TiltGlassModel.relativeNormal(posture(135,0),reference),flat).amount(),.001f);
+        assertEquals(0,TiltGlassModel.direction(TiltGlassModel.relativeNormal(posture(45,0),reference),flat).amount(),.001f);
+    }
+    @Test public void fallbackReferenceMatchesReadingAngleAndHorizontalEndpoint() {
+        assertArrayEquals(flat,TiltGlassModel.readingGravity(0),.001f);
+        assertArrayEquals(new float[]{0,9.81f,0},TiltGlassModel.readingGravity(90),.001f);
+        assertEquals(0,TiltGlassModel.direction(gravityAt(45,90),TiltGlassModel.readingGravity(45)).amount(),.001f);
+    }
     private float[] gravityAt(double degrees,double azimuth) {
         double a=Math.toRadians(degrees),b=Math.toRadians(azimuth);
         return new float[]{(float)(9.81*Math.sin(a)*Math.cos(b)),(float)(9.81*Math.sin(a)*Math.sin(b)),(float)(9.81*Math.cos(a))};

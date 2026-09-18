@@ -14,4 +14,6 @@
     <cache-path
         name="cache"
         path="share/" />
+    <files-path name="selfie_photos" path="selfies/" />
+    <files-path name="wave_photos" path="wave-photos/" />
 </paths>

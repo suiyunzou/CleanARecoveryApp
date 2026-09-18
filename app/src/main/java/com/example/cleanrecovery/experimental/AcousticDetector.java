@@ -11,10 +11,13 @@ public final class AcousticDetector {
         Result(State state, float energy, double carrier) { this.state=state; this.energy=energy; this.carrier=carrier; }
     }
     private int frames, consecutive, direction;
+    private final long gestureInterval;
     private double baselineLow, baselineHigh;
     private long lastGesture = -1000;
     private final double[] window = new double[SIZE];
-    public AcousticDetector() {
+    public AcousticDetector() { this(700); }
+    public AcousticDetector(long interval) {
+        gestureInterval=interval;
         for (int i=0; i<SIZE; i++) window[i] = .5-.5*Math.cos(2*Math.PI*i/(SIZE-1));
     }
     public Result accept(short[] samples, long ms) {
@@ -46,7 +49,7 @@ public final class AcousticDetector {
         } else {
             consecutive = candidate == direction ? consecutive+1 : 1;
             direction = candidate;
-            if (consecutive >= 2 && ms-lastGesture >= 700) {
+            if (consecutive >= 2 && ms-lastGesture >= gestureInterval) {
                 lastGesture=ms; consecutive=0;
                 return new Result(candidate>0 ? State.TOWARD : State.AWAY, strength, carrier);
             }
