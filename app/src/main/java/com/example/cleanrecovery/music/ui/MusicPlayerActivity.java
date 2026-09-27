@@ -117,7 +117,6 @@ public final class MusicPlayerActivity extends Activity implements MusicPlayer.C
         super.onCreate(savedInstanceState);
         SystemUiHelper.apply(this);
         setContentView(R.layout.activity_music_player);
-        requestNotificationPermissionIfNeeded();
         app = MusicApp.init(this);
         app.player.addCallback(this);
         // 定时到点提示（进程级定时器在 MusicPlayer 内，页面销毁不失效）
@@ -137,15 +136,6 @@ public final class MusicPlayerActivity extends Activity implements MusicPlayer.C
         maybeLoadLyrics();
     }
 
-    /** Android 13+ 需要运行时通知权限,媒体通知卡片才能在状态栏显示。 */
-    private void requestNotificationPermissionIfNeeded() {
-        if (android.os.Build.VERSION.SDK_INT >= 33
-                && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
-                        != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 100);
-        }
-    }
-
     @Override
     protected void onResume() {
         super.onResume();
@@ -157,6 +147,14 @@ public final class MusicPlayerActivity extends Activity implements MusicPlayer.C
         ui.removeCallbacks(wordProgress);
         lyricsView.removeCallbacks(wordProgress);
         ui.post(wordProgress);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == DesktopLyricsDialog.PERMISSION_REQUEST) {
+            DesktopLyricsDialog.permissionReturned(this);
+        }
     }
 
     @Override
@@ -1408,11 +1406,13 @@ public final class MusicPlayerActivity extends Activity implements MusicPlayer.C
 
         LinearLayout row2 = new LinearLayout(this);
         row2.setPadding(0, dp(24), 0, 0);
-        row2.addView(moreGridItem(R.drawable.ic_more_feedback_filled,
-                getString(R.string.music_more_feedback), null, () -> {
+        row2.addView(moreGridItem(R.drawable.ic_more_desktop_lyrics,
+                getString(R.string.music_desktop_lyrics),
+                getString(com.example.cleanrecovery.music.player.DesktopLyricsSettings.get(this)
+                        .getBoolean(com.example.cleanrecovery.music.player.DesktopLyricsSettings.ENABLED, false)
+                        ? R.string.desktop_lyrics_on : R.string.desktop_lyrics_off), () -> {
                     dialog.dismiss();
-                    GlassToast.makeText(this, R.string.music_more_feedback_todo,
-                            GlassToast.LENGTH_SHORT).show();
+                    DesktopLyricsDialog.show(this);
                 }));
         row2.addView(moreGridItem(R.drawable.ic_more_headphones_filled,
                 getString(R.string.music_more_quality),
@@ -1722,22 +1722,13 @@ public final class MusicPlayerActivity extends Activity implements MusicPlayer.C
         currentLyrics = Lyrics.empty();
         renderLyrics(currentLyrics);
         final SongInfo loadingSong = song;
-        lyricsExecutor.execute(() -> {
-            Lyrics result;
-            try {
-                result = app.dataSource.getLyrics(loadingSong);
-            } catch (Exception exception) {
-                result = Lyrics.empty();
-            }
-            Lyrics finalResult = result;
-            ui.post(() -> {
-                if (isDestroyed() || requestId != lyricsRequestId) return;
-                loadedLyricsHash = loadingSong.hash;
-                currentLyrics = finalResult;
-                renderLyrics(finalResult);
-                lyricsView.updatePosition(app.player.getCurrentPosition());
-                updateLyricSummary(app.player.getCurrentPosition());
-            });
+        app.lyrics.load(loadingSong, (result, failed) -> {
+            if (isDestroyed() || requestId != lyricsRequestId) return;
+            loadedLyricsHash = loadingSong.hash;
+            currentLyrics = result;
+            renderLyrics(result);
+            lyricsView.updatePosition(app.player.getCurrentPosition());
+            updateLyricSummary(app.player.getCurrentPosition());
         });
         lyricsExecutor.execute(() -> {
             long start = -1;

@@ -8,6 +8,8 @@ import android.content.SharedPreferences;
 public final class ScanHistoryStore {
     private static final String PREFS = "clean_recovery_scan_history";
 
+    private static final int PERMISSION_SETUP_VERSION = 1;
+    private static final String KEY_PERMISSION_SETUP_VERSION = "permission_setup_version";
     private static final String KEY_ONBOARDING_DONE = "onboarding_done";
     private static final String KEY_LAST_SCAN_TIME_MS = "last_scan_time_ms";
     private static final String KEY_LAST_SCANNED_COUNT = "last_scanned_count";
@@ -70,11 +72,14 @@ public final class ScanHistoryStore {
     }
 
     public static boolean isOnboardingComplete(Context context) {
-        return prefs(context).getBoolean(KEY_ONBOARDING_DONE, false);
+        SharedPreferences preferences = prefs(context);
+        return preferences.getBoolean(KEY_ONBOARDING_DONE, false)
+                && preferences.getInt(KEY_PERMISSION_SETUP_VERSION, 0) >= PERMISSION_SETUP_VERSION;
     }
 
     public static void setOnboardingComplete(Context context) {
-        prefs(context).edit().putBoolean(KEY_ONBOARDING_DONE, true).apply();
+        prefs(context).edit().putBoolean(KEY_ONBOARDING_DONE, true)
+                .putInt(KEY_PERMISSION_SETUP_VERSION, PERMISSION_SETUP_VERSION).apply();
     }
 
     public static Snapshot read(Context context) {

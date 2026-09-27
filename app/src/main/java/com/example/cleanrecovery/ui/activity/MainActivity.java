@@ -159,12 +159,10 @@ public final class MainActivity extends Activity {
 
         // 开屏内容：按「设置→启动后显示」冷启动路由（默认音乐不跳）。
         // 首启引导：onboarding 已完成的老用户直接弹；未完成的等 onboarding 结束再弹。
-        if (savedInstanceState == null) {
-            if (AppStartup.choiceMade(this)) {
-                AppStartup.routeIfConfigured(this);
-            } else if (ScanHistoryStore.isOnboardingComplete(this)) {
-                AppStartup.maybeShowFirstRunChoice(this);
-            }
+        if (ScanHistoryStore.isOnboardingComplete(this)
+                && !getIntent().getBooleanExtra("module_switch", false)) {
+            if (!AppStartup.choiceMade(this)) AppStartup.maybeShowFirstRunChoice(this);
+            else if (savedInstanceState == null) AppStartup.routeIfConfigured(this);
         }
         handleNavIntent(getIntent());
         // 初始化应用工作目录并异步清理过期回收站条目（>30 天）
@@ -276,7 +274,8 @@ public final class MainActivity extends Activity {
             refreshHome();
             // onboarding 完成后引导一次「启动后显示」
             if (resultCode == RESULT_OK) {
-                AppStartup.maybeShowFirstRunChoice(this);
+                if (AppStartup.choiceMade(this)) AppStartup.routeIfConfigured(this);
+                else AppStartup.maybeShowFirstRunChoice(this);
             }
         } else if (requestCode == REQUEST_RESTORE_TRASH) {
             handleTrashRestoreResult(resultCode);

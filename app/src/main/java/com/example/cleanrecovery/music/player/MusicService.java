@@ -47,11 +47,13 @@ public class MusicService extends Service implements MusicPlayer.Callback {
     public static final String ACTION_NEXT = "com.example.cleanrecovery.music.NEXT";
     public static final String ACTION_PREV = "com.example.cleanrecovery.music.PREV";
     public static final String ACTION_CLOSE = "com.example.cleanrecovery.music.CLOSE";
+    public static final String ACTION_UNLOCK_LYRICS = "com.example.cleanrecovery.music.UNLOCK_LYRICS";
 
     private static final String CHANNEL_ID = "music_playback_channel";
     private static final int NOTIFICATION_ID = 1001;
 
     private MusicPlayer player;
+    private DesktopLyricsController desktopLyrics;
     private NotificationManager notificationManager;
     private MediaSessionCompat mediaSession;
     private android.os.PowerManager.WakeLock transitionWakeLock;
@@ -73,12 +75,17 @@ public class MusicService extends Service implements MusicPlayer.Callback {
         transitionWakeLock = power.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK,
                 getPackageName() + ":music-transition");
         transitionWakeLock.setReferenceCounted(false);
+        desktopLyrics = new DesktopLyricsController(this, this::updateNotification);
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && intent.getAction() != null) {
             switch (intent.getAction()) {
+                case ACTION_UNLOCK_LYRICS:
+                    DesktopLyricsSettings.get(this).edit()
+                            .putBoolean(DesktopLyricsSettings.LOCKED, false).apply();
+                    break;
                 case ACTION_TOGGLE:
                     player.toggle();
                     break;
@@ -100,6 +107,7 @@ public class MusicService extends Service implements MusicPlayer.Callback {
 
     @Override
     public void onDestroy() {
+        if (desktopLyrics != null) desktopLyrics.close();
         player.removeCallback(this);
         coverExecutor.shutdownNow();
         if (mediaSession != null) {
@@ -118,6 +126,7 @@ public class MusicService extends Service implements MusicPlayer.Callback {
 
     /** 关闭播放器通知:暂停保留队列,撤销通知与前台状态,停服务。 */
     private void closePlayback() {
+        DesktopLyricsSettings.get(this).edit().putBoolean(DesktopLyricsSettings.ENABLED, false).apply();
         player.pause();
         notificationShowing = false;
         notificationManager.cancel(NOTIFICATION_ID);
@@ -171,6 +180,14 @@ public class MusicService extends Service implements MusicPlayer.Callback {
             public void onStop() {
                 closePlayback();
             }
+
+            @Override
+            public void onCustomAction(String action, android.os.Bundle extras) {
+                if (ACTION_UNLOCK_LYRICS.equals(action)) {
+                    DesktopLyricsSettings.get(MusicService.this).edit()
+                            .putBoolean(DesktopLyricsSettings.LOCKED, false).apply();
+                }
+            }
         });
         mediaSession.setActive(true);
         syncPlaybackState();
@@ -188,6 +205,11 @@ public class MusicService extends Service implements MusicPlayer.Callback {
                         | PlaybackStateCompat.ACTION_STOP)
                 .setState(playing ? PlaybackStateCompat.STATE_PLAYING : PlaybackStateCompat.STATE_PAUSED,
                         position, playing ? 1f : 0f);
+        // Android 13+ derives media buttons from PlaybackState rather than notification actions.
+        if (DesktopLyricsSettings.get(this).getBoolean(DesktopLyricsSettings.ENABLED, false)) {
+            psb.addCustomAction(ACTION_UNLOCK_LYRICS, getString(R.string.desktop_lyrics_unlock),
+                    R.drawable.ic_more_desktop_lyrics);
+        }
         mediaSession.setPlaybackState(psb.build());
     }
 
@@ -251,6 +273,10 @@ public class MusicService extends Service implements MusicPlayer.Callback {
                         .setMediaSession(mediaSession.getSessionToken())
                         .setShowActionsInCompactView(0, 1, 2));
 
+        if (DesktopLyricsSettings.get(this).getBoolean(DesktopLyricsSettings.ENABLED, false)) {
+            builder.addAction(R.drawable.ic_more_desktop_lyrics, getString(R.string.desktop_lyrics_unlock),
+                    servicePending(ACTION_UNLOCK_LYRICS, 5));
+        }
         if (keepForeground) {
             startForeground(NOTIFICATION_ID, builder.build());
         } else {
