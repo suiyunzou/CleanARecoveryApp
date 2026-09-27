@@ -23,6 +23,7 @@ public final class MusicApp {
 
     public final IAuthService auth;
     public final KugouDataSource dataSource;
+    public final com.example.cleanrecovery.music.data.LyricsRepository lyrics;
     public final PlaylistStore playlists;
     public final DownloadStore downloadStore;
     public final DownloadManager downloads;
@@ -48,6 +49,9 @@ public final class MusicApp {
         } catch (Exception ignored) {
         }
         dataSource = new KugouDataSource();
+        android.os.Handler lyricDelivery = new android.os.Handler(android.os.Looper.getMainLooper());
+        lyrics = new com.example.cleanrecovery.music.data.LyricsRepository(dataSource::getLyrics,
+                Executors.newFixedThreadPool(2), command -> lyricDelivery.post(command));
         playlists = new PlaylistStore(ctx);
         downloadStore = new DownloadStore(ctx);
         downloads = new DownloadManager(ctx, dataSource, downloadStore);

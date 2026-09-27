@@ -13,6 +13,7 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <!-- P0 A1: 后台下载服务使用 dataSync 类型前台服务，避免下载中被系统杀死 -->
@@ -67,6 +68,7 @@
             android:exported="false" />
         <activity
             android:name=".ui.activity.OnboardingActivity"
+            android:theme="@style/PermissionSheetTheme"
             android:exported="false" />
         <activity android:name=".ui.activity.AppAboutActivity" android:exported="false" />
         <activity
